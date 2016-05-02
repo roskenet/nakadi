@@ -420,7 +420,7 @@ paths:
           format: flow-id
       responses:
         '200':
-          description: Ok
+          description: A JSON with the schema used for validating events.
         '401':
           description: Client is not authenticated
           schema:
