@@ -484,7 +484,7 @@ public class EventTypeControllerTest {
 
         when(eventTypeRepository.findByName(eventType.getName())).thenReturn(eventType);
 
-        final MockHttpServletRequestBuilder requestBuilder = get("/event-types/" + eventType.getName() + "/effective_schema").accept(
+        final MockHttpServletRequestBuilder requestBuilder = get("/event-types/" + eventType.getName() + "/effective-schema").accept(
                 APPLICATION_JSON);
 
         mockMvc.perform(requestBuilder).andExpect(status().is(200))
@@ -500,7 +500,7 @@ public class EventTypeControllerTest {
 
         when(eventTypeRepository.findByName(eventType.getName())).thenReturn(eventType);
 
-        final MockHttpServletRequestBuilder requestBuilder = get("/event-types/" + eventType.getName() + "/effective_schema").accept(
+        final MockHttpServletRequestBuilder requestBuilder = get("/event-types/" + eventType.getName() + "/effective-schema").accept(
                 APPLICATION_JSON);
 
         mockMvc.perform(requestBuilder).andExpect(status().is(200))
@@ -516,7 +516,7 @@ public class EventTypeControllerTest {
         Mockito.doThrow(new NoSuchEventTypeException("dummy message")).when(eventTypeRepository).findByName(
                 eventTypeName);
 
-        final MockHttpServletRequestBuilder requestBuilder = get("/event-types/" + eventTypeName + "/effective_schema").
+        final MockHttpServletRequestBuilder requestBuilder = get("/event-types/" + eventTypeName + "/effective-schema").
                 accept(APPLICATION_JSON);
 
         mockMvc.perform(requestBuilder)
