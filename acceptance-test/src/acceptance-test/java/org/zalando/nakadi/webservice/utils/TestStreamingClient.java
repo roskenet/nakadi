@@ -51,7 +51,7 @@ public class TestStreamingClient {
     private final Optional<String> bodyParams;
     private volatile int responseCode;
     private Consumer<List<StreamBatch>> batchesListener;
-    private final CountDownLatch started = new CountDownLatch(1);
+    private CountDownLatch responseReceived;
 
     public TestStreamingClient(final String baseUrl, final String subscriptionId, final String params,
                                final Optional<String> token, final Optional<String> bodyParams) {
@@ -85,19 +85,22 @@ public class TestStreamingClient {
         return new TestStreamingClient(BaseAT.URL, subscriptionId, "");
     }
 
-    private TestStreamingClient startInternal(final boolean wait,
-                                              final Runnable action)
+    private TestStreamingClient startInternal(final Runnable action)
             throws InterruptedException {
         if (!running) {
             running = true;
+            responseReceived = new CountDownLatch(1);
+
             jsonBatches.clear();
             binaryBatches.clear();
             headers.clear();
+
             final Thread thread = new Thread(action);
             thread.start();
-            if (wait) {
-                started.await();
-            }
+
+            LOG.info("Awaiting open stream response...");
+            responseReceived.await();
+
             return this;
         } else {
             throw new IllegalStateException("Client has not yet finished with previous run");
@@ -106,7 +109,7 @@ public class TestStreamingClient {
 
     public TestStreamingClient start() {
         try {
-            return startInternal(false, new JsonConsumer((ignore) -> {}));
+            return startInternal(new JsonConsumer((ignore) -> {}));
         } catch (final InterruptedException ignore) {
             throw new RuntimeException(ignore);
         }
@@ -114,7 +117,7 @@ public class TestStreamingClient {
 
     public TestStreamingClient start(final Consumer<StreamBatch> onBatch) {
         try {
-            return startInternal(false, new JsonConsumer(onBatch));
+            return startInternal(new JsonConsumer(onBatch));
         } catch (final InterruptedException ignore) {
             throw new RuntimeException(ignore);
         }
@@ -122,7 +125,7 @@ public class TestStreamingClient {
 
     public TestStreamingClient startBinary() {
         try {
-            return startInternal(false, new BinaryConsumer());
+            return startInternal(new BinaryConsumer());
         } catch (final InterruptedException ignore) {
             throw new RuntimeException(ignore);
         }
@@ -131,7 +134,7 @@ public class TestStreamingClient {
     public TestStreamingClient startWithAutocommit(final Consumer<List<StreamBatch>> batchesListener)
             throws InterruptedException {
         this.batchesListener = batchesListener;
-        final TestStreamingClient client = startInternal(true, new JsonConsumer((ignore)->{}));
+        final TestStreamingClient client = start();
         final Thread autocommitThread = new Thread(() -> {
             int oldIdx = 0;
             while (client.isRunning()) {
@@ -245,10 +248,12 @@ public class TestStreamingClient {
                         .filter(entry -> entry.getKey() != null)
                         .forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
                 connection.setReadTimeout(10);
+
+                responseReceived.countDown();
+
                 if (responseCode != HttpURLConnection.HTTP_OK) {
                     throw new IOException("Response code is " + responseCode);
                 }
-                started.countDown();
                 sessionId = connection.getHeaderField("X-Nakadi-StreamId");
                 try (InputStream inputStream = connection.getInputStream()) {
                     readBatches(inputStream);
