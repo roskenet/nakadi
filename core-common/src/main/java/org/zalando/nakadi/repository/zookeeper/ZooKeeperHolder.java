@@ -53,7 +53,8 @@ public class ZooKeeperHolder {
 
     CuratorFramework newCuratorFramework() throws ZookeeperException {
         try {
-            return createCuratorFramework(sessionTimeoutMs, connectionTimeoutMs);
+            // max commit timeout is not higher than 60 seconds, it is safe to cast to integer
+            return createCuratorFramework((int) maxCommitTimeoutMs, connectionTimeoutMs);
         } catch (final Exception e) {
             throw new ZookeeperException("Failed to create curator framework", e);
         }
