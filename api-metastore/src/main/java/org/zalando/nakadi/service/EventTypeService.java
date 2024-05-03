@@ -190,10 +190,9 @@ public class EventTypeService {
 
         validateOwningApplication(null, eventType.getOwningApplication());
 
-        validateEventOwnerSelector(eventType);
-
         presetAnnotationsAndLabels(eventType);
         eventTypeAnnotationsValidator.validateAnnotations(null, eventType);
+        validateEventOwnerSelector(eventType);
 
         final AtomicReference<EventType> createdEventType = new AtomicReference<>(null);
         final AtomicReference<Timeline> createdTimeline = new AtomicReference<>(null);
@@ -452,12 +451,11 @@ public class EventTypeService {
             }
 
             authorizationValidator.authorizeEventTypeView(original);
-            if (!adminService.isAdmin(AuthorizationService.Operation.WRITE)) {
+            final var isAdmin = adminService.isAdmin(AuthorizationService.Operation.WRITE);
+            if (!isAdmin) {
                 eventTypeOptionsValidator.checkRetentionTime(eventTypeBase.getOptions());
                 authorizationValidator.authorizeEventTypeAdmin(original);
-                validateEventOwnerSelectorUnchanged(original, eventTypeBase);
             }
-            validateEventOwnerSelector(eventTypeBase);
 
             authorizationValidator.validateAuthorization(original.asResource(), eventTypeBase.asBaseResource());
             validateName(eventTypeName, eventTypeBase);
@@ -470,6 +468,11 @@ public class EventTypeService {
             validateStatisticsUpdate(original, eventType);
             updateAnnotationsAndLabels(original, eventType);
             eventTypeAnnotationsValidator.validateAnnotations(original, eventTypeBase);
+            if (!isAdmin) {
+                validateEventOwnerSelectorUnchanged(original, eventTypeBase);
+            }
+            validateEventOwnerSelector(eventTypeBase);
+
             updateRetentionTime(original, eventType);
             updateEventType(original, eventType);
         } catch (final InterruptedException e) {
