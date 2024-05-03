@@ -20,7 +20,8 @@ import java.util.regex.Pattern;
 
 @Component
 public class EventTypeAnnotationsValidator {
-    static final String DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION = "compliance.zalando.org/aspd-classification";
+    public static final String DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION =
+            "compliance.zalando.org/aspd-classification";
 
     private static final Pattern DATA_LAKE_ANNOTATIONS_PERIOD_PATTERN = Pattern.compile(
             "^(unlimited|(([7-9]|[1-9]\\d{1,2}|[1-2]\\d{3}|3[0-5]\\d{2}|36[0-4]\\d|3650)((\\sdays?)|(d)))" +
