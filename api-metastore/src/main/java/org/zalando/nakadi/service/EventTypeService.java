@@ -90,8 +90,10 @@ public class EventTypeService {
 
     private static final Map<String, List<String>> ALLOWED_EOS_NAMES_BY_ASPD_DATA_CLASSIFICATION = Map.of(
             "none", Collections.emptyList(),
-            "aspd", List.of("merchant_id"),
-            "mcf-aspd", List.of("retailer_id", "merchant_id"));
+            // TODO: the below two data classifications might support merchant_id event-level discriminator
+            //  in the future.
+            "aspd", Collections.emptyList(),
+            "mcf-aspd", List.of("retailer_id"));
 
     private final EventTypeRepository eventTypeRepository;
     private final TimelineService timelineService;
