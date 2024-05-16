@@ -20,6 +20,9 @@ import java.util.regex.Pattern;
 
 @Component
 public class EventTypeAnnotationsValidator {
+    public static final String DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION =
+            "compliance.zalando.org/aspd-classification";
+
     private static final Pattern DATA_LAKE_ANNOTATIONS_PERIOD_PATTERN = Pattern.compile(
             "^(unlimited|(([7-9]|[1-9]\\d{1,2}|[1-2]\\d{3}|3[0-5]\\d{2}|36[0-4]\\d|3650)((\\sdays?)|(d)))" +
                     "|(([1-9][0-9]?|[1-4][0-9]{2}|5([0-1][0-9]|2[0-1]))((\\sweeks?)|(w)))|" +
@@ -52,7 +55,24 @@ public class EventTypeAnnotationsValidator {
                 null : Optional.ofNullable(oldEventType.getAnnotations()).orElseGet(Collections::emptyMap);
         final var newAnnotations = Optional.ofNullable(newEventType.getAnnotations())
                 .orElseGet(Collections::emptyMap);
+        validateDataComplianceAnnotations(newAnnotations);
         validateDataLakeAnnotations(oldAnnotations, newAnnotations);
+    }
+
+    @VisibleForTesting
+    void validateDataComplianceAnnotations(
+            @NotNull final Map<String, String> annotations) {
+
+        final var aspdClassification = annotations.get(DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
+        if (aspdClassification != null) {
+            if (!List.of("none", "aspd", "mcf-aspd").contains(aspdClassification)) {
+                throw new InvalidEventTypeException(
+                        "Annotation " + DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION
+                                + " is not valid. Provided value: \""
+                                + aspdClassification
+                                + "\". Possible values are: \"none\" or \"aspd\" or \"mcf-aspd\".");
+            }
+        }
     }
 
     @VisibleForTesting

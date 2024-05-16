@@ -67,15 +67,18 @@ import org.zalando.nakadi.view.EventOwnerSelector;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.google.common.base.Preconditions.checkState;
 import static org.zalando.nakadi.domain.Feature.DELETE_EVENT_TYPE_WITH_SUBSCRIPTIONS;
 import static org.zalando.nakadi.domain.Feature.FORCE_EVENT_TYPE_AUTHZ;
 
@@ -84,6 +87,13 @@ import static org.zalando.nakadi.domain.Feature.FORCE_EVENT_TYPE_AUTHZ;
 public class EventTypeService {
 
     private static final Logger LOG = LoggerFactory.getLogger(EventTypeService.class);
+
+    private static final Map<String, List<String>> ALLOWED_EOS_NAMES_BY_ASPD_DATA_CLASSIFICATION = Map.of(
+            "none", Collections.emptyList(),
+            // TODO: the below two data classifications might support merchant_id event-level discriminator
+            //  in the future.
+            "aspd", Collections.emptyList(),
+            "mcf-aspd", List.of("retailer_id"));
 
     private final EventTypeRepository eventTypeRepository;
     private final TimelineService timelineService;
@@ -190,10 +200,9 @@ public class EventTypeService {
 
         validateOwningApplication(null, eventType.getOwningApplication());
 
-        validateEventOwnerSelector(eventType);
-
         presetAnnotationsAndLabels(eventType);
         eventTypeAnnotationsValidator.validateAnnotations(null, eventType);
+        validateEventOwnerSelector(eventType);
 
         final AtomicReference<EventType> createdEventType = new AtomicReference<>(null);
         final AtomicReference<Timeline> createdTimeline = new AtomicReference<>(null);
@@ -452,12 +461,11 @@ public class EventTypeService {
             }
 
             authorizationValidator.authorizeEventTypeView(original);
-            if (!adminService.isAdmin(AuthorizationService.Operation.WRITE)) {
+            final var isAdmin = adminService.isAdmin(AuthorizationService.Operation.WRITE);
+            if (!isAdmin) {
                 eventTypeOptionsValidator.checkRetentionTime(eventTypeBase.getOptions());
                 authorizationValidator.authorizeEventTypeAdmin(original);
-                validateEventOwnerSelectorUnchanged(original, eventTypeBase);
             }
-            validateEventOwnerSelector(eventTypeBase);
 
             authorizationValidator.validateAuthorization(original.asResource(), eventTypeBase.asBaseResource());
             validateName(eventTypeName, eventTypeBase);
@@ -470,6 +478,11 @@ public class EventTypeService {
             validateStatisticsUpdate(original, eventType);
             updateAnnotationsAndLabels(original, eventType);
             eventTypeAnnotationsValidator.validateAnnotations(original, eventTypeBase);
+            if (!isAdmin) {
+                validateEventOwnerSelectorUnchanged(original, eventType);
+            }
+            validateEventOwnerSelector(eventType);
+
             updateRetentionTime(original, eventType);
             updateEventType(original, eventType);
         } catch (final InterruptedException e) {
@@ -650,13 +663,39 @@ public class EventTypeService {
         }
     }
 
+    // TODO: taking into account that this is coupled with authorization,
+    //  this should be encapsulated in a relevant component.
     static void validateEventOwnerSelector(final EventTypeBase eventType) {
+        checkState(eventType.getAnnotations() != null, "annotations map must be preset on the event type");
+        final String dataClassification = eventType.getAnnotations()
+                .get(EventTypeAnnotationsValidator.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
         final EventOwnerSelector selector = eventType.getEventOwnerSelector();
         if (selector != null) {
             if (selector.getType() == EventOwnerSelector.Type.METADATA && selector.getValue() != null) {
                 throw new InvalidEventTypeException(
                         "event_owner_selector specifying value for type 'metadata' is not supported");
             }
+        }
+        if (dataClassification == null) {
+            // TODO: this is for backwards compatibility. Although we already could add some restrictions.
+            return;
+        }
+
+        final var allowedSelectors = ALLOWED_EOS_NAMES_BY_ASPD_DATA_CLASSIFICATION.get(dataClassification);
+        checkState(allowedSelectors != null, "not implemented (case: " + dataClassification + ")");
+
+        if (selector != null && !allowedSelectors.contains(selector.getName())) {
+            final String errorMessage;
+            if (allowedSelectors.isEmpty()) {
+                errorMessage = String.format(
+                        "\"%s\" data classification with event_owner_selector is not allowed",
+                        dataClassification);
+            } else {
+                errorMessage = String.format(
+                        "\"%s\" data classification is compatible with event_owner_selector.name in {%s} set only",
+                        dataClassification, String.join(", ", allowedSelectors));
+            }
+            throw new InvalidEventTypeException(errorMessage);
         }
     }
 

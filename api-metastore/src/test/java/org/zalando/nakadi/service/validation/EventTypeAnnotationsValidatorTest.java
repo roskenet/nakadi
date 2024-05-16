@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,7 +13,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.zalando.nakadi.domain.Feature;
 import org.zalando.nakadi.exceptions.runtime.InvalidEventTypeException;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
@@ -35,6 +37,29 @@ public class EventTypeAnnotationsValidatorTest {
         authorizationService = mock(AuthorizationService.class);
         validator = new EventTypeAnnotationsValidator(
             featureToggleService, authorizationService, Collections.singletonList(A_TEST_APPLICATION));
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"none", "aspd", "mcf-aspd"})
+    public void testValidDataComplianceAnnotations(@Nullable final String value) {
+        final Map<String, String> annotations = value != null ?
+                Map.of(EventTypeAnnotationsValidator.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, value) :
+                Collections.emptyMap();
+        validator.validateDataComplianceAnnotations(annotations);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"NONE", "ASPD", "MCF-ASPD", "mcf_aspd"})
+    public void testInvalidDataComplianceAnnotations(final String value) {
+        final Map<String, String> annotations =
+                Map.of(EventTypeAnnotationsValidator.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, value);
+
+        final var exception = assertThrows(
+                InvalidEventTypeException.class,
+                () -> validator.validateDataComplianceAnnotations(annotations));
+        Assertions.assertThat(exception.getMessage())
+                .contains(EventTypeAnnotationsValidator.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
     }
 
     @ParameterizedTest
