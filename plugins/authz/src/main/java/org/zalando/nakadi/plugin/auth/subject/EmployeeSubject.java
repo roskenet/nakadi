@@ -25,8 +25,8 @@ public class EmployeeSubject extends UidSubject {
         this.teamService = teamService;
     }
 
-
-    public boolean isAuthorized(
+    @Override
+    protected boolean isOperationAllowed(
             final String resourceType,
             final AuthorizationService.Operation operation,
             final Optional<List<AuthorizationAttribute>> attributes) {
@@ -45,7 +45,6 @@ public class EmployeeSubject extends UidSubject {
 
         allAttributes.addAll(teamMembers);
 
-        return super.isAuthorized(resourceType, operation, Optional.of(allAttributes));
-
+        return super.isOperationAllowed(resourceType, operation, Optional.of(allAttributes));
     }
 }

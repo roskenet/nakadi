@@ -35,7 +35,8 @@ public class UidSubject extends Principal {
                 " does not support business partners");
     }
 
-    public boolean isAuthorized(
+    @Override
+    protected boolean isOperationAllowed(
             final String resourceType,
             final AuthorizationService.Operation operation,
             final Optional<List<AuthorizationAttribute>> attributes) {
