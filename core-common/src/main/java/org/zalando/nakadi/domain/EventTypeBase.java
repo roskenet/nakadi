@@ -9,7 +9,6 @@ import org.zalando.nakadi.annotations.validation.LabelKey;
 import org.zalando.nakadi.annotations.validation.LabelValue;
 import org.zalando.nakadi.partitioning.PartitionStrategy;
 import org.zalando.nakadi.plugin.api.authz.EventTypeAuthz;
-import org.zalando.nakadi.plugin.api.authz.Resource;
 import org.zalando.nakadi.view.EventOwnerSelector;
 
 import javax.annotation.Nullable;
@@ -294,11 +293,6 @@ public class EventTypeBase implements EventTypeAuthz {
     @Override
     public String getAuthCleanupPolicy() {
         return this.cleanupPolicy.toString();
-    }
-
-    @JsonIgnore
-    public Resource<EventTypeAuthz> asResource() {
-        return new ResourceImpl<>(getName(), ResourceImpl.EVENT_TYPE_RESOURCE, getAuthorization(), this);
     }
 
     public void setAnnotations(final Map<String, String> annotations) {

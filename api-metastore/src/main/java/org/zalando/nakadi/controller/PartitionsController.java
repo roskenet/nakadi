@@ -48,6 +48,8 @@ import static org.springframework.http.ResponseEntity.noContent;
 import javax.annotation.Nullable;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.emptyList;
+import static org.zalando.nakadi.service.auth.AuthorizationResourceMapping.mapToResource;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -284,7 +286,7 @@ public class PartitionsController {
             @RequestBody final PartitionCountView partitionsNumberView) throws NoSuchEventTypeException {
         final EventType eventType = eventTypeRepository.findByName(eventTypeName);
         if (!adminService.isAdmin(AuthorizationService.Operation.WRITE)) {
-            throw new AccessDeniedException(AuthorizationService.Operation.ADMIN, eventType.asResource());
+            throw new AccessDeniedException(AuthorizationService.Operation.ADMIN, mapToResource(eventType));
         }
 
         repartitioningService.repartition(eventType.getName(), partitionsNumberView.getPartitionCount());

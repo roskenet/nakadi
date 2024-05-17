@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static com.google.common.collect.Sets.newHashSet;
+import static org.zalando.nakadi.service.auth.AuthorizationResourceMapping.mapToResource;
 
 @Service
 public class AuthorizationValidator {
@@ -110,7 +111,7 @@ public class AuthorizationValidator {
         if (eventType.getAuthorization() == null) {
             return;
         }
-        final Resource resource = eventType.asResource();
+        final Resource resource = mapToResource(eventType);
         try {
             final boolean authorized = authorizationService.isAuthorized(
                     AuthorizationService.Operation.WRITE,
@@ -183,7 +184,7 @@ public class AuthorizationValidator {
 
     public void authorizeEventTypeView(final EventType eventType)
             throws AccessDeniedException, ServiceTemporarilyUnavailableException {
-        authorizeResourceView(eventType.asResource());
+        authorizeResourceView(mapToResource(eventType));
     }
 
     public void authorizeSubscriptionView(final Subscription subscription)
@@ -196,7 +197,7 @@ public class AuthorizationValidator {
         if (eventType.getAuthorization() == null) {
             return;
         }
-        authorizeResourceAdmin(eventType.asResource());
+        authorizeResourceAdmin(mapToResource(eventType));
     }
 
     public void authorizeStreamRead(final EventType eventType) throws AccessDeniedException {
@@ -204,7 +205,7 @@ public class AuthorizationValidator {
             return;
         }
 
-        final Resource resource = eventType.asResource();
+        final Resource resource = mapToResource(eventType);
         checkResourceAuthorization(resource);
     }
 

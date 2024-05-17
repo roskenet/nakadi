@@ -61,6 +61,8 @@ import java.util.ListIterator;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static org.zalando.nakadi.service.auth.AuthorizationResourceMapping.mapToResource;
+
 @Service
 public class TimelineService {
 
@@ -120,7 +122,7 @@ public class TimelineService {
         try {
             final EventType eventType = eventTypeCache.getEventType(eventTypeName);
             if (!adminService.isAdmin(AuthorizationService.Operation.WRITE)) {
-                throw new AccessDeniedException(AuthorizationService.Operation.ADMIN, eventType.asResource());
+                throw new AccessDeniedException(AuthorizationService.Operation.ADMIN, mapToResource(eventType));
             }
             if (eventType.getCleanupPolicy() == CleanupPolicy.COMPACT ||
                     eventType.getCleanupPolicy() == CleanupPolicy.COMPACT_AND_DELETE) {
