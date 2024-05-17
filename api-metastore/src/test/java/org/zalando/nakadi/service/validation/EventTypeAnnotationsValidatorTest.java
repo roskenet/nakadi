@@ -19,6 +19,7 @@ import org.zalando.nakadi.domain.Feature;
 import org.zalando.nakadi.exceptions.runtime.InvalidEventTypeException;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.service.FeatureToggleService;
+import org.zalando.nakadi.service.auth.AuthorizationResourceMapping;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
@@ -44,7 +45,7 @@ public class EventTypeAnnotationsValidatorTest {
     @ValueSource(strings = {"none", "aspd", "mcf-aspd"})
     public void testValidDataComplianceAnnotations(@Nullable final String value) {
         final Map<String, String> annotations = value != null ?
-                Map.of(EventTypeAnnotationsValidator.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, value) :
+                Map.of(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, value) :
                 Collections.emptyMap();
         validator.validateDataComplianceAnnotations(annotations);
     }
@@ -53,13 +54,13 @@ public class EventTypeAnnotationsValidatorTest {
     @ValueSource(strings = {"NONE", "ASPD", "MCF-ASPD", "mcf_aspd"})
     public void testInvalidDataComplianceAnnotations(final String value) {
         final Map<String, String> annotations =
-                Map.of(EventTypeAnnotationsValidator.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, value);
+                Map.of(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, value);
 
         final var exception = assertThrows(
                 InvalidEventTypeException.class,
                 () -> validator.validateDataComplianceAnnotations(annotations));
         Assertions.assertThat(exception.getMessage())
-                .contains(EventTypeAnnotationsValidator.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
+                .contains(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
     }
 
     @ParameterizedTest

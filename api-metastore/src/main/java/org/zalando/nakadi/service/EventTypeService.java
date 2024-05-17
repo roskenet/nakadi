@@ -56,6 +56,7 @@ import org.zalando.nakadi.repository.TopicRepository;
 import org.zalando.nakadi.repository.db.EventTypeRepository;
 import org.zalando.nakadi.repository.db.SubscriptionDbRepository;
 import org.zalando.nakadi.repository.kafka.PartitionsCalculator;
+import org.zalando.nakadi.service.auth.AuthorizationResourceMapping;
 import org.zalando.nakadi.service.publishing.NakadiAuditLogPublisher;
 import org.zalando.nakadi.service.publishing.NakadiKpiPublisher;
 import org.zalando.nakadi.service.timeline.TimelineService;
@@ -669,7 +670,7 @@ public class EventTypeService {
     static void validateEventOwnerSelector(final EventTypeBase eventType) {
         checkState(eventType.getAnnotations() != null, "annotations map must be preset on the event type");
         final String dataClassification = eventType.getAnnotations()
-                .get(EventTypeAnnotationsValidator.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
+                .get(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
         final EventOwnerSelector selector = eventType.getEventOwnerSelector();
         if (selector != null) {
             if (selector.getType() == EventOwnerSelector.Type.METADATA && selector.getValue() != null) {

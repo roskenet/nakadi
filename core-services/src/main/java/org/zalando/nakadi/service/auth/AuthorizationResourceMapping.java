@@ -6,6 +6,8 @@ import org.zalando.nakadi.plugin.api.authz.EventTypeAuthz;
 import org.zalando.nakadi.plugin.api.authz.Resource;
 
 public class AuthorizationResourceMapping {
+    public static final String DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION =
+            "compliance.zalando.org/aspd-classification";
 
     public static Resource<EventTypeAuthz> mapToResource(final EventTypeBase eventType) {
         return new ResourceImpl<>(
