@@ -215,6 +215,40 @@ paths:
           schema:
             $ref: '#/definitions/Problem'
 
+  /test-event-types:
+    post:
+      tags:
+        - explain-api
+      description: |
+        Assuming that a new event type could be successfully created with the
+        provided EventType definition (e.g. existing event type with the same
+        name is ignored), returns the detailed explanation about various event
+        type run-time behavior aspects, such as authorization in the context
+        of MCF ASPD.
+      parameters:
+        - name: event-type
+          in: body
+          description: EventType to be tested
+          schema:
+            $ref: '#/definitions/EventType'
+          required: true
+        - name: explain
+          in: query
+          description: The "explain mode" for event type test operation.
+          collectionFormat: multi
+          type: array
+          items:
+            type: string
+            x-extensible-enum:
+              - all
+              - authorization
+          required: true
+      responses:
+        '200':
+          description: Explain operation was successful
+          schema:
+            $ref: '#/definitions/EventTypeExplainResult'
+
   /event-types/{name}:
     get:
       tags:
@@ -3185,6 +3219,114 @@ definitions:
           authorization or path to a field inside the events published to fetch the data to be used for per-event
           authorization.
         example: 'data.security.team'
+
+
+  EventTypeExplainResult:
+    type: object
+    properties:
+      explain_result:
+        type: object
+        properties:
+          authorization:
+            $ref: '#/definitions/ExplainAuthorizationResult'
+    required:
+      - explain_result
+
+  ExplainAuthorizationResult:
+    type: object
+    properties:
+      context:
+        type: object
+        properties:
+          data_classifications:
+            type: array
+            items:
+              type: object
+              properties:
+                name:
+                  type: string
+                  x-extensible-enum:
+                    - aspd
+                value:
+                  type:
+                    - string
+                    - null
+                source:
+                  type: string
+                  example: "annotations['org.zalando.compliance/aspd-data-classification']"
+              required:
+                - name
+                - value
+                - source
+          event_discriminators:
+            type: array
+            items:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "retailer_id"
+                source:
+                  type: string
+                  example: "event_owner_selector.name"
+              required:
+                - name
+                - source
+        required:
+          - data_classifications
+          - event_discriminators
+      readers:
+        type: array
+        items:
+          type: object
+          properties:
+            subject:
+              $ref: '#/definitions/AuthorizationAttribute'
+            result:
+              $ref: '#/definitions/ExplainAuthorizationAttributeResult'
+
+  ExplainAuthorizationAttributeResult:
+    type: object
+    properties:
+      access_level:
+        type: string
+        enum:
+          - full-access
+          - restricted-access
+          - no-access
+      access_restriction:
+        type: string
+        x-extensible-enum:
+          - matching-event-discriminators
+      matching_event_discriminators:
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              type: string
+              example: "retailer_id"
+            values:
+              type: array
+              items:
+                type: string
+          required:
+            - name
+            - values
+      reason:
+        type: string
+        description: Human-readable explanation for the access evaluation decision.
+        examples:
+          - Full access for authorized subject to event type with ASPD classification "none".
+          - Full access for authorized member of the MCF group to event type regardless of its APSD classification ("MCF-ASPD") or event discriminators.
+          - Restricted access for authorized subject to event type with ASPD classification "ASPD" and "retailer_id" event discriminator.
+          - Restricted access for authorized member of the ASE group to event type with ASPD classification "ASPD" and "merchant_id" event discriminator.
+          - No access for member of the ASE group to event type with ASPD classification "ASPD" and no event discriminators defined.
+          - No access for member of the ASE group to event type with ASPD classification "MCF-ASPD" regardless of event discriminators.
+          - No access for authorized subject to event type with no ASPD classification defined.
+    required:
+      - access_level
+      - reason
 
 
   Annotations:
