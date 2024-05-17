@@ -110,7 +110,7 @@ public class AuthorizationValidator {
         if (eventType.getAuthorization() == null) {
             return;
         }
-        final Resource<EventType> resource = eventType.asResource();
+        final Resource resource = eventType.asResource();
         try {
             final boolean authorized = authorizationService.isAuthorized(
                     AuthorizationService.Operation.WRITE,

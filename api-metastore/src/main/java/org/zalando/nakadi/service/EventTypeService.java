@@ -195,7 +195,7 @@ public class EventTypeService {
             throw new AuthorizationSectionException("Authorization section is mandatory");
         }
         if (checkAuth) {
-            authorizationValidator.validateAuthorization(eventType.asBaseResource());
+            authorizationValidator.validateAuthorization(eventType.asResource());
         }
 
         validateOwningApplication(null, eventType.getOwningApplication());
@@ -467,7 +467,7 @@ public class EventTypeService {
                 authorizationValidator.authorizeEventTypeAdmin(original);
             }
 
-            authorizationValidator.validateAuthorization(original.asResource(), eventTypeBase.asBaseResource());
+            authorizationValidator.validateAuthorization(original.asResource(), eventTypeBase.asResource());
             validateName(eventTypeName, eventTypeBase);
             validateCompactionUpdate(original, eventTypeBase);
             schemaService.validateSchema(eventTypeBase);

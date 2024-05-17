@@ -297,7 +297,7 @@ public class EventTypeBase implements EventTypeAuthz {
     }
 
     @JsonIgnore
-    public Resource<EventTypeBase> asBaseResource() {
+    public Resource<EventTypeAuthz> asResource() {
         return new ResourceImpl<>(getName(), ResourceImpl.EVENT_TYPE_RESOURCE, getAuthorization(), this);
     }
 
