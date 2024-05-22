@@ -19,6 +19,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.zalando.nakadi.service.auth.AuthorizationResourceMapping.mapToResource;
 import static org.zalando.problem.Status.FORBIDDEN;
 import static org.zalando.problem.Status.UNPROCESSABLE_ENTITY;
 
@@ -40,7 +41,7 @@ public class EventTypeAuthorizationTest extends EventTypeControllerTestCase {
     @Test
     public void whenPUTNotAuthorizedThen403() throws Exception {
         final EventType eventType = EventTypeTestBuilder.builder().build();
-        final Resource resource = eventType.asResource();
+        final Resource resource = mapToResource(eventType);
 
         doReturn(eventType).when(eventTypeRepository).findByName(any());
         doThrow(new AccessDeniedException(AuthorizationService.Operation.ADMIN, resource))
@@ -97,7 +98,7 @@ public class EventTypeAuthorizationTest extends EventTypeControllerTestCase {
     @Test
     public void whenDELETENotAuthorizedThen403() throws Exception {
         final EventType eventType = EventTypeTestBuilder.builder().build();
-        final Resource resource = eventType.asResource();
+        final Resource resource = mapToResource(eventType);
 
         doReturn(Optional.of(eventType)).when(eventTypeCache).getEventTypeIfExists(any());
         doThrow(new AccessDeniedException(AuthorizationService.Operation.ADMIN, resource))

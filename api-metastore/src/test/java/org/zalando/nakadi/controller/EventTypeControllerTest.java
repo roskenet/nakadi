@@ -62,6 +62,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.zalando.nakadi.domain.EventCategory.BUSINESS;
+import static org.zalando.nakadi.service.auth.AuthorizationResourceMapping.mapToResource;
 import static org.zalando.problem.Status.INTERNAL_SERVER_ERROR;
 import static org.zalando.problem.Status.NOT_FOUND;
 import static org.zalando.problem.Status.SERVICE_UNAVAILABLE;
@@ -878,7 +879,7 @@ public class EventTypeControllerTest extends EventTypeControllerTestCase {
         final EventType eventType = TestUtils.buildDefaultEventType();
         final String eventTypeName = eventType.getName();
         when(eventTypeCache.getEventType(any())).thenReturn(eventType);
-        doThrow(new AccessDeniedException(AuthorizationService.Operation.VIEW, eventType.asResource()))
+        doThrow(new AccessDeniedException(AuthorizationService.Operation.VIEW, mapToResource(eventType)))
                 .when(authorizationValidator).authorizeEventTypeView(eventType);
         getEventType(eventTypeName).andExpect(status().isForbidden());
     }

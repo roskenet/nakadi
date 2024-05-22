@@ -4,6 +4,7 @@ import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.Subject;
 import org.zalando.nakadi.plugin.api.exceptions.PluginException;
+import org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType;
 
 import java.util.List;
 import java.util.Objects;
@@ -52,8 +53,7 @@ public abstract class Principal implements Subject {
             final AuthorizationAttribute attribute)
             throws PluginException {
 
-        // FIXME: Move strings to a constant in plugin api (related to all the authorization attributes)
-        if (!Objects.equals(attribute.getDataType(), "retailer_id")) {
+        if (!Objects.equals(attribute.getDataType(), AuthorizationAttributeType.EOS_RETAILER_ID)) {
             return false;
         }
         switch (operation) {

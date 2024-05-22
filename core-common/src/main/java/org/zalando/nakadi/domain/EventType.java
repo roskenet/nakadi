@@ -1,7 +1,6 @@
 package org.zalando.nakadi.domain;
 
 import org.joda.time.DateTime;
-import org.zalando.nakadi.plugin.api.authz.Resource;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -69,9 +68,5 @@ public class EventType extends EventTypeBase {
 
     public void setCreatedAt(final DateTime createdAt) {
         this.createdAt = createdAt;
-    }
-
-    public Resource<EventType> asResource() {
-        return new ResourceImpl<>(getName(), ResourceImpl.EVENT_TYPE_RESOURCE, getAuthorization(), this);
     }
 }

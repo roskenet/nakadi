@@ -81,6 +81,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static com.google.common.base.Preconditions.checkState;
 import static org.zalando.nakadi.domain.Feature.DELETE_EVENT_TYPE_WITH_SUBSCRIPTIONS;
 import static org.zalando.nakadi.domain.Feature.FORCE_EVENT_TYPE_AUTHZ;
+import static org.zalando.nakadi.service.auth.AuthorizationResourceMapping.mapToResource;
 
 @Component
 @DependsOn({"storageService"})
@@ -195,7 +196,7 @@ public class EventTypeService {
             throw new AuthorizationSectionException("Authorization section is mandatory");
         }
         if (checkAuth) {
-            authorizationValidator.validateAuthorization(eventType.asBaseResource());
+            authorizationValidator.validateAuthorization(mapToResource(eventType));
         }
 
         validateOwningApplication(null, eventType.getOwningApplication());
@@ -345,7 +346,7 @@ public class EventTypeService {
             authorizationValidator.authorizeEventTypeAdmin(eventType);
 
             if (eventType.getAuthorization() == null && featureToggleService.isFeatureEnabled(FORCE_EVENT_TYPE_AUTHZ)) {
-                throw new AccessDeniedException(AuthorizationService.Operation.ADMIN, eventType.asResource(),
+                throw new AccessDeniedException(AuthorizationService.Operation.ADMIN, mapToResource(eventType),
                         "You cannot delete event-type without authorization.");
             }
 
@@ -467,7 +468,7 @@ public class EventTypeService {
                 authorizationValidator.authorizeEventTypeAdmin(original);
             }
 
-            authorizationValidator.validateAuthorization(original.asResource(), eventTypeBase.asBaseResource());
+            authorizationValidator.validateAuthorization(mapToResource(original), mapToResource(eventTypeBase));
             validateName(eventTypeName, eventTypeBase);
             validateCompactionUpdate(original, eventTypeBase);
             schemaService.validateSchema(eventTypeBase);

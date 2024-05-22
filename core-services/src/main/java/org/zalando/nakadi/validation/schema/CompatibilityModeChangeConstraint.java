@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.zalando.nakadi.service.auth.AuthorizationResourceMapping.mapToResource;
+
 @Service
 public class CompatibilityModeChangeConstraint implements SchemaEvolutionConstraint {
     final Map<CompatibilityMode, List<CompatibilityMode>> allowedChanges = ImmutableMap.of(
@@ -36,7 +38,7 @@ public class CompatibilityModeChangeConstraint implements SchemaEvolutionConstra
     public Optional<SchemaEvolutionIncompatibility> validate(final EventType original, final EventTypeBase eventType) {
         final boolean isNakadiAdmin = adminService.isAdmin(AuthorizationService.Operation.WRITE);
         final boolean isEventTypeAdmin = authorizationService
-                .isAuthorized(AuthorizationService.Operation.ADMIN, original.asResource());
+                .isAuthorized(AuthorizationService.Operation.ADMIN, mapToResource(original));
         final boolean isChangeValid = allowedChanges.get(original.getCompatibilityMode())
                 .contains(eventType.getCompatibilityMode());
         if (isEventTypeAdmin || isNakadiAdmin || isChangeValid) {
