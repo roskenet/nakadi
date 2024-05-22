@@ -15,7 +15,7 @@ public class KafkaFactoryTest {
     private static class FakeKafkaFactory extends KafkaFactory {
 
         FakeKafkaFactory(final int numActiveProducers, final int consumerPoolSize) {
-            super(null, new MetricRegistry(), numActiveProducers, consumerPoolSize);
+            super(null, new MetricRegistry(), "fake-storage", numActiveProducers, consumerPoolSize);
         }
 
         @Override

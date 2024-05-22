@@ -31,18 +31,20 @@ public class KafkaFactory {
 
     public KafkaFactory(final KafkaLocationManager kafkaLocationManager,
                         final MetricRegistry metricsRegistry,
+                        final String storageId,
                         final int numActiveProducers,
                         final int consumerPoolSize) {
         this.kafkaLocationManager = kafkaLocationManager;
 
-        LOG.info("Allocating {} Kafka producers", numActiveProducers);
+        LOG.info("Allocating {} Kafka producers for storage {}", numActiveProducers, storageId);
         this.producers = new ArrayList<>(numActiveProducers);
         for (int i = 0; i < numActiveProducers; ++i) {
             this.producers.add(createProducerInstance());
         }
 
         if (consumerPoolSize > 0) {
-            LOG.info("Preparing timelag checker pool of {} Kafka consumers", consumerPoolSize);
+            LOG.info("Preparing timelag checker pool of {} Kafka consumers for storage {}",
+                    consumerPoolSize, storageId);
             this.consumerPool = new LinkedBlockingQueue(consumerPoolSize);
             for (int i = 0; i < consumerPoolSize; ++i) {
                 this.consumerPool.add(createConsumerProxyInstance());
