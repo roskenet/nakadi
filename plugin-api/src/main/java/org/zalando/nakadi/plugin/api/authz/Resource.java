@@ -10,7 +10,7 @@ public interface Resource<T> {
 
     String getType();
 
-    Optional<List<AuthorizationAttribute>> getAttributesForOperation(final AuthorizationService.Operation operation);
+    Optional<List<AuthorizationAttribute>> getAttributesForOperation(AuthorizationService.Operation operation);
 
     T get();
 
