@@ -40,7 +40,8 @@ dependencies {
     compile project(':core-common')
     compile project(':core-metastore')
     compile project(':core-services')
-    
+    compile project(':plugin-api')
+
     compile "org.springframework.boot:spring-boot-starter-parent:${springBootVersion}"
     compile project(':api-publishing')
     compile project(':api-consumption')
@@ -48,7 +49,6 @@ dependencies {
     compile project(':api-cursors')
     compile project(':api-misc')
     compile project(':app')
-
     // spring
     compile("org.springframework.boot:spring-boot-starter-web") {
         exclude module: 'logback-classic'

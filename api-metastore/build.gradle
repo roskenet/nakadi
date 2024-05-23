@@ -23,6 +23,7 @@ dependencies {
     implementation project(':core-common')
     implementation project(':core-services')
     implementation project(':core-metastore')
+    implementation project(':plugin-api')
 
     compile 'org.json:json:20180130'
 
