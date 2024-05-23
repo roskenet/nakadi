@@ -27,6 +27,7 @@ dependencies {
 
     implementation project(':core-common')
     implementation project(':core-metastore')
+    implementation project(':plugin-api')
 
     // spring
     compile("org.springframework.boot:spring-boot-starter-web") {
@@ -48,7 +49,6 @@ dependencies {
         exclude module: "logback-classic"
     }
 
-    compile 'org.zalando:nakadi-plugin-api:3.2.1'
     compile 'com.google.guava:guava:30.1-jre'
     compile 'org.apache.commons:commons-lang3:3.8.1'
 

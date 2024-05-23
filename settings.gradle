@@ -14,6 +14,7 @@ include 'api-misc'
 
 include 'acceptance-test'
 
+include 'plugin-api'
 include 'authz'
 include 'lightstep'
 project(':authz').projectDir = new File('plugins/authz')
