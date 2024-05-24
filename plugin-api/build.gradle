@@ -2,8 +2,6 @@ group 'org.zalando'
 version '3.2.1'
 
 apply plugin: 'java'
-apply plugin: 'maven'
-apply plugin: 'signing'
 
 repositories {
     mavenCentral()
