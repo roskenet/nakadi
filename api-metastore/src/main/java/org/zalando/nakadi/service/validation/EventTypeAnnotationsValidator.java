@@ -10,7 +10,6 @@ import org.zalando.nakadi.exceptions.runtime.InvalidEventTypeException;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.Subject;
 import org.zalando.nakadi.service.FeatureToggleService;
-import org.zalando.nakadi.service.auth.AuthorizationResourceMapping;
 
 import javax.validation.constraints.NotNull;
 import java.util.Collections;
@@ -18,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
+
+import static org.zalando.nakadi.service.auth.AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION;
 
 @Component
 public class EventTypeAnnotationsValidator {
@@ -53,23 +54,33 @@ public class EventTypeAnnotationsValidator {
                 null : Optional.ofNullable(oldEventType.getAnnotations()).orElseGet(Collections::emptyMap);
         final var newAnnotations = Optional.ofNullable(newEventType.getAnnotations())
                 .orElseGet(Collections::emptyMap);
-        validateDataComplianceAnnotations(newAnnotations);
+        validateDataComplianceAnnotations(oldAnnotations, newAnnotations);
         validateDataLakeAnnotations(oldAnnotations, newAnnotations);
     }
 
     @VisibleForTesting
     void validateDataComplianceAnnotations(
+            // null iff we're validating a new event type (i.e. there is no old event type)
+            final Map<String, String> oldAnnotations,
             @NotNull final Map<String, String> annotations) {
 
-        final var aspdClassification = annotations.get(
-                AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
+        final var aspdClassification = annotations.get(DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
         if (aspdClassification != null) {
             if (!List.of("none", "aspd", "mcf-aspd").contains(aspdClassification)) {
                 throw new InvalidEventTypeException(
-                        "Annotation " + AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION
+                        "Annotation " + DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION
                                 + " is not valid. Provided value: \""
                                 + aspdClassification
                                 + "\". Possible values are: \"none\" or \"aspd\" or \"mcf-aspd\".");
+            }
+        }
+
+        final boolean isRequired = oldAnnotations != null &&
+                oldAnnotations.containsKey(DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
+        if (isRequired) {
+            if (aspdClassification == null) {
+                throw new InvalidEventTypeException(
+                        "Annotation " + DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION + " is required");
             }
         }
     }

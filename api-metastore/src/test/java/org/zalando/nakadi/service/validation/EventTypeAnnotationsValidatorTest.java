@@ -47,7 +47,7 @@ public class EventTypeAnnotationsValidatorTest {
         final Map<String, String> annotations = value != null ?
                 Map.of(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, value) :
                 Collections.emptyMap();
-        validator.validateDataComplianceAnnotations(annotations);
+        validator.validateDataComplianceAnnotations(null, annotations);
     }
 
     @ParameterizedTest
@@ -58,10 +58,22 @@ public class EventTypeAnnotationsValidatorTest {
 
         final var exception = assertThrows(
                 InvalidEventTypeException.class,
-                () -> validator.validateDataComplianceAnnotations(annotations));
+                () -> validator.validateDataComplianceAnnotations(null, annotations));
         Assertions.assertThat(exception.getMessage())
                 .contains(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
     }
+
+    @Test
+    public void testDataComplianceAnnotationCannotBeRemovedOnUpdate() {
+        final var exception = assertThrows(
+                InvalidEventTypeException.class,
+                () -> validator.validateDataComplianceAnnotations(
+                        Map.of(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, "a-value"),
+                        Collections.emptyMap()));
+        Assertions.assertThat(exception.getMessage())
+                .contains(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, " is required");
+    }
+
 
     @ParameterizedTest
     @MethodSource("getValidDataLakeAnnotations")
