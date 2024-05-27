@@ -19,7 +19,7 @@ public class KafkaFactoryTest {
         }
 
         @Override
-        protected Producer<byte[], byte[]> createProducerInstance() {
+        protected Producer<byte[], byte[]> createProducerInstance(final String clientId) {
             return Mockito.mock(Producer.class);
         }
 

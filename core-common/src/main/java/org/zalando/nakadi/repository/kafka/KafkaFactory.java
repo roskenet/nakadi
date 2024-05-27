@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -39,7 +40,7 @@ public class KafkaFactory {
         LOG.info("Allocating {} Kafka producers for storage {}", numActiveProducers, storageId);
         this.producers = new ArrayList<>(numActiveProducers);
         for (int i = 0; i < numActiveProducers; ++i) {
-            this.producers.add(createProducerInstance());
+            this.producers.add(createProducerInstance(storageId));
         }
 
         if (consumerPoolSize > 0) {
@@ -116,8 +117,9 @@ public class KafkaFactory {
         return new KafkaConsumer<byte[], byte[]>(properties);
     }
 
-    protected Producer<byte[], byte[]> createProducerInstance() {
-        return new KafkaProducer<byte[], byte[]>(kafkaLocationManager.getKafkaProducerProperties());
+    protected Producer<byte[], byte[]> createProducerInstance(final String clientIdOpt) {
+        return new KafkaProducer<>(kafkaLocationManager.getKafkaProducerProperties(
+                Optional.ofNullable(clientIdOpt)));
     }
 
     protected Consumer<byte[], byte[]> createConsumerProxyInstance() {
