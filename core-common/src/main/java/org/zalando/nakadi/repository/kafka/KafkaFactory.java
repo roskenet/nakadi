@@ -9,6 +9,7 @@ import org.apache.kafka.clients.producer.Producer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -117,9 +118,9 @@ public class KafkaFactory {
         return new KafkaConsumer<byte[], byte[]>(properties);
     }
 
-    protected Producer<byte[], byte[]> createProducerInstance(final String clientIdOpt) {
+    protected Producer<byte[], byte[]> createProducerInstance(@Nullable final String clientId) {
         return new KafkaProducer<>(kafkaLocationManager.getKafkaProducerProperties(
-                Optional.ofNullable(clientIdOpt)));
+                Optional.ofNullable(clientId)));
     }
 
     protected Consumer<byte[], byte[]> createConsumerProxyInstance() {
