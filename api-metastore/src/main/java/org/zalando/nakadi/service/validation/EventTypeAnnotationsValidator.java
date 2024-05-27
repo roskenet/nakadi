@@ -18,11 +18,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
+import static org.zalando.nakadi.service.auth.AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION;
+
 @Component
 public class EventTypeAnnotationsValidator {
-    public static final String DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION =
-            "compliance.zalando.org/aspd-classification";
-
     private static final Pattern DATA_LAKE_ANNOTATIONS_PERIOD_PATTERN = Pattern.compile(
             "^(unlimited|(([7-9]|[1-9]\\d{1,2}|[1-2]\\d{3}|3[0-5]\\d{2}|36[0-4]\\d|3650)((\\sdays?)|(d)))" +
                     "|(([1-9][0-9]?|[1-4][0-9]{2}|5([0-1][0-9]|2[0-1]))((\\sweeks?)|(w)))|" +
@@ -55,12 +54,14 @@ public class EventTypeAnnotationsValidator {
                 null : Optional.ofNullable(oldEventType.getAnnotations()).orElseGet(Collections::emptyMap);
         final var newAnnotations = Optional.ofNullable(newEventType.getAnnotations())
                 .orElseGet(Collections::emptyMap);
-        validateDataComplianceAnnotations(newAnnotations);
+        validateDataComplianceAnnotations(oldAnnotations, newAnnotations);
         validateDataLakeAnnotations(oldAnnotations, newAnnotations);
     }
 
     @VisibleForTesting
     void validateDataComplianceAnnotations(
+            // null iff we're validating a new event type (i.e. there is no old event type)
+            final Map<String, String> oldAnnotations,
             @NotNull final Map<String, String> annotations) {
 
         final var aspdClassification = annotations.get(DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
@@ -71,6 +72,15 @@ public class EventTypeAnnotationsValidator {
                                 + " is not valid. Provided value: \""
                                 + aspdClassification
                                 + "\". Possible values are: \"none\" or \"aspd\" or \"mcf-aspd\".");
+            }
+        }
+
+        final boolean isRequired = oldAnnotations != null &&
+                oldAnnotations.containsKey(DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
+        if (isRequired) {
+            if (aspdClassification == null) {
+                throw new InvalidEventTypeException(
+                        "Annotation " + DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION + " is required");
             }
         }
     }

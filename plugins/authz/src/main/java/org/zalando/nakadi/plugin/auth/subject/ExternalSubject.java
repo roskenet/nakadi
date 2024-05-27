@@ -29,7 +29,7 @@ public class ExternalSubject extends Principal {
     }
 
     @Override
-    public boolean isAuthorized(
+    protected boolean isOperationAllowed(
             final String resourceType,
             final AuthorizationService.Operation operation, final Optional<List<AuthorizationAttribute>> attributes) {
         if (operation == AuthorizationService.Operation.VIEW) {

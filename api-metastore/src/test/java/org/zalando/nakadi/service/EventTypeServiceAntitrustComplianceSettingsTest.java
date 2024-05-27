@@ -6,7 +6,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.exceptions.runtime.InvalidEventTypeException;
-import org.zalando.nakadi.service.validation.EventTypeAnnotationsValidator;
+import org.zalando.nakadi.service.auth.AuthorizationResourceMapping;
 import org.zalando.nakadi.utils.TestUtils;
 import org.zalando.nakadi.view.EventOwnerSelector;
 
@@ -127,7 +127,7 @@ public class EventTypeServiceAntitrustComplianceSettingsTest {
         final EventType et = TestUtils.buildDefaultEventType();
         if (aspdDataClassification != null) {
             et.getAnnotations().put(
-                    EventTypeAnnotationsValidator.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION,
+                    AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION,
                     aspdDataClassification);
         }
         et.setEventOwnerSelector(eos);
