@@ -36,6 +36,7 @@ dependencies {
     compile project(':api-metastore')
     compile project(':api-cursors')
     compile project(':api-misc')
+    implementation project(':plugin-api')
 
     compile "org.glassfish.jaxb:jaxb-runtime"
 
@@ -102,7 +103,6 @@ dependencies {
     compile "io.dropwizard.metrics:metrics-servlets:$dropwizardVersion"
     compile "io.dropwizard.metrics:metrics-jvm:$dropwizardVersion"
     compile 'org.apache.commons:commons-lang3:3.8.1'
-    compile 'org.zalando:nakadi-plugin-api:3.2.1'
     compile 'org.echocat.jomon:runtime:1.6.3'
     compile 'com.googlecode.libphonenumber:libphonenumber:8.12.7'
 
