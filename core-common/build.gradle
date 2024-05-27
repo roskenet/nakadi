@@ -31,6 +31,8 @@ dependencies {
     ext['json-path'] = '2.4.0'
     ext['jsonassert'] = '1.5.0'
 
+    implementation project(':plugin-api')
+
     // spring
     compile("org.springframework.boot:spring-boot-starter-web") {
         exclude module: 'logback-classic'
@@ -51,7 +53,6 @@ dependencies {
         exclude module: "logback-classic"
     }
 
-    compile 'org.zalando:nakadi-plugin-api:3.2.1'
     compile 'com.google.guava:guava:30.1-jre'
     compile 'org.apache.commons:commons-lang3:3.8.1'
 

@@ -1,0 +1,25 @@
+group 'org.zalando'
+version '3.2.1'
+
+apply plugin: 'java'
+
+repositories {
+    mavenCentral()
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from 'build/docs/javadoc'
+}
+
+task sourcesJar(type: Jar) {
+    from sourceSets.main.allSource
+    classifier = 'sources'
+}
+
+artifacts {
+    archives jar
+
+    archives javadocJar
+    archives sourcesJar
+}

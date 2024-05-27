@@ -32,7 +32,8 @@ dependencyManagement {
 
 dependencies {
 
-    compile 'org.zalando:nakadi-plugin-api:3.2.1'
+    implementation project(':plugin-api')
+
     compile ('org.springframework.boot:spring-boot-starter-web') {
         exclude module: 'logback-classic'
         exclude module: 'log4j-over-slf4j'
