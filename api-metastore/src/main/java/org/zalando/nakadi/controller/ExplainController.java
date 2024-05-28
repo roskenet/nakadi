@@ -38,14 +38,15 @@ public class ExplainController {
 
 
     @Autowired
-    public ExplainController(EventTypeAnnotationsValidator eventTypeAnnotationsValidator,
+    public ExplainController(final EventTypeAnnotationsValidator eventTypeAnnotationsValidator,
                              final AuthorizationValidator authorizationValidator) {
         this.eventTypeAnnotationsValidator = eventTypeAnnotationsValidator;
         this.authorizationValidator = authorizationValidator;
     }
     @RequestMapping(value = "/event-type-auth", method = RequestMethod.POST)
-    public ResponseEntity<EventTypeAuthExplainResult> explainEventTypeAuth(@Valid @RequestBody final ExplainController.EventTypeAuthExplainRequest eventTypeAuthExplainRequest,
-                                                                           final Errors errors) {
+    public ResponseEntity<EventTypeAuthExplainResult> explainEventTypeAuth(
+            @Valid @RequestBody final EventTypeAuthExplainRequest eventTypeAuthExplainRequest,
+            final Errors errors) {
         if (errors.hasErrors()) {
             throw new ValidationException(errors);
         }

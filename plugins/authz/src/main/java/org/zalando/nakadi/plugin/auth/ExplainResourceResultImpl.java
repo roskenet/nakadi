@@ -35,15 +35,22 @@ public class ExplainResourceResultImpl implements ExplainResourceResult {
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        ExplainResourceResultImpl that = (ExplainResourceResultImpl) o;
-
-        if (!Objects.equals(parentAuthAttribute, that.parentAuthAttribute))
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
             return false;
-        if (!authAttribute.equals(that.authAttribute)) return false;
+        }
+
+        final ExplainResourceResultImpl that = (ExplainResourceResultImpl) o;
+
+        if (!Objects.equals(parentAuthAttribute, that.parentAuthAttribute)) {
+            return false;
+        }
+        if (!authAttribute.equals(that.authAttribute)) {
+            return false;
+        }
         return result.equals(that.result);
     }
 

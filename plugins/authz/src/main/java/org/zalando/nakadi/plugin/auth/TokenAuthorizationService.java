@@ -10,12 +10,12 @@ import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.EventTypeAuthz;
 import org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult;
 import org.zalando.nakadi.plugin.api.authz.ExplainResourceResult;
+import org.zalando.nakadi.plugin.api.authz.MatchingEventDiscriminator;
 import org.zalando.nakadi.plugin.api.authz.Resource;
 import org.zalando.nakadi.plugin.api.authz.Subject;
 import org.zalando.nakadi.plugin.api.exceptions.AuthorizationInvalidException;
 import org.zalando.nakadi.plugin.api.exceptions.OperationOnResourceNotPermittedException;
 import org.zalando.nakadi.plugin.api.exceptions.PluginException;
-import org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType;
 import org.zalando.nakadi.plugin.auth.attribute.SimpleAuthorizationAttribute;
 import org.zalando.nakadi.plugin.auth.attribute.TeamAuthorizationAttribute;
 import org.zalando.nakadi.plugin.auth.subject.Principal;
@@ -38,6 +38,10 @@ import static org.zalando.nakadi.plugin.auth.ResourceType.ALL_DATA_ACCESS_RESOUR
 import static org.zalando.nakadi.plugin.auth.ResourceType.EVENT_TYPE_RESOURCE;
 import static org.zalando.nakadi.plugin.auth.ResourceType.PERMISSION_RESOURCE;
 import static org.zalando.nakadi.plugin.auth.ResourceType.SUBSCRIPTION_RESOURCE;
+import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.AUTH_SERVICE;
+import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.AUTH_TEAM;
+import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.AUTH_USER;
+import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.EOS_RETAILER_ID;
 
 public class TokenAuthorizationService implements AuthorizationService {
 
@@ -318,7 +322,8 @@ public class TokenAuthorizationService implements AuthorizationService {
     }
 
     @Override
-    public List<ExplainResourceResult> explainAuthorization(final Operation operation, final Resource resource) throws PluginException {
+    public List<ExplainResourceResult> explainAuthorization(final Operation operation,
+                                                            final Resource resource) throws PluginException {
         if (!resource.getType().equals(EVENT_TYPE_RESOURCE)) {
             throw new IllegalArgumentException("Only resource of type " + EVENT_TYPE_RESOURCE + " is supported!");
         }
@@ -330,20 +335,20 @@ public class TokenAuthorizationService implements AuthorizationService {
                 map(a -> new SimpleAuthorizationAttribute(a.getDataType().toLowerCase(), a.getValue())).
                 collect(Collectors.groupingBy(AuthorizationAttribute::getDataType));
 
-        final var teamAuthAttributes = authsByType.get(AuthorizationAttributeType.AUTH_TEAM);
-        final var userAuthAttributes = authsByType.get(AuthorizationAttributeType.AUTH_USER);
-        final var serviceAuthAttributes = authsByType.get(AuthorizationAttributeType.AUTH_SERVICE);
+        final var teamAuthAttributes = authsByType.get(AUTH_TEAM);
+        final var userAuthAttributes = authsByType.get(AUTH_USER);
+        final var serviceAuthAttributes = authsByType.get(AUTH_SERVICE);
 
         //resolve team
         final var teamAttrToUserAttributes = teamAuthAttributes.stream().
                 collect(Collectors.toMap(Function.identity(),
                         attr -> teamService.getTeamMembers(attr.getValue()).stream().
-                                map(user -> new SimpleAuthorizationAttribute(AuthorizationAttributeType.AUTH_USER,user)).
+                                map(user -> new SimpleAuthorizationAttribute(AUTH_USER, user)).
                                 collect(Collectors.toList())));
 
         //call opa
         final var resultList = new ArrayList<ExplainResourceResult>();
-        for (var teamAttr: teamAttrToUserAttributes.keySet()) {
+        for (final var teamAttr : teamAttrToUserAttributes.keySet()) {
             final var usrAttrList = teamAttrToUserAttributes.get(teamAttr);
             resultList.addAll(explainSubjects(teamAttr, usrAttrList, opaClient::getRetailerIdsForUser));
         }
@@ -363,12 +368,19 @@ public class TokenAuthorizationService implements AuthorizationService {
         final var usrAttrToRetailerIds = usrAttrList.stream().
                 collect(Collectors.toMap(Function.identity(), usrAttr -> fetchRetailersFn.apply(usrAttr.getValue())));
 
-        for (final var item : usrAttrToRetailerIds.entrySet()) {
-            final var accessLevel = decideAccessLevel(item.getValue());
-            final var reason = getReason(item.getKey().getValue(), accessLevel);
-            final var retailerIdDiscriminators = new MatchingEventDiscriminatorImpl(AuthorizationAttributeType.EOS_RETAILER_ID, item.getValue());
-            final var explainAttrResult = new ExplainAttributeResultImpl(accessLevel, ExplainAttributeResult.AccessRestrictionType.MATCHING_EVENT_DISCRIMINATORS, reason, List.of(retailerIdDiscriminators));
-            resultList.add(new ExplainResourceResultImpl(teamAttr, item.getKey(), explainAttrResult));
+        for (final var userRetailersPair : usrAttrToRetailerIds.entrySet()) {
+            final var accessLevel = decideAccessLevel(userRetailersPair.getValue());
+            final var reason = getReason(userRetailersPair.getKey().getValue(), accessLevel);
+
+            final List<MatchingEventDiscriminator> retailerIdDiscriminators =
+                    List.of(new MatchingEventDiscriminatorImpl(EOS_RETAILER_ID,
+                            userRetailersPair.getValue()));
+
+            final var explainAttrResult =
+                    new ExplainAttributeResultImpl(accessLevel,
+                    ExplainAttributeResult.AccessRestrictionType.MATCHING_EVENT_DISCRIMINATORS,
+                    reason, retailerIdDiscriminators);
+            resultList.add(new ExplainResourceResultImpl(teamAttr, userRetailersPair.getKey(), explainAttrResult));
         }
         return resultList;
     }
