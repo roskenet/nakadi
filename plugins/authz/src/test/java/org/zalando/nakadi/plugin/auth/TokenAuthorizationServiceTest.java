@@ -10,6 +10,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
+import org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult;
+import org.zalando.nakadi.plugin.api.authz.ExplainResourceResult;
+import org.zalando.nakadi.plugin.api.authz.MatchingEventDiscriminator;
 import org.zalando.nakadi.plugin.api.authz.Resource;
 import org.zalando.nakadi.plugin.api.exceptions.AuthorizationInvalidException;
 import org.zalando.nakadi.plugin.api.exceptions.OperationOnResourceNotPermittedException;
@@ -20,7 +23,12 @@ import org.zalando.nakadi.plugin.auth.utils.SimpleEventResource;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 import static junit.framework.TestCase.assertTrue;
 import static org.hamcrest.CoreMatchers.equalTo;
@@ -31,6 +39,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessLevel.FULL_ACCESS;
+import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessLevel.NO_ACCESS;
+import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessLevel.RESTRICTED_ACCESS;
+import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessRestrictionType.MATCHING_EVENT_DISCRIMINATORS;
 import static org.zalando.nakadi.plugin.auth.ResourceType.ALL_DATA_ACCESS_RESOURCE;
 import static org.zalando.nakadi.plugin.auth.utils.ResourceBuilder.rb;
 
@@ -393,5 +405,95 @@ public class TokenAuthorizationServiceTest {
                 .thenReturn(new EmployeeSubject("jdoe", Collections::emptySet, "users", teamService));
         assertFalse("jdoe should not be authorized",
                 authzService.isAuthorized(AuthorizationService.Operation.WRITE, r));
+    }
+
+
+    @Test
+    public void testExplainAuthorizationOnlySupportsRead() {
+        final Resource r = rb("myResource1", "event-type")
+                .build();
+//        when(teamService.getTeamMembers("empty-team"))
+//                .thenReturn(Collections.emptyList());
+
+//        when(authentication.getPrincipal())
+//                .thenReturn(new EmployeeSubject("jdoe", Collections::emptySet, "users", teamService));
+        final var exception = assertThrows(IllegalArgumentException.class,
+                () -> authzService.explainAuthorization(AuthorizationService.Operation.WRITE, r));
+
+        assertThat(exception.getMessage(), equalTo("Only read operation is supported for explain authorization!"));
+
+    }
+
+
+    @Test
+    public void testExplainAuthorizationOnlySupportsEventTypeResource() {
+        final Resource r = rb("myResource1", "subscription")
+                .build();
+//        when(teamService.getTeamMembers("empty-team"))
+//                .thenReturn(Collections.emptyList());
+        final var exception = assertThrows(IllegalArgumentException.class, () -> authzService.explainAuthorization(AuthorizationService.Operation.READ, r));
+        assertThat(exception.getMessage(), equalTo("Only resource of type event-type is supported!"));
+    }
+
+    @Test
+    public void testExplainAuthorizationWithUserAndServices() {
+        final Resource r = rb("myResource1", "event-type")
+                .add(AuthorizationService.Operation.READ, "service", "foo_app")
+                .add(AuthorizationService.Operation.READ, "user", "bar_user")
+                .add(AuthorizationService.Operation.READ, "user", "shoo_user")
+                .build();
+
+        when(opaClient.getRetailerIdsForService(eq("foo_app"))).thenReturn(Set.of("retailer_1", "retailer_2"));
+        when(opaClient.getRetailerIdsForUser(eq("bar_user"))).thenReturn(Set.of("*"));
+        when(opaClient.getRetailerIdsForUser(eq("shoo_user"))).thenReturn(new HashSet<>());
+
+        final var explainList = authzService.explainAuthorization(AuthorizationService.Operation.READ, r);
+        assertThat(explainList.size(), equalTo(3));
+
+        final var expectedFoo = resourceResult("service", "foo_app").
+                apply(attributeResultWithRestrictedAccess(
+                        "foo_app has restricted access to the event type",
+                        "retailer_1", "retailer_2"));
+
+        final var expectedBar = resourceResult("user", "bar_user").
+                apply(attributeResultWithFullAccess(
+                        "bar_user has full access to the event type"));
+
+        final var expectedShoo = resourceResult("user", "shoo_user").
+                apply(attributeResultWithNoAccess(
+                        "shoo_user has no access to the event type"));
+
+        assertThat(explainList.get(2), equalTo(expectedFoo));
+        assertThat(explainList.get(1), equalTo(expectedBar));
+        assertThat(explainList.get(0), equalTo(expectedShoo));
+        System.out.println(explainList);
+    }
+
+    private static Function<ExplainAttributeResult, ExplainResourceResult> resourceResult(final String type,
+                                                                                          final String value) {
+        return attrResult ->
+                new ExplainResourceResultImpl(null, new SimpleAuthorizationAttribute(type, value), attrResult);
+    }
+
+    private static BiFunction<AuthorizationAttribute, ExplainAttributeResult, ExplainResourceResult> resourceResultWithParent(final String type,
+                                                                                                                              final String value) {
+        return (parentAttr , attrResult) ->
+                new ExplainResourceResultImpl(parentAttr, new SimpleAuthorizationAttribute(type, value), attrResult);
+    }
+
+    private static ExplainAttributeResult attributeResultWithRestrictedAccess(final String reason, final String... retailerIds) {
+        return new ExplainAttributeResultImpl(RESTRICTED_ACCESS, MATCHING_EVENT_DISCRIMINATORS, reason, retailerDiscriminators(retailerIds));
+    }
+
+    private static ExplainAttributeResult attributeResultWithFullAccess(final String reason) {
+        return new ExplainAttributeResultImpl(FULL_ACCESS, MATCHING_EVENT_DISCRIMINATORS, reason, retailerDiscriminators("*"));
+    }
+
+    private static ExplainAttributeResult attributeResultWithNoAccess(final String reason) {
+        return new ExplainAttributeResultImpl(NO_ACCESS, MATCHING_EVENT_DISCRIMINATORS, reason, retailerDiscriminators());
+    }
+
+    private static List<MatchingEventDiscriminator> retailerDiscriminators(final String... retailerIds) {
+       return List.of(new MatchingEventDiscriminatorImpl("retailer_id", new HashSet<>(List.of(retailerIds))));
     }
 }

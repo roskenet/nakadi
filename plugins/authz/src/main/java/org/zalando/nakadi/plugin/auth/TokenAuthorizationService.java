@@ -328,6 +328,10 @@ public class TokenAuthorizationService implements AuthorizationService {
             throw new IllegalArgumentException("Only resource of type " + EVENT_TYPE_RESOURCE + " is supported!");
         }
 
+       if (operation != Operation.READ) {
+           throw new IllegalArgumentException("Only read operation is supported for explain authorization!");
+       }
+
         final List<AuthorizationAttribute> readers = (List<AuthorizationAttribute>)
                 resource.getAttributesForOperation(Operation.READ).orElseGet(Collections::emptyList);
 
@@ -335,9 +339,9 @@ public class TokenAuthorizationService implements AuthorizationService {
                 map(a -> new SimpleAuthorizationAttribute(a.getDataType().toLowerCase(), a.getValue())).
                 collect(Collectors.groupingBy(AuthorizationAttribute::getDataType));
 
-        final var teamAuthAttributes = authsByType.get(AUTH_TEAM);
-        final var userAuthAttributes = authsByType.get(AUTH_USER);
-        final var serviceAuthAttributes = authsByType.get(AUTH_SERVICE);
+        final var teamAuthAttributes = authsByType.getOrDefault(AUTH_TEAM, Collections.emptyList());
+        final var userAuthAttributes = authsByType.getOrDefault(AUTH_USER, Collections.emptyList());
+        final var serviceAuthAttributes = authsByType.getOrDefault(AUTH_SERVICE, Collections.emptyList());
 
         //resolve team
         final var teamAttrToUserAttributes = teamAuthAttributes.stream().
@@ -399,7 +403,7 @@ public class TokenAuthorizationService implements AuthorizationService {
 
     private static String getReason(final String subject, final ExplainAttributeResult.AccessLevel accessLevel) {
        switch (accessLevel) {
-           case FULL_ACCESS: return String.format("% has full access to the event type", subject);
+           case FULL_ACCESS: return String.format("%s has full access to the event type", subject);
            case RESTRICTED_ACCESS: return String.format("%s has restricted access to the event type", subject);
            case NO_ACCESS: return String.format("%s has no access to the event type", subject);
            default: throw new IllegalArgumentException("Access level " + accessLevel + " is unsupported!");
