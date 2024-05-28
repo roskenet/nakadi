@@ -141,13 +141,12 @@ public class ExplainController {
         }
     }
 
-    public static class EventTypeAuthExplainResult extends EventTypeAuthExplainRequest {
+    public static class EventTypeAuthExplainResult {
 
         private List<ExplainResourceResult> readers;
 
         public EventTypeAuthExplainResult(final EventTypeAuthExplainRequest request,
                                           final List<ExplainResourceResult> readers) {
-            super(request);
             this.readers = readers;
         }
 
@@ -163,9 +162,6 @@ public class ExplainController {
         public String toString() {
             return "EventTypeAuthExplainResult{" +
                     "readers=" + readers +
-                    ", annotations=" + getAnnotations() +
-                    ", eventOwnerSelector=" + getEventOwnerSelector() +
-                    ", authorization=" + getAuthorization() +
                     '}';
         }
     }
