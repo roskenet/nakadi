@@ -60,4 +60,7 @@ public interface AuthorizationService {
      * @throws PluginException if an error occurred during execution
      */
     Optional<Subject> getSubject() throws PluginException;
+
+    List<ExplainResourceResult> explainAuthorization(Operation operation, Resource resource)
+            throws PluginException;
 }

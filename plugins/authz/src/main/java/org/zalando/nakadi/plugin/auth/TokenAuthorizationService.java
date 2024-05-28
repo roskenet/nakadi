@@ -8,22 +8,29 @@ import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.EventTypeAuthz;
+import org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult;
+import org.zalando.nakadi.plugin.api.authz.ExplainResourceResult;
 import org.zalando.nakadi.plugin.api.authz.Resource;
 import org.zalando.nakadi.plugin.api.authz.Subject;
 import org.zalando.nakadi.plugin.api.exceptions.AuthorizationInvalidException;
 import org.zalando.nakadi.plugin.api.exceptions.OperationOnResourceNotPermittedException;
 import org.zalando.nakadi.plugin.api.exceptions.PluginException;
+import org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType;
+import org.zalando.nakadi.plugin.auth.attribute.SimpleAuthorizationAttribute;
 import org.zalando.nakadi.plugin.auth.attribute.TeamAuthorizationAttribute;
 import org.zalando.nakadi.plugin.auth.subject.Principal;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -56,6 +63,8 @@ public class TokenAuthorizationService implements AuthorizationService {
     private final ValueRegistry userRegistry;
     private final ZalandoTeamService teamService;
 
+    private final OPAClient opaClient;
+
     public TokenAuthorizationService(final String usersType,
                                      final ValueRegistry userRegistry,
                                      final String servicesType,
@@ -63,6 +72,7 @@ public class TokenAuthorizationService implements AuthorizationService {
                                      final String businessPartnersType,
                                      final ValueRegistry merchantRegistry,
                                      final ZalandoTeamService teamService,
+                                     final OPAClient opaClient,
                                      final List<String> merchantUids) {
         this.usersType = usersType;
         this.servicesType = servicesType;
@@ -72,6 +82,7 @@ public class TokenAuthorizationService implements AuthorizationService {
         this.merchantRegistry = merchantRegistry;
         this.teamService = teamService;
         this.userRegistry = userRegistry;
+        this.opaClient = opaClient;
     }
 
     @Override
@@ -304,5 +315,82 @@ public class TokenAuthorizationService implements AuthorizationService {
     @Override
     public Optional<Subject> getSubject() throws PluginException {
         return Optional.ofNullable(getPrincipal(false));
+    }
+
+    @Override
+    public List<ExplainResourceResult> explainAuthorization(final Operation operation, final Resource resource) throws PluginException {
+        if (!resource.getType().equals(EVENT_TYPE_RESOURCE)) {
+            throw new IllegalArgumentException("Only resource of type " + EVENT_TYPE_RESOURCE + " is supported!");
+        }
+
+        final List<AuthorizationAttribute> readers = (List<AuthorizationAttribute>)
+                resource.getAttributesForOperation(Operation.READ).orElseGet(Collections::emptyList);
+
+        final Map<String, List<AuthorizationAttribute>> authsByType = readers.stream().
+                map(a -> new SimpleAuthorizationAttribute(a.getDataType().toLowerCase(), a.getValue())).
+                collect(Collectors.groupingBy(AuthorizationAttribute::getDataType));
+
+        final var teamAuthAttributes = authsByType.get(AuthorizationAttributeType.AUTH_TEAM);
+        final var userAuthAttributes = authsByType.get(AuthorizationAttributeType.AUTH_USER);
+        final var serviceAuthAttributes = authsByType.get(AuthorizationAttributeType.AUTH_SERVICE);
+
+        //resolve team
+        final var teamAttrToUserAttributes = teamAuthAttributes.stream().
+                collect(Collectors.toMap(Function.identity(),
+                        attr -> teamService.getTeamMembers(attr.getValue()).stream().
+                                map(user -> new SimpleAuthorizationAttribute(AuthorizationAttributeType.AUTH_USER,user)).
+                                collect(Collectors.toList())));
+
+        //call opa
+        final var resultList = new ArrayList<ExplainResourceResult>();
+        for (var teamAttr: teamAttrToUserAttributes.keySet()) {
+            final var usrAttrList = teamAttrToUserAttributes.get(teamAttr);
+            resultList.addAll(explainSubjects(teamAttr, usrAttrList, opaClient::getRetailerIdsForUser));
+        }
+
+        //repeat for users
+        resultList.addAll(explainSubjects(null, userAuthAttributes, opaClient::getRetailerIdsForUser));
+
+        //repeat for services
+        resultList.addAll(explainSubjects(null, serviceAuthAttributes, opaClient::getRetailerIdsForService));
+        return resultList;
+    }
+
+    private List<ExplainResourceResult> explainSubjects(final AuthorizationAttribute teamAttr,
+                                                        final List<? extends AuthorizationAttribute> usrAttrList,
+                                                        final Function<String, Set<String>> fetchRetailersFn) {
+        final var resultList = new ArrayList<ExplainResourceResult>();
+        final var usrAttrToRetailerIds = usrAttrList.stream().
+                collect(Collectors.toMap(Function.identity(), usrAttr -> fetchRetailersFn.apply(usrAttr.getValue())));
+
+        for (final var item : usrAttrToRetailerIds.entrySet()) {
+            final var accessLevel = decideAccessLevel(item.getValue());
+            final var reason = getReason(item.getKey().getValue(), accessLevel);
+            final var retailerIdDiscriminators = new MatchingEventDiscriminatorImpl(AuthorizationAttributeType.EOS_RETAILER_ID, item.getValue());
+            final var explainAttrResult = new ExplainAttributeResultImpl(accessLevel, ExplainAttributeResult.AccessRestrictionType.MATCHING_EVENT_DISCRIMINATORS, reason, List.of(retailerIdDiscriminators));
+            resultList.add(new ExplainResourceResultImpl(teamAttr, item.getKey(), explainAttrResult));
+        }
+        return resultList;
+    }
+
+    /**
+     * TODO: consider merchant id too in future to decide access.
+     */
+    private static ExplainAttributeResult.AccessLevel decideAccessLevel(final Set<String> retailerIds) {
+        if (retailerIds.contains("*")) {
+            return ExplainAttributeResult.AccessLevel.FULL_ACCESS;
+        } else if (retailerIds.isEmpty()) {
+            return ExplainAttributeResult.AccessLevel.NO_ACCESS;
+        }
+        return ExplainAttributeResult.AccessLevel.RESTRICTED_ACCESS;
+    }
+
+    private static String getReason(final String subject, final ExplainAttributeResult.AccessLevel accessLevel) {
+       switch (accessLevel) {
+           case FULL_ACCESS: return String.format("% has full access to the event type", subject);
+           case RESTRICTED_ACCESS: return String.format("%s has restricted access to the event type", subject);
+           case NO_ACCESS: return String.format("%s has no access to the event type", subject);
+           default: throw new IllegalArgumentException("Access level " + accessLevel + " is unsupported!");
+       }
     }
 }
