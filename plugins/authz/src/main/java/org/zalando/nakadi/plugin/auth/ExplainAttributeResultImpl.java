@@ -40,4 +40,36 @@ public class ExplainAttributeResultImpl implements ExplainAttributeResult {
     public String getReason() {
         return reason;
     }
+
+    @Override
+    public String toString() {
+        return "ExplainAttributeResultImpl{" +
+                "accessLevel=" + accessLevel +
+                ", accessRestrictionType=" + accessRestrictionType +
+                ", reason='" + reason + '\'' +
+                ", matchingEventDiscriminators=" + matchingEventDiscriminators +
+                '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        ExplainAttributeResultImpl that = (ExplainAttributeResultImpl) o;
+
+        if (accessLevel != that.accessLevel) return false;
+        if (accessRestrictionType != that.accessRestrictionType) return false;
+        if (!reason.equals(that.reason)) return false;
+        return matchingEventDiscriminators.equals(that.matchingEventDiscriminators);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = accessLevel.hashCode();
+        result = 31 * result + accessRestrictionType.hashCode();
+        result = 31 * result + reason.hashCode();
+        result = 31 * result + matchingEventDiscriminators.hashCode();
+        return result;
+    }
 }

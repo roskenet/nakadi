@@ -23,4 +23,30 @@ public class MatchingEventDiscriminatorImpl implements MatchingEventDiscriminato
     public Set<String> getValues() {
         return values;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        MatchingEventDiscriminatorImpl that = (MatchingEventDiscriminatorImpl) o;
+
+        if (!name.equals(that.name)) return false;
+        return values.equals(that.values);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = name.hashCode();
+        result = 31 * result + values.hashCode();
+        return result;
+    }
+
+    @Override
+    public String toString() {
+        return "MatchingEventDiscriminatorImpl{" +
+                "name='" + name + '\'' +
+                ", values=" + values +
+                '}';
+    }
 }

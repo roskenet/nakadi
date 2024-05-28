@@ -61,4 +61,13 @@ public class ExplainResourceResultImpl implements ExplainResourceResult {
         result1 = 31 * result1 + result.hashCode();
         return result1;
     }
+
+    @Override
+    public String toString() {
+        return "ExplainResourceResultImpl{" +
+                "parentAuthAttribute=" + parentAuthAttribute +
+                ", authAttribute=" + authAttribute +
+                ", result=" + result +
+                '}';
+    }
 }
