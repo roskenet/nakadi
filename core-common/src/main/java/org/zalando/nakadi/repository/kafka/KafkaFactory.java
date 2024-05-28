@@ -40,9 +40,9 @@ public class KafkaFactory {
 
         LOG.info("Allocating {} Kafka producers for storage {}", numActiveProducers, storageId);
         this.producers = new ArrayList<>(numActiveProducers);
-        final String producerClientId = "nakadi_" + storageId;
         for (int i = 0; i < numActiveProducers; ++i) {
-            this.producers.add(createProducerInstance(producerClientId));
+            final String clientId = String.format("nakadi_%s-%d", storageId, i);
+            this.producers.add(createProducerInstance(clientId));
         }
 
         if (consumerPoolSize > 0) {
