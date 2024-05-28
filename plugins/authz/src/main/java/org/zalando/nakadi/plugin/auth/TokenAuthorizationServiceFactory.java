@@ -1,6 +1,7 @@
 package org.zalando.nakadi.plugin.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import okhttp3.OkHttpClient;
 import org.zalando.nakadi.plugin.api.SystemProperties;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationServiceFactory;
@@ -9,6 +10,8 @@ import org.zalando.nakadi.plugin.api.exceptions.PluginException;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 public class TokenAuthorizationServiceFactory implements AuthorizationServiceFactory {
 
@@ -28,7 +31,32 @@ public class TokenAuthorizationServiceFactory implements AuthorizationServiceFac
                     servicesType, serviceFactory.getOrCreateApplicationRegistry(),
                     businessPartnersType, serviceFactory.getOrCreateMerchantRegistry(),
                     teamService(serviceFactory),
+                    createOpaClient(serviceFactory),
                     merchantUids);
+        } catch (URISyntaxException e) {
+            throw new PluginException(e);
+        }
+    }
+
+    private OPAClient createOpaClient(final ServiceFactory factory) {
+        try {
+            final String endpoint = factory.getProperty("nakadi.plugins.authz.opa.endpoint");
+            final String policyPath = factory.getProperty("nakadi.plugins.authz.opa.policypath");
+            final TokenProvider tokenProvider = factory.getOrCreateTokenProvider();
+            final long timeoutConnect = factory.getOrDefaultProperty("nakadi.plugins.authz.opa.timeoutms.connect", Long::valueOf, 60L);
+            final long timeoutWrite = factory.getOrDefaultProperty("nakadi.plugins.authz.opa.timeoutms.write", Long::valueOf, 60L);
+            final long timeoutRead = factory.getOrDefaultProperty("nakadi.plugins.authz.opa.timeoutms.read", Long::valueOf, 80L);
+            final long retryTimeout = factory.getOrDefaultProperty("nakadi.plugins.authz.opa.retry.timeout", Long::valueOf, 100L);
+            final int retryTimes = factory.getOrDefaultProperty("nakadi.plugins.authz.opa.retry.times", Integer::valueOf, 1);
+            final String opaDegradationPolicy = factory.getOrDefaultProperty("nakadi.plugins.authz.opa.degradation", Function.identity(), "THROW");
+            final OpaDegradationPolicy policy =  OpaDegradationPolicy.from(opaDegradationPolicy).get();
+            final OkHttpClient client = new OkHttpClient.Builder()
+                    .connectTimeout(timeoutConnect, TimeUnit.MILLISECONDS)
+                    .writeTimeout(timeoutWrite, TimeUnit.MILLISECONDS)
+                    .readTimeout(timeoutRead, TimeUnit.MILLISECONDS)
+                    .retryOnConnectionFailure(false)
+                    .build();
+            return new OPAClient(client, tokenProvider, endpoint, policyPath, retryTimeout, retryTimes, policy);
         } catch (URISyntaxException e) {
             throw new PluginException(e);
         }
