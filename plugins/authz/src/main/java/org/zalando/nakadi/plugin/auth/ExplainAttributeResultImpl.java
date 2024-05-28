@@ -51,25 +51,36 @@ public class ExplainAttributeResultImpl implements ExplainAttributeResult {
                 '}';
     }
 
+
     @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof ExplainAttributeResultImpl)) {
+            return false;
+        }
 
-        ExplainAttributeResultImpl that = (ExplainAttributeResultImpl) o;
+        final ExplainAttributeResultImpl that = (ExplainAttributeResultImpl) o;
 
-        if (accessLevel != that.accessLevel) return false;
-        if (accessRestrictionType != that.accessRestrictionType) return false;
-        if (!reason.equals(that.reason)) return false;
-        return matchingEventDiscriminators.equals(that.matchingEventDiscriminators);
+        if (getAccessLevel() != that.getAccessLevel()) {
+            return false;
+        }
+        if (getAccessRestrictionType() != that.getAccessRestrictionType()) {
+            return false;
+        }
+        if (!getReason().equals(that.getReason())) {
+            return false;
+        }
+        return getMatchingEventDiscriminators().equals(that.getMatchingEventDiscriminators());
     }
 
     @Override
     public int hashCode() {
-        int result = accessLevel.hashCode();
-        result = 31 * result + accessRestrictionType.hashCode();
-        result = 31 * result + reason.hashCode();
-        result = 31 * result + matchingEventDiscriminators.hashCode();
+        int result = getAccessLevel().hashCode();
+        result = 31 * result + getAccessRestrictionType().hashCode();
+        result = 31 * result + getReason().hashCode();
+        result = 31 * result + getMatchingEventDiscriminators().hashCode();
         return result;
     }
 }

@@ -422,7 +422,8 @@ public class TokenAuthorizationServiceTest {
     public void testExplainAuthorizationOnlySupportsEventTypeResource() {
         final Resource r = rb("myResource1", "subscription")
                 .build();
-        final var exception = assertThrows(IllegalArgumentException.class, () -> authzService.explainAuthorization(AuthorizationService.Operation.READ, r));
+        final var exception = assertThrows(IllegalArgumentException.class,
+                () -> authzService.explainAuthorization(AuthorizationService.Operation.READ, r));
         assertThat(exception.getMessage(), equalTo("Only resource of type event-type is supported!"));
     }
 
@@ -506,25 +507,31 @@ public class TokenAuthorizationServiceTest {
                 new ExplainResourceResultImpl(null, new SimpleAuthorizationAttribute(type, value), attrResult);
     }
 
-    private static BiFunction<AuthorizationAttribute, ExplainAttributeResult, ExplainResourceResult> resourceResultWithParent(final String type,
-                                                                                                                              final String value) {
-        return (parentAttr , attrResult) ->
+    private static BiFunction<AuthorizationAttribute, ExplainAttributeResult, ExplainResourceResult>
+    resourceResultWithParent(final String type,
+                             final String value) {
+        return (parentAttr, attrResult) ->
                 new ExplainResourceResultImpl(parentAttr, new SimpleAuthorizationAttribute(type, value), attrResult);
     }
 
-    private static ExplainAttributeResult withRestrictedAccess(final String reason, final String... retailerIds) {
-        return new ExplainAttributeResultImpl(RESTRICTED_ACCESS, MATCHING_EVENT_DISCRIMINATORS, reason, retailerDiscriminators(retailerIds));
+    private static ExplainAttributeResult withRestrictedAccess(final String reason,
+                                                               final String... retailerIds) {
+        return new ExplainAttributeResultImpl(RESTRICTED_ACCESS, MATCHING_EVENT_DISCRIMINATORS,
+                reason, retailerDiscriminators(retailerIds));
     }
 
     private static ExplainAttributeResult withFullAccess(final String reason) {
-        return new ExplainAttributeResultImpl(FULL_ACCESS, MATCHING_EVENT_DISCRIMINATORS, reason, retailerDiscriminators("*"));
+        return new ExplainAttributeResultImpl(FULL_ACCESS, MATCHING_EVENT_DISCRIMINATORS,
+                reason, retailerDiscriminators("*"));
     }
 
     private static ExplainAttributeResult withNoAccess(final String reason) {
-        return new ExplainAttributeResultImpl(NO_ACCESS, MATCHING_EVENT_DISCRIMINATORS, reason, retailerDiscriminators());
+        return new ExplainAttributeResultImpl(NO_ACCESS, MATCHING_EVENT_DISCRIMINATORS,
+                reason, retailerDiscriminators());
     }
 
     private static List<MatchingEventDiscriminator> retailerDiscriminators(final String... retailerIds) {
-       return List.of(new MatchingEventDiscriminatorImpl("retailer_id", new HashSet<>(List.of(retailerIds))));
+       return List.of(new MatchingEventDiscriminatorImpl("retailer_id",
+               new HashSet<>(List.of(retailerIds))));
     }
 }
