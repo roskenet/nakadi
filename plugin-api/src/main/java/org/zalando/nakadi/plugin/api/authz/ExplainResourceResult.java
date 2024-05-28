@@ -6,5 +6,5 @@ public interface ExplainResourceResult {
 
     AuthorizationAttribute getAuthAttribute();
 
-    ExplainAttributeResult result();
+    ExplainAttributeResult getResult();
 }

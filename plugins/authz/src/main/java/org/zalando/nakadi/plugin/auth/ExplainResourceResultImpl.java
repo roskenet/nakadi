@@ -30,7 +30,7 @@ public class ExplainResourceResultImpl implements ExplainResourceResult {
     }
 
     @Override
-    public ExplainAttributeResult result() {
+    public ExplainAttributeResult getResult() {
         return result;
     }
 
