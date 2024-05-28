@@ -57,6 +57,9 @@ public class TokenAuthorizationServiceTest {
     @Mock
     private ZalandoTeamService teamService;
 
+    @Mock
+    private OPAClient opaClient;
+
     @Before
     public void setUp() {
         when(authentication.getPrincipal()).thenReturn(principal);
@@ -66,6 +69,7 @@ public class TokenAuthorizationServiceTest {
                 SERVICES_TYPE, serviceRegistry,
                 BUSINESS_PARTNER_TYPE, merchantRegistry,
                 teamService,
+                opaClient,
                 Arrays.asList("stups_merchant-uid"));
 
         SecurityContextHolder.getContext().setAuthentication(new OAuth2Authentication(null, authentication));
