@@ -137,8 +137,11 @@ public class KafkaLocationManager {
         return properties;
     }
 
-    public Properties getKafkaProducerProperties() {
+    public Properties getKafkaProducerProperties(final Optional<String> clientId) {
         final Properties producerProps = (Properties) kafkaProperties.clone();
+
+        clientId.ifPresent(id -> producerProps.put(ProducerConfig.CLIENT_ID_CONFIG, id));
+
         producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
                 "org.apache.kafka.common.serialization.ByteArraySerializer");
         producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
