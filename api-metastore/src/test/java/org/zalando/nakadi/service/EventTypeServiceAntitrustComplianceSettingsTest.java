@@ -7,6 +7,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.exceptions.runtime.InvalidEventTypeException;
 import org.zalando.nakadi.service.auth.AuthorizationResourceMapping;
+import org.zalando.nakadi.service.validation.EventOwnerValidator;
 import org.zalando.nakadi.utils.TestUtils;
 import org.zalando.nakadi.view.EventOwnerSelector;
 
@@ -19,7 +20,7 @@ public class EventTypeServiceAntitrustComplianceSettingsTest {
     @MethodSource("getValidParameters")
     void testValidParameters(@Nullable final String aspdDataClassification, @Nullable final EventOwnerSelector eos) {
         final var et = buildEventType(aspdDataClassification, eos);
-        EventTypeService.validateEventOwnerSelector(et);
+        EventOwnerValidator.validateEventOwnerSelector(et);
     }
 
     public static Stream<Arguments> getValidParameters() {
@@ -66,7 +67,7 @@ public class EventTypeServiceAntitrustComplianceSettingsTest {
         final var et = buildEventType(aspdDataClassification, eos);
         Assertions.assertThrows(
                 expected,
-                () -> EventTypeService.validateEventOwnerSelector(et));
+                () -> EventOwnerValidator.validateEventOwnerSelector(et));
     }
 
     public static Stream<Arguments> getInvalidParameters() {

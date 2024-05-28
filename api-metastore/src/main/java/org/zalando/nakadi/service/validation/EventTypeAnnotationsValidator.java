@@ -59,7 +59,7 @@ public class EventTypeAnnotationsValidator {
     }
 
     @VisibleForTesting
-    void validateDataComplianceAnnotations(
+    public void validateDataComplianceAnnotations(
             // null iff we're validating a new event type (i.e. there is no old event type)
             final Map<String, String> oldAnnotations,
             @NotNull final Map<String, String> annotations) {
