@@ -407,16 +407,10 @@ public class TokenAuthorizationServiceTest {
                 authzService.isAuthorized(AuthorizationService.Operation.WRITE, r));
     }
 
-
     @Test
     public void testExplainAuthorizationOnlySupportsRead() {
         final Resource r = rb("myResource1", "event-type")
                 .build();
-//        when(teamService.getTeamMembers("empty-team"))
-//                .thenReturn(Collections.emptyList());
-
-//        when(authentication.getPrincipal())
-//                .thenReturn(new EmployeeSubject("jdoe", Collections::emptySet, "users", teamService));
         final var exception = assertThrows(IllegalArgumentException.class,
                 () -> authzService.explainAuthorization(AuthorizationService.Operation.WRITE, r));
 
@@ -424,19 +418,16 @@ public class TokenAuthorizationServiceTest {
 
     }
 
-
     @Test
     public void testExplainAuthorizationOnlySupportsEventTypeResource() {
         final Resource r = rb("myResource1", "subscription")
                 .build();
-//        when(teamService.getTeamMembers("empty-team"))
-//                .thenReturn(Collections.emptyList());
         final var exception = assertThrows(IllegalArgumentException.class, () -> authzService.explainAuthorization(AuthorizationService.Operation.READ, r));
         assertThat(exception.getMessage(), equalTo("Only resource of type event-type is supported!"));
     }
 
     @Test
-    public void testExplainAuthorizationWithUserAndServices() {
+    public void testExplainAuthorizationWithUsersServices() {
         final Resource r = rb("myResource1", "event-type")
                 .add(AuthorizationService.Operation.READ, "service", "foo_app")
                 .add(AuthorizationService.Operation.READ, "user", "bar_user")
@@ -451,22 +442,62 @@ public class TokenAuthorizationServiceTest {
         assertThat(explainList.size(), equalTo(3));
 
         final var expectedFoo = resourceResult("service", "foo_app").
-                apply(attributeResultWithRestrictedAccess(
+                apply(withRestrictedAccess(
                         "foo_app has restricted access to the event type",
                         "retailer_1", "retailer_2"));
 
         final var expectedBar = resourceResult("user", "bar_user").
-                apply(attributeResultWithFullAccess(
+                apply(withFullAccess(
                         "bar_user has full access to the event type"));
 
         final var expectedShoo = resourceResult("user", "shoo_user").
-                apply(attributeResultWithNoAccess(
+                apply(withNoAccess(
                         "shoo_user has no access to the event type"));
 
         assertThat(explainList.get(2), equalTo(expectedFoo));
         assertThat(explainList.get(1), equalTo(expectedBar));
         assertThat(explainList.get(0), equalTo(expectedShoo));
-        System.out.println(explainList);
+    }
+
+    @Test
+    public void testExplainAuthorizationWithTeam() {
+        //1 team and 2 users
+        final Resource r = rb("myResource1", "event-type")
+                .add(AuthorizationService.Operation.READ, "team", "foo_team")
+                .add(AuthorizationService.Operation.READ, "user", "foo_team_user1")
+                .add(AuthorizationService.Operation.READ, "user", "bar_user")
+                .build();
+
+        //team has 1 member which is already present in auth section
+        when(teamService.getTeamMembers("foo_team"))
+                .thenReturn(Collections.singletonList("foo_team_user1"));
+
+        when(opaClient.getRetailerIdsForUser(eq("foo_team_user1"))).thenReturn(Set.of("retailer_1", "retailer_2"));
+        when(opaClient.getRetailerIdsForUser(eq("bar_user"))).thenReturn(Set.of("*"));
+
+        final var explainList = authzService.explainAuthorization(AuthorizationService.Operation.READ, r);
+        assertThat(explainList.size(), equalTo(3));
+
+        //expect to receive 3 results, 1 for each user and 1 for each team member
+        final var expectedFoo = resourceResultWithParent("user", "foo_team_user1").
+                apply(new SimpleAuthorizationAttribute("team", "foo_team"),
+                        withRestrictedAccess(
+                        "foo_team_user1 has restricted access to the event type",
+                        "retailer_1", "retailer_2"));
+
+        final var expectedBar = resourceResult("user", "bar_user").
+                apply(withFullAccess(
+                        "bar_user has full access to the event type"));
+
+        //auth explain for user directly mentioned in auth
+        final var expectedFooWithoutTeam = resourceResult("user", "foo_team_user1").
+                apply(withRestrictedAccess(
+                        "foo_team_user1 has restricted access to the event type",
+                        "retailer_1", "retailer_2"));
+
+        assertThat(explainList.get(0), equalTo(expectedFoo));
+        assertThat(explainList.get(1), equalTo(expectedBar));
+        assertThat(explainList.get(2), equalTo(expectedFooWithoutTeam));
     }
 
     private static Function<ExplainAttributeResult, ExplainResourceResult> resourceResult(final String type,
@@ -481,15 +512,15 @@ public class TokenAuthorizationServiceTest {
                 new ExplainResourceResultImpl(parentAttr, new SimpleAuthorizationAttribute(type, value), attrResult);
     }
 
-    private static ExplainAttributeResult attributeResultWithRestrictedAccess(final String reason, final String... retailerIds) {
+    private static ExplainAttributeResult withRestrictedAccess(final String reason, final String... retailerIds) {
         return new ExplainAttributeResultImpl(RESTRICTED_ACCESS, MATCHING_EVENT_DISCRIMINATORS, reason, retailerDiscriminators(retailerIds));
     }
 
-    private static ExplainAttributeResult attributeResultWithFullAccess(final String reason) {
+    private static ExplainAttributeResult withFullAccess(final String reason) {
         return new ExplainAttributeResultImpl(FULL_ACCESS, MATCHING_EVENT_DISCRIMINATORS, reason, retailerDiscriminators("*"));
     }
 
-    private static ExplainAttributeResult attributeResultWithNoAccess(final String reason) {
+    private static ExplainAttributeResult withNoAccess(final String reason) {
         return new ExplainAttributeResultImpl(NO_ACCESS, MATCHING_EVENT_DISCRIMINATORS, reason, retailerDiscriminators());
     }
 
