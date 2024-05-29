@@ -51,38 +51,17 @@ public class ExplainController {
             throw new ValidationException(errors);
         }
 
-        /*
-            TODO: validation
-            1. check for required annotation for mcf classification -- done
-            2. Check if user/team/application is valid by appropriate api  --done
-            3. if classification is none then skip --done
-            (only retailer is supported)
-            4. If classification is aspd then throw error (maybe not needed) --done
-            5. If classification is mcf-aspd then only retailer should be present in EOS --done
 
-            TODO: resolve
-            6. If readers.attribute.type is team then resolve it to users --done
-
-            TODO: resolve
-            7. For each user hit OPA and get retailers --done
-
-            TODO: form result
-            8. Create result, put in team ref if present --done
-            9. Put in human readable result probably from constants for different combinations? --done
-         */
-
-        //1.
         final var newAnnotations = Optional.ofNullable(eventTypeAuthExplainRequest.getAnnotations())
                 .orElseGet(Collections::emptyMap);
         eventTypeAnnotationsValidator.validateDataComplianceAnnotations(null, newAnnotations);
 
         final var authResource = eventTypeAuthExplainRequest.asEventTypeBase();
-        //3 and 5.
         EventOwnerValidator.validateEventOwnerSelector(authResource);
-        //2
+
         final Resource eventTypeResource = AuthorizationResourceMapping.mapToResource(authResource);
         authorizationValidator.validateAuthorization(eventTypeResource);
-        //6, 7, 8, 9
+
         final var readersResult = authorizationValidator.explainReadAuthorization(eventTypeResource);
         return ResponseEntity.ok(new EventTypeAuthExplainResult(eventTypeAuthExplainRequest, readersResult));
     }
