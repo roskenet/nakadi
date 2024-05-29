@@ -69,9 +69,6 @@ public class ExplainAttributeResultImpl implements ExplainAttributeResult {
         if (getAccessRestrictionType() != that.getAccessRestrictionType()) {
             return false;
         }
-        if (!getReason().equals(that.getReason())) {
-            return false;
-        }
         return getMatchingEventDiscriminators().equals(that.getMatchingEventDiscriminators());
     }
 
@@ -79,7 +76,6 @@ public class ExplainAttributeResultImpl implements ExplainAttributeResult {
     public int hashCode() {
         int result = getAccessLevel().hashCode();
         result = 31 * result + getAccessRestrictionType().hashCode();
-        result = 31 * result + getReason().hashCode();
         result = 31 * result + getMatchingEventDiscriminators().hashCode();
         return result;
     }
