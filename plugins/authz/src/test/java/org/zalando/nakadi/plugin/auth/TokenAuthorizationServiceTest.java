@@ -19,16 +19,19 @@ import org.zalando.nakadi.plugin.api.exceptions.OperationOnResourceNotPermittedE
 import org.zalando.nakadi.plugin.auth.attribute.SimpleAuthorizationAttribute;
 import org.zalando.nakadi.plugin.auth.subject.EmployeeSubject;
 import org.zalando.nakadi.plugin.auth.subject.Principal;
+import org.zalando.nakadi.plugin.auth.utils.ResourceBuilder;
 import org.zalando.nakadi.plugin.auth.utils.SimpleEventResource;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static junit.framework.TestCase.assertTrue;
 import static org.hamcrest.CoreMatchers.equalTo;
@@ -413,9 +416,7 @@ public class TokenAuthorizationServiceTest {
                 .build();
         final var exception = assertThrows(IllegalArgumentException.class,
                 () -> authzService.explainAuthorization(AuthorizationService.Operation.WRITE, r));
-
         assertThat(exception.getMessage(), equalTo("Only read operation is supported for explain authorization!"));
-
     }
 
     @Test
@@ -428,77 +429,130 @@ public class TokenAuthorizationServiceTest {
     }
 
     @Test
-    public void testExplainAuthorizationWithUsersServices() {
-        final Resource r = rb("myResource1", "event-type")
-                .add(AuthorizationService.Operation.READ, "service", "foo_app")
-                .add(AuthorizationService.Operation.READ, "user", "bar_user")
-                .add(AuthorizationService.Operation.READ, "user", "shoo_user")
-                .build();
+    public void testExplainAuthorizationMCFClassification() {
+        final var fooAppRestricted = resourceResult("service", "foo_app_with_r_ids").
+                apply(withRestrictedAccess("retailer_1", "retailer_2"));
 
-        when(opaClient.getRetailerIdsForService(eq("foo_app"))).thenReturn(Set.of("retailer_1", "retailer_2"));
-        when(opaClient.getRetailerIdsForUser(eq("bar_user"))).thenReturn(Set.of("*"));
-        when(opaClient.getRetailerIdsForUser(eq("shoo_user"))).thenReturn(new HashSet<>());
+        final var barFullAccess = resourceResult("user", "bar_user_star_r_id").
+                apply(withFullAccess("*"));
 
-        final var explainList = authzService.explainAuthorization(AuthorizationService.Operation.READ, r);
-        assertThat(explainList.size(), equalTo(3));
-
-        final var expectedFoo = resourceResult("service", "foo_app").
-                apply(withRestrictedAccess(
-                        "foo_app has restricted access to the event type",
-                        "retailer_1", "retailer_2"));
-
-        final var expectedBar = resourceResult("user", "bar_user").
-                apply(withFullAccess(
-                        "bar_user has full access to the event type"));
-
-        final var expectedShoo = resourceResult("user", "shoo_user").
-                apply(withNoAccess(
-                        "shoo_user has no access to the event type"));
-
-        assertThat(explainList.get(2), equalTo(expectedFoo));
-        assertThat(explainList.get(1), equalTo(expectedBar));
-        assertThat(explainList.get(0), equalTo(expectedShoo));
+        testExplainAuthorization("mcf-aspd", true, fooAppRestricted, barFullAccess);
     }
 
     @Test
-    public void testExplainAuthorizationWithTeam() {
-        //1 team and 2 users
-        final Resource r = rb("myResource1", "event-type")
-                .add(AuthorizationService.Operation.READ, "team", "foo_team")
-                .add(AuthorizationService.Operation.READ, "user", "foo_team_user1")
-                .add(AuthorizationService.Operation.READ, "user", "bar_user")
-                .build();
+    public void testExplainAuthorizationMCFClassificationWithEOS() {
+        final var fooAppNoAccess = resourceResult("service", "foo_app_with_r_ids").
+                apply(withNoAccess("retailer_1", "retailer_2"));
 
-        //team has 1 member which is already present in auth section
-        when(teamService.getTeamMembers("foo_team"))
-                .thenReturn(Collections.singletonList("foo_team_user1"));
+        final var barFullAccess = resourceResult("user", "bar_user_star_r_id").
+                apply(withFullAccess("*"));
 
-        when(opaClient.getRetailerIdsForUser(eq("foo_team_user1"))).thenReturn(Set.of("retailer_1", "retailer_2"));
-        when(opaClient.getRetailerIdsForUser(eq("bar_user"))).thenReturn(Set.of("*"));
+        testExplainAuthorization("mcf-aspd", false, fooAppNoAccess, barFullAccess);
+    }
+
+    @Test
+    public void testExplainAuthorizationASPDClassification() {
+        final var fooAppNoAccess = resourceResult("service", "foo_app_with_r_ids").
+                apply(withNoAccess("retailer_1", "retailer_2"));
+
+        final var barFullAccess = resourceResult("user", "bar_user_star_r_id").
+                apply(withFullAccess("*"));
+        testExplainAuthorization("aspd", false, fooAppNoAccess, barFullAccess);
+    }
+
+    @Test
+    public void testExplainAuthorizationNoneClassification() {
+        final var fooAppFullAcess = resourceResult("service", "foo_app_with_r_ids").
+                apply(withFullAccess("retailer_1", "retailer_2"));
+
+        final var barFullAccess = resourceResult("user", "bar_user_star_r_id").
+                apply(withFullAccess("*"));
+
+        testExplainAuthorization("none", false, fooAppFullAcess, barFullAccess);
+    }
+
+    @Test
+    public void testExplainAuthorizationMCFClassificationWithTeam() {
+        final var fooAppRestricted = resourceResult("service", "foo_app_with_r_ids").
+                apply(withRestrictedAccess("retailer_1", "retailer_2"));
+
+        final var memberNoAccess = resourceResultWithParent("user", "aruha_member_no_r_ids").
+                apply(new SimpleAuthorizationAttribute("team", "aruha"), withNoAccess());
+
+        final var memberFullAccess = resourceResultWithParent("user", "aruha_member_star_r_id").
+                apply(new SimpleAuthorizationAttribute("team", "aruha"), withFullAccess("*"));
+
+        testExplainAuthorization("mcf-aspd", true, fooAppRestricted, memberNoAccess, memberFullAccess);
+    }
+
+
+    // this tests the response when a user is specified as directly in auth section
+    // and as well as part of team
+    @Test
+    public void testExplainAuthorizationMCFClassificationWithTeamMemberDirect() {
+        final var fooApp = resourceResult("service", "foo_app_with_r_ids").
+                apply(withRestrictedAccess("retailer_1", "retailer_2"));
+
+        final var memberNoAccess = resourceResultWithParent("user", "aruha_member_no_r_ids").
+                apply(new SimpleAuthorizationAttribute("team", "aruha"), withNoAccess());
+
+        final var memberFullAcess = resourceResultWithParent("user", "aruha_member_star_r_id").
+                apply(new SimpleAuthorizationAttribute("team", "aruha"), withFullAccess("*"));
+
+        final var directMemberFullAccess = resourceResultWithParent("user", "aruha_member_star_r_id").
+                apply(null, withFullAccess("*"));
+
+        testExplainAuthorization("mcf-aspd", true,
+                fooApp, memberNoAccess, memberFullAcess,  directMemberFullAccess);
+    }
+
+    public void testExplainAuthorization(final String classification, final boolean eosPathExists,
+                                         final ExplainResourceResult... expectedResults) {
+        final ResourceBuilder rb = rb("myResource1", "event-type")
+                .add(AuthorizationService.Operation.READ, "service", "foo_app_with_r_ids")
+                .add(AuthorizationService.Operation.READ, "team", "aruha")
+                .add(AuthorizationService.Operation.READ, "user", "bar_user_star_r_id")
+                .add(AuthorizationService.Operation.READ, "user", "aruha_member_no_r_ids")
+                .add(AuthorizationService.Operation.READ, "user", "aruha_member_star_r_id")
+                .add(AuthorizationService.Operation.READ, "user", "direct_aruha_member_star_r_id");
+
+        if (classification != null) {
+           rb.add(AuthorizationService.Operation.READ, "aspd-classification", classification);
+        }
+        if (eosPathExists) {
+            rb.add(AuthorizationService.Operation.READ, "event_owner_selector.name", "some-path");
+        }
+
+        when(teamService.getTeamMembers("aruha"))
+                .thenReturn(List.of(
+                        "aruha_member_no_r_ids",
+                        "aruha_member_star_r_id",
+                        "direct_aruha_member_star_r_id"));
+
+        final Resource r = rb.build();
+
+        when(opaClient.getRetailerIdsForService(eq("foo_app_with_r_ids"))).
+                thenReturn(Set.of("retailer_1", "retailer_2"));
+        when(opaClient.getRetailerIdsForUser(eq("bar_user_star_r_id"))).thenReturn(Set.of("*"));
+        when(opaClient.getRetailerIdsForUser(eq("aruha_member_no_r_ids"))).thenReturn(new HashSet<>());
+        when(opaClient.getRetailerIdsForUser(eq("aruha_member_star_r_id"))).thenReturn(Set.of("*"));
 
         final var explainList = authzService.explainAuthorization(AuthorizationService.Operation.READ, r);
-        assertThat(explainList.size(), equalTo(3));
 
-        //expect to receive 3 results, 1 for each user and 1 for each team member
-        final var expectedFoo = resourceResultWithParent("user", "foo_team_user1").
-                apply(new SimpleAuthorizationAttribute("team", "foo_team"),
-                        withRestrictedAccess(
-                        "foo_team_user1 has restricted access to the event type",
-                        "retailer_1", "retailer_2"));
+        final BiFunction<AuthorizationAttribute, AuthorizationAttribute, String> getKey =
+                (sub, parent) -> sub.toString() + (parent == null? "": parent.toString());
+        final var subject = explainList.stream().
+                collect(Collectors.
+                        groupingBy(res -> getKey.apply(res.getAuthAttribute(), res.getParentAuthAttribute()))).
+                entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().get(0)));
 
-        final var expectedBar = resourceResult("user", "bar_user").
-                apply(withFullAccess(
-                        "bar_user has full access to the event type"));
-
-        //auth explain for user directly mentioned in auth
-        final var expectedFooWithoutTeam = resourceResult("user", "foo_team_user1").
-                apply(withRestrictedAccess(
-                        "foo_team_user1 has restricted access to the event type",
-                        "retailer_1", "retailer_2"));
-
-        assertThat(explainList.get(0), equalTo(expectedFoo));
-        assertThat(explainList.get(1), equalTo(expectedBar));
-        assertThat(explainList.get(2), equalTo(expectedFooWithoutTeam));
+        for (final var expected : expectedResults) {
+            assertThat(subject.get(
+                            getKey.apply(
+                                    expected.getAuthAttribute(),
+                                    expected.getParentAuthAttribute())),
+                    equalTo(expected));
+        }
     }
 
     private static Function<ExplainAttributeResult, ExplainResourceResult> resourceResult(final String type,
@@ -514,20 +568,19 @@ public class TokenAuthorizationServiceTest {
                 new ExplainResourceResultImpl(parentAttr, new SimpleAuthorizationAttribute(type, value), attrResult);
     }
 
-    private static ExplainAttributeResult withRestrictedAccess(final String reason,
-                                                               final String... retailerIds) {
+    private static ExplainAttributeResult withRestrictedAccess(final String... retailerIds) {
         return new ExplainAttributeResultImpl(RESTRICTED_ACCESS, MATCHING_EVENT_DISCRIMINATORS,
-                reason, retailerDiscriminators(retailerIds));
+                "", retailerDiscriminators(retailerIds));
     }
 
-    private static ExplainAttributeResult withFullAccess(final String reason) {
+    private static ExplainAttributeResult withFullAccess(final String... retailerIds) {
         return new ExplainAttributeResultImpl(FULL_ACCESS, MATCHING_EVENT_DISCRIMINATORS,
-                reason, retailerDiscriminators("*"));
+                "", retailerDiscriminators(retailerIds));
     }
 
-    private static ExplainAttributeResult withNoAccess(final String reason) {
+    private static ExplainAttributeResult withNoAccess(final String... retailerIds) {
         return new ExplainAttributeResultImpl(NO_ACCESS, MATCHING_EVENT_DISCRIMINATORS,
-                reason, retailerDiscriminators());
+                "", retailerDiscriminators(retailerIds));
     }
 
     private static List<MatchingEventDiscriminator> retailerDiscriminators(final String... retailerIds) {
