@@ -215,14 +215,13 @@ paths:
           schema:
             $ref: '#/definitions/Problem'
 
-  /test-event-types:
+  /explanations/{explain-type}:
     post:
       tags:
         - explain-api
       description: |
         Assuming that a new event type could be successfully created with the
-        provided EventType definition (e.g. existing event type with the same
-        name is ignored), returns the detailed explanation about various event
+        defined parameters, returns the detailed explanation about various event
         type run-time behavior aspects, such as authorization in the context
         of MCF ASPD.
       parameters:
@@ -230,24 +229,18 @@ paths:
           in: body
           description: EventType to be tested
           schema:
-            $ref: '#/definitions/EventType'
+            $ref: '#/definitions/EventTypeAuthExplainRequest'
           required: true
-        - name: explain
-          in: query
-          description: The "explain mode" for event type test operation.
-          collectionFormat: multi
-          type: array
-          items:
-            type: string
-            x-extensible-enum:
-              - all
-              - authorization
+        - name: explain-type
+          in: path
+          type: string
+          description: The "explain type" which can be explained. Only "event-type-auth" is accepted currently.
           required: true
       responses:
         '200':
           description: Explain operation was successful
           schema:
-            $ref: '#/definitions/EventTypeExplainResult'
+            $ref: '#/definitions/EventTypeAuthExplainResult'
 
   /event-types/{name}:
     get:
@@ -3220,70 +3213,35 @@ definitions:
           authorization.
         example: 'data.security.team'
 
-
-  EventTypeExplainResult:
+  EventTypeAuthExplainRequest:
     type: object
     properties:
-      explain_result:
-        type: object
-        properties:
-          authorization:
-            $ref: '#/definitions/ExplainAuthorizationResult'
+      annotations:
+        $ref: '#/definitions/Annotations'
+      event_owner_selector:
+        $ref: '#/definitions/EventOwnerSelector'
+      authorization:
+        $ref: '#/definitions/EventTypeAuthorization'
     required:
-      - explain_result
+      - authorization
 
-  ExplainAuthorizationResult:
+  EventTypeAuthExplainResult:
     type: object
     properties:
-      context:
-        type: object
-        properties:
-          data_classifications:
-            type: array
-            items:
-              type: object
-              properties:
-                name:
-                  type: string
-                  x-extensible-enum:
-                    - aspd
-                value:
-                  type:
-                    - string
-                    - null
-                source:
-                  type: string
-                  example: "annotations['org.zalando.compliance/aspd-data-classification']"
-              required:
-                - name
-                - value
-                - source
-          event_discriminators:
-            type: array
-            items:
-              type: object
-              properties:
-                name:
-                  type: string
-                  example: "retailer_id"
-                source:
-                  type: string
-                  example: "event_owner_selector.name"
-              required:
-                - name
-                - source
-        required:
-          - data_classifications
-          - event_discriminators
       readers:
         type: array
         items:
           type: object
           properties:
-            subject:
+            parent_auth_attribute:
+              $ref: '#/definitions/AuthorizationAttribute'
+            auth_attribute:
               $ref: '#/definitions/AuthorizationAttribute'
             result:
               $ref: '#/definitions/ExplainAuthorizationAttributeResult'
+          required:
+            - auth_attribute
+            - result
 
   ExplainAuthorizationAttributeResult:
     type: object
