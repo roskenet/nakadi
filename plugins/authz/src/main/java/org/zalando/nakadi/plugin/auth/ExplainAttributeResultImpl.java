@@ -4,6 +4,7 @@ import org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult;
 import org.zalando.nakadi.plugin.api.authz.MatchingEventDiscriminator;
 
 import java.util.List;
+import java.util.Objects;
 
 public class ExplainAttributeResultImpl implements ExplainAttributeResult {
    private AccessLevel accessLevel;
@@ -51,7 +52,6 @@ public class ExplainAttributeResultImpl implements ExplainAttributeResult {
                 '}';
     }
 
-
     @Override
     public boolean equals(final Object o) {
         if (this == o) {
@@ -60,23 +60,17 @@ public class ExplainAttributeResultImpl implements ExplainAttributeResult {
         if (!(o instanceof ExplainAttributeResultImpl)) {
             return false;
         }
-
         final ExplainAttributeResultImpl that = (ExplainAttributeResultImpl) o;
-
-        if (getAccessLevel() != that.getAccessLevel()) {
-            return false;
-        }
-        if (getAccessRestrictionType() != that.getAccessRestrictionType()) {
-            return false;
-        }
-        return getMatchingEventDiscriminators().equals(that.getMatchingEventDiscriminators());
+        return getAccessLevel() == that.getAccessLevel() &&
+                getAccessRestrictionType() == that.getAccessRestrictionType() &&
+                Objects.equals(getMatchingEventDiscriminators(),
+                        that.getMatchingEventDiscriminators());
     }
 
     @Override
     public int hashCode() {
-        int result = getAccessLevel().hashCode();
-        result = 31 * result + getAccessRestrictionType().hashCode();
-        result = 31 * result + getMatchingEventDiscriminators().hashCode();
-        return result;
+        return Objects.hash(getAccessLevel(),
+                getAccessRestrictionType(),
+                getMatchingEventDiscriminators());
     }
 }

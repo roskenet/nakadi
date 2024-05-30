@@ -4,6 +4,8 @@ import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
 import org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult;
 import org.zalando.nakadi.plugin.api.authz.ExplainResourceResult;
 
+import java.util.Objects;
+
 public class ExplainResourceResultImpl implements ExplainResourceResult {
     private final AuthorizationAttribute parentAuthAttribute;
     private final AuthorizationAttribute authAttribute;
@@ -49,23 +51,15 @@ public class ExplainResourceResultImpl implements ExplainResourceResult {
         if (!(o instanceof ExplainResourceResultImpl)) {
             return false;
         }
-
         final ExplainResourceResultImpl that = (ExplainResourceResultImpl) o;
-        if (getParentAuthAttribute() != null ? !getParentAuthAttribute().
-                equals(that.getParentAuthAttribute()) : that.getParentAuthAttribute() != null){
-            return false;
-        }
-        if (!getAuthAttribute().equals(that.getAuthAttribute())) {
-            return false;
-        }
-        return getResult().equals(that.getResult());
+        return Objects.equals(getParentAuthAttribute(), that.getParentAuthAttribute()) &&
+                Objects.equals(getAuthAttribute(), that.getAuthAttribute())
+                && Objects.equals(getResult(), that.getResult());
     }
 
     @Override
     public int hashCode() {
-        int result1 = getParentAuthAttribute() != null ? getParentAuthAttribute().hashCode() : 0;
-        result1 = 31 * result1 + getAuthAttribute().hashCode();
-        result1 = 31 * result1 + getResult().hashCode();
-        return result1;
+        return Objects.hash(getParentAuthAttribute(),
+                getAuthAttribute(), getResult());
     }
 }

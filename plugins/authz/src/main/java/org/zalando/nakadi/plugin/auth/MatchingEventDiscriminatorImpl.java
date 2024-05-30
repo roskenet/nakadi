@@ -2,6 +2,7 @@ package org.zalando.nakadi.plugin.auth;
 
 import org.zalando.nakadi.plugin.api.authz.MatchingEventDiscriminator;
 
+import java.util.Objects;
 import java.util.Set;
 
 public class MatchingEventDiscriminatorImpl implements MatchingEventDiscriminator {
@@ -40,19 +41,13 @@ public class MatchingEventDiscriminatorImpl implements MatchingEventDiscriminato
         if (!(o instanceof MatchingEventDiscriminatorImpl)) {
             return false;
         }
-
         final MatchingEventDiscriminatorImpl that = (MatchingEventDiscriminatorImpl) o;
-
-        if (!getName().equals(that.getName())) {
-            return false;
-        }
-        return getValues().equals(that.getValues());
+        return Objects.equals(getName(), that.getName()) &&
+                Objects.equals(getValues(), that.getValues());
     }
 
     @Override
     public int hashCode() {
-        int result = getName().hashCode();
-        result = 31 * result + getValues().hashCode();
-        return result;
+        return Objects.hash(getName(), getValues());
     }
 }
