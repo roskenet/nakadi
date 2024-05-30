@@ -7,10 +7,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
+import org.zalando.nakadi.exceptions.runtime.InvalidEventTypeException;
+import org.zalando.nakadi.exceptions.runtime.UnableProcessException;
 import org.zalando.nakadi.exceptions.runtime.ValidationException;
 import org.zalando.nakadi.model.EventTypeAuthExplainRequest;
 import org.zalando.nakadi.model.EventTypeAuthExplainResult;
 import org.zalando.nakadi.plugin.api.authz.Resource;
+import org.zalando.nakadi.plugin.api.exceptions.AuthorizationInvalidException;
 import org.zalando.nakadi.service.AuthorizationValidator;
 import org.zalando.nakadi.service.auth.AuthorizationResourceMapping;
 import org.zalando.nakadi.service.validation.EventOwnerValidator;
@@ -37,7 +40,9 @@ public class ExplainController {
     @RequestMapping(value = "/event-type-auth", method = RequestMethod.POST)
     public ResponseEntity<EventTypeAuthExplainResult> explainEventTypeAuth(
             @Valid @RequestBody final EventTypeAuthExplainRequest eventTypeAuthExplainRequest,
-            final Errors errors) {
+            final Errors errors)
+            throws IllegalArgumentException, InvalidEventTypeException,
+            AuthorizationInvalidException, UnableProcessException {
         if (errors.hasErrors()) {
             throw new ValidationException(errors);
         }
