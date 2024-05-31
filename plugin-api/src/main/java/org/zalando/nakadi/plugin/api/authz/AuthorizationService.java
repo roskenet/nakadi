@@ -61,6 +61,6 @@ public interface AuthorizationService {
      */
     Optional<Subject> getSubject() throws PluginException;
 
-    List<ExplainResourceResult> explainAuthorization(Operation operation, Resource resource)
+    List<ExplainResourceResult> explainAuthorization(Resource resource)
             throws PluginException;
 }
