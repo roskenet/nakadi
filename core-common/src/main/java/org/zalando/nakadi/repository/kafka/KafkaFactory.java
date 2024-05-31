@@ -9,9 +9,11 @@ import org.apache.kafka.clients.producer.Producer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -39,7 +41,8 @@ public class KafkaFactory {
         LOG.info("Allocating {} Kafka producers for storage {}", numActiveProducers, storageId);
         this.producers = new ArrayList<>(numActiveProducers);
         for (int i = 0; i < numActiveProducers; ++i) {
-            this.producers.add(createProducerInstance());
+            final String clientId = String.format("nakadi_%s-%d", storageId, i);
+            this.producers.add(createProducerInstance(clientId));
         }
 
         if (consumerPoolSize > 0) {
@@ -116,8 +119,9 @@ public class KafkaFactory {
         return new KafkaConsumer<byte[], byte[]>(properties);
     }
 
-    protected Producer<byte[], byte[]> createProducerInstance() {
-        return new KafkaProducer<byte[], byte[]>(kafkaLocationManager.getKafkaProducerProperties());
+    protected Producer<byte[], byte[]> createProducerInstance(@Nullable final String clientId) {
+        return new KafkaProducer<>(kafkaLocationManager.getKafkaProducerProperties(
+                Optional.ofNullable(clientId)));
     }
 
     protected Consumer<byte[], byte[]> createConsumerProxyInstance() {
