@@ -3233,14 +3233,14 @@ definitions:
         items:
           type: object
           properties:
-            parent_auth_attribute:
+            target_attribute:
               $ref: '#/definitions/AuthorizationAttribute'
-            auth_attribute:
+            primary_attribute:
               $ref: '#/definitions/AuthorizationAttribute'
             result:
               $ref: '#/definitions/ExplainAuthorizationAttributeResult'
           required:
-            - auth_attribute
+            - primary_attribute
             - result
 
   ExplainAuthorizationAttributeResult:
