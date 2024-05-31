@@ -4,24 +4,24 @@ import java.util.Objects;
 import java.util.Optional;
 
 public class ExplainResourceResult {
-    private final AuthorizationAttribute parentAuthAttribute;
-    private final AuthorizationAttribute authAttribute;
+    private final AuthorizationAttribute targetAttribute;
+    private final AuthorizationAttribute primaryAttribute;
     private final ExplainAttributeResult result;
 
-    public ExplainResourceResult(final AuthorizationAttribute parentAuthAttribute,
-                                 final AuthorizationAttribute authAttribute,
+    public ExplainResourceResult(final AuthorizationAttribute targetAttribute,
+                                 final AuthorizationAttribute primaryAttribute,
                                  final ExplainAttributeResult result) {
-        this.parentAuthAttribute = parentAuthAttribute;
-        this.authAttribute = authAttribute;
+        this.targetAttribute = targetAttribute;
+        this.primaryAttribute = primaryAttribute;
         this.result = result;
     }
 
-    public AuthorizationAttribute getParentAuthAttribute() {
-        return parentAuthAttribute;
+    public Optional<AuthorizationAttribute> getTargetAttribute() {
+        return Optional.ofNullable(targetAttribute);
     }
 
-    public Optional<AuthorizationAttribute> getAuthAttribute() {
-        return Optional.ofNullable(authAttribute);
+    public AuthorizationAttribute getPrimaryAttribute() {
+        return primaryAttribute;
     }
 
     public ExplainAttributeResult getResult() {
@@ -31,8 +31,8 @@ public class ExplainResourceResult {
     @Override
     public String toString() {
         return "ExplainResourceResult {" +
-                "parentAuthAttribute=" + parentAuthAttribute +
-                ", authAttribute=" + authAttribute +
+                "targetAttribute=" + targetAttribute +
+                ", primaryAttribute=" + primaryAttribute +
                 ", result=" + result +
                 '}';
     }
@@ -46,14 +46,14 @@ public class ExplainResourceResult {
             return false;
         }
         final ExplainResourceResult that = (ExplainResourceResult) o;
-        return Objects.equals(getParentAuthAttribute(), that.getParentAuthAttribute()) &&
-                Objects.equals(getAuthAttribute(), that.getAuthAttribute())
+        return Objects.equals(getTargetAttribute(), that.getTargetAttribute()) &&
+                Objects.equals(getPrimaryAttribute(), that.getPrimaryAttribute())
                 && Objects.equals(getResult(), that.getResult());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getParentAuthAttribute(),
-                getAuthAttribute(), getResult());
+        return Objects.hash(getTargetAttribute(),
+                getPrimaryAttribute(), getResult());
     }
 }

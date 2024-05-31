@@ -419,7 +419,11 @@ public class TokenAuthorizationService implements AuthorizationService {
                     new ExplainAttributeResult(accessLevel,
                             ExplainAttributeResult.AccessRestrictionType.MATCHING_EVENT_DISCRIMINATORS,
                             reason, retailerIdDiscriminators);
-            resultList.add(new ExplainResourceResult(teamAttr, subjectRetailersPair.getKey(), explainAttrResult));
+            if (teamAttr == null) {
+                resultList.add(new ExplainResourceResult(null, subjectRetailersPair.getKey(), explainAttrResult));
+            } else {
+                resultList.add(new ExplainResourceResult(subjectRetailersPair.getKey(), teamAttr, explainAttrResult));
+            }
         }
         return resultList;
     }

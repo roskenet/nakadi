@@ -30,7 +30,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static junit.framework.TestCase.assertTrue;
@@ -422,80 +421,98 @@ public class TokenAuthorizationServiceTest {
 
     @Test
     public void testExplainAuthorizationMCFClassification() {
-        final var fooAppRestricted = resourceResult("service", "foo_app_with_r_ids").
-                apply(withRestrictedAccess("retailer_1", "retailer_2"));
+        final var fooAppRestricted = explainResource(
+                authAttr("service", "foo_app_with_r_ids"),
+                withRestrictedAccess("retailer_1", "retailer_2"));
 
-        final var barFullAccess = resourceResult("user", "bar_user_star_r_id").
-                apply(withFullAccess("*"));
+        final var barFullAccess = explainResource(
+                authAttr("user", "bar_user_star_r_id"),
+                withFullAccess("*"));
 
         testExplainAuthorization("mcf-aspd", true, fooAppRestricted, barFullAccess);
     }
 
     @Test
     public void testExplainAuthorizationMCFClassificationWithEOS() {
-        final var fooAppNoAccess = resourceResult("service", "foo_app_with_r_ids").
-                apply(withNoAccess("retailer_1", "retailer_2"));
+        final var fooAppNoAccess = explainResource(
+                authAttr("service", "foo_app_with_r_ids"),
+                withNoAccess("retailer_1", "retailer_2"));
 
-        final var barFullAccess = resourceResult("user", "bar_user_star_r_id").
-                apply(withFullAccess("*"));
+        final var barFullAccess = explainResource(
+                authAttr("user", "bar_user_star_r_id"),
+                withFullAccess("*"));
 
         testExplainAuthorization("mcf-aspd", false, fooAppNoAccess, barFullAccess);
     }
 
     @Test
     public void testExplainAuthorizationASPDClassification() {
-        final var fooAppNoAccess = resourceResult("service", "foo_app_with_r_ids").
-                apply(withNoAccess("retailer_1", "retailer_2"));
+        final var fooAppNoAccess = explainResource(
+                authAttr("service", "foo_app_with_r_ids"),
+                withNoAccess("retailer_1", "retailer_2"));
 
-        final var barFullAccess = resourceResult("user", "bar_user_star_r_id").
-                apply(withFullAccess("*"));
+        final var barFullAccess = explainResource(
+                authAttr("user", "bar_user_star_r_id"),
+                withFullAccess("*"));
         testExplainAuthorization("aspd", false, fooAppNoAccess, barFullAccess);
     }
 
     @Test
     public void testExplainAuthorizationNoneClassification() {
-        final var fooAppFullAcess = resourceResult("service", "foo_app_with_r_ids").
-                apply(withFullAccess("retailer_1", "retailer_2"));
+        final var fooAppFullAccess = explainResource(
+                authAttr("service", "foo_app_with_r_ids"),
+                withFullAccess("retailer_1", "retailer_2"));
 
-        final var barFullAccess = resourceResult("user", "bar_user_star_r_id").
-                apply(withFullAccess("*"));
-
-        testExplainAuthorization("none", false, fooAppFullAcess, barFullAccess);
+        final var barFullAccess = explainResource(
+                authAttr("user", "bar_user_star_r_id"),
+                withFullAccess("*"));
+        testExplainAuthorization("none", false, fooAppFullAccess, barFullAccess);
     }
 
     @Test
     public void testExplainAuthorizationMCFClassificationWithTeam() {
-        final var fooAppRestricted = resourceResult("service", "foo_app_with_r_ids").
-                apply(withRestrictedAccess("retailer_1", "retailer_2"));
+        final var fooAppRestricted =
+                explainResource(
+                        authAttr("service", "foo_app_with_r_ids"),
+                        withRestrictedAccess("retailer_1", "retailer_2"));
 
-        final var memberNoAccess = resourceResultWithParent("user", "aruha_member_no_r_ids").
-                apply(new SimpleAuthorizationAttribute("team", "aruha"), withNoAccess());
+        final var memberNoAccess = explainResource(
+                authAttr("team", "aruha"),
+                authAttr("user", "aruha_member_no_r_ids"),
+                withNoAccess());
 
-        final var memberFullAccess = resourceResultWithParent("user", "aruha_member_star_r_id").
-                apply(new SimpleAuthorizationAttribute("team", "aruha"), withFullAccess("*"));
+        final var memberFullAccess = explainResource(
+                authAttr("team", "aruha"),
+                authAttr("user", "aruha_member_star_r_id"),
+                withFullAccess("*"));
 
         testExplainAuthorization("mcf-aspd", true, fooAppRestricted, memberNoAccess, memberFullAccess);
     }
-
 
     // this tests the response when a user is specified as directly in auth section
     // and as well as part of team
     @Test
     public void testExplainAuthorizationMCFClassificationWithTeamMemberDirect() {
-        final var fooApp = resourceResult("service", "foo_app_with_r_ids").
-                apply(withRestrictedAccess("retailer_1", "retailer_2"));
+        final var fooApp = explainResource(authAttr("service", "foo_app_with_r_ids"),
+                withRestrictedAccess("retailer_1", "retailer_2"));
 
-        final var memberNoAccess = resourceResultWithParent("user", "aruha_member_no_r_ids").
-                apply(new SimpleAuthorizationAttribute("team", "aruha"), withNoAccess());
+        final var memberNoAccess = explainResource(
+                authAttr("team", "aruha"),
+                authAttr("user", "aruha_member_no_r_ids"),
+                withNoAccess());
 
-        final var memberFullAcess = resourceResultWithParent("user", "aruha_member_star_r_id").
-                apply(new SimpleAuthorizationAttribute("team", "aruha"), withFullAccess("*"));
+        final var memberFullAcess = explainResource(
+                authAttr("team", "aruha"),
+                authAttr("user", "aruha_member_star_r_id"),
+                withFullAccess("*"));
 
-        final var directMemberFullAccess = resourceResultWithParent("user", "aruha_member_star_r_id").
-                apply(null, withFullAccess("*"));
+        final var directMemberFullAccess = explainResource(
+                authAttr("team", "aruha"),
+                authAttr("user", "aruha_member_star_r_id"),
+                withFullAccess("*"));
 
         testExplainAuthorization("mcf-aspd", true,
-                fooApp, memberNoAccess, memberFullAcess,  directMemberFullAccess);
+                fooApp, memberNoAccess, memberFullAcess, directMemberFullAccess);
     }
 
     public void testExplainAuthorization(final String classification, final boolean eosPathExists,
@@ -509,7 +526,7 @@ public class TokenAuthorizationServiceTest {
                 .add(AuthorizationService.Operation.READ, "user", "direct_aruha_member_star_r_id");
 
         if (classification != null) {
-           rb.add(AuthorizationService.Operation.READ, "aspd-classification", classification);
+            rb.add(AuthorizationService.Operation.READ, "aspd-classification", classification);
         }
         if (eosPathExists) {
             rb.add(AuthorizationService.Operation.READ, "event_owner_selector.name", "some-path");
@@ -531,33 +548,31 @@ public class TokenAuthorizationServiceTest {
 
         final var explainList = authzService.explainAuthorization(r);
 
-        final BiFunction<AuthorizationAttribute, AuthorizationAttribute, String> getKey =
-                (sub, parent) -> sub.toString() + (parent == null? "": parent.toString());
+        final BiFunction<AuthorizationAttribute, Optional<AuthorizationAttribute>, String> getKey =
+                (sub, target) -> sub.toString() + (target.isEmpty() ? "" : target.get().toString());
         final var subject = explainList.stream().
                 collect(Collectors.
-                        groupingBy(res -> getKey.apply(res.getAuthAttribute().get(), res.getParentAuthAttribute()))).
+                        groupingBy(res -> getKey.apply(res.getPrimaryAttribute(), res.getTargetAttribute()))).
                 entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().get(0)));
 
         for (final var expected : expectedResults) {
             assertThat(subject.get(
                             getKey.apply(
-                                    expected.getAuthAttribute().get(),
-                                    expected.getParentAuthAttribute())),
+                                    expected.getPrimaryAttribute(),
+                                    expected.getTargetAttribute())),
                     equalTo(expected));
         }
     }
 
-    private static Function<ExplainAttributeResult, ExplainResourceResult> resourceResult(final String type,
-                                                                                          final String value) {
-        return attrResult ->
-                new ExplainResourceResult(null, new SimpleAuthorizationAttribute(type, value), attrResult);
+    private static ExplainResourceResult explainResource(final AuthorizationAttribute authAttr,
+                                                         final AuthorizationAttribute targetAttr,
+                                                         final ExplainAttributeResult result) {
+        return new ExplainResourceResult(targetAttr, authAttr, result);
     }
 
-    private static BiFunction<AuthorizationAttribute, ExplainAttributeResult, ExplainResourceResult>
-    resourceResultWithParent(final String type,
-                             final String value) {
-        return (parentAttr, attrResult) ->
-                new ExplainResourceResult(parentAttr, new SimpleAuthorizationAttribute(type, value), attrResult);
+    private static ExplainResourceResult explainResource(final AuthorizationAttribute authAttr,
+                                                         final ExplainAttributeResult result) {
+        return explainResource(authAttr, null, result);
     }
 
     private static ExplainAttributeResult withRestrictedAccess(final String... retailerIds) {
@@ -578,5 +593,10 @@ public class TokenAuthorizationServiceTest {
     private static List<MatchingEventDiscriminator> retailerDiscriminators(final String... retailerIds) {
        return List.of(new MatchingEventDiscriminator("retailer_id",
                new HashSet<>(List.of(retailerIds))));
+    }
+
+    private static AuthorizationAttribute authAttr(final String type,
+                                                   final String value) {
+        return new SimpleAuthorizationAttribute(type, value);
     }
 }
