@@ -2,14 +2,12 @@ package org.zalando.nakadi.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.Errors;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 import org.zalando.nakadi.exceptions.runtime.InvalidEventTypeException;
 import org.zalando.nakadi.exceptions.runtime.UnableProcessException;
-import org.zalando.nakadi.exceptions.runtime.ValidationException;
 import org.zalando.nakadi.model.EventTypeAuthExplainRequest;
 import org.zalando.nakadi.model.EventTypeAuthExplainResult;
 import org.zalando.nakadi.plugin.api.authz.Resource;
@@ -39,13 +37,9 @@ public class ExplainController {
     }
     @RequestMapping(value = "/event-type-auth", method = RequestMethod.POST)
     public ResponseEntity<EventTypeAuthExplainResult> explainEventTypeAuth(
-            @Valid @RequestBody final EventTypeAuthExplainRequest eventTypeAuthExplainRequest,
-            final Errors errors)
+            @Valid @RequestBody final EventTypeAuthExplainRequest eventTypeAuthExplainRequest)
             throws IllegalArgumentException, InvalidEventTypeException,
             AuthorizationInvalidException, UnableProcessException {
-        if (errors.hasErrors()) {
-            throw new ValidationException(errors);
-        }
 
         final var newAnnotations = Optional.ofNullable(eventTypeAuthExplainRequest.getAnnotations())
                 .orElseGet(Collections::emptyMap);

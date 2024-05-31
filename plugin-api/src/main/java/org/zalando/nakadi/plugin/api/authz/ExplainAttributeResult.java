@@ -14,9 +14,9 @@ public class ExplainAttributeResult {
     }
 
     private AccessLevel accessLevel;
-   private AccessRestrictionType accessRestrictionType;
-   private String reason;
-   private List<MatchingEventDiscriminator> matchingEventDiscriminators;
+    private AccessRestrictionType accessRestrictionType;
+    private String reason;
+    private List<MatchingEventDiscriminator> matchingEventDiscriminators;
 
     public ExplainAttributeResult(final AccessLevel accessLevel,
                                   final AccessRestrictionType accessRestrictionType,
