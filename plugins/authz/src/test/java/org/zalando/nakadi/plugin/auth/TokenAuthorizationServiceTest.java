@@ -410,21 +410,13 @@ public class TokenAuthorizationServiceTest {
                 authzService.isAuthorized(AuthorizationService.Operation.WRITE, r));
     }
 
-    @Test
-    public void testExplainAuthorizationOnlySupportsRead() {
-        final Resource r = rb("myResource1", "event-type")
-                .build();
-        final var exception = assertThrows(IllegalArgumentException.class,
-                () -> authzService.explainAuthorization(AuthorizationService.Operation.WRITE, r));
-        assertThat(exception.getMessage(), equalTo("Only read operation is supported for explain authorization!"));
-    }
 
     @Test
     public void testExplainAuthorizationOnlySupportsEventTypeResource() {
         final Resource r = rb("myResource1", "subscription")
                 .build();
         final var exception = assertThrows(IllegalArgumentException.class,
-                () -> authzService.explainAuthorization(AuthorizationService.Operation.READ, r));
+                () -> authzService.explainAuthorization(r));
         assertThat(exception.getMessage(), equalTo("Only resource of type event-type is supported!"));
     }
 
@@ -537,7 +529,7 @@ public class TokenAuthorizationServiceTest {
         when(opaClient.getRetailerIdsForUser(eq("aruha_member_no_r_ids"))).thenReturn(new HashSet<>());
         when(opaClient.getRetailerIdsForUser(eq("aruha_member_star_r_id"))).thenReturn(Set.of("*"));
 
-        final var explainList = authzService.explainAuthorization(AuthorizationService.Operation.READ, r);
+        final var explainList = authzService.explainAuthorization(r);
 
         final BiFunction<AuthorizationAttribute, AuthorizationAttribute, String> getKey =
                 (sub, parent) -> sub.toString() + (parent == null? "": parent.toString());
@@ -558,33 +550,33 @@ public class TokenAuthorizationServiceTest {
     private static Function<ExplainAttributeResult, ExplainResourceResult> resourceResult(final String type,
                                                                                           final String value) {
         return attrResult ->
-                new ExplainResourceResultImpl(null, new SimpleAuthorizationAttribute(type, value), attrResult);
+                new ExplainResourceResult(null, new SimpleAuthorizationAttribute(type, value), attrResult);
     }
 
     private static BiFunction<AuthorizationAttribute, ExplainAttributeResult, ExplainResourceResult>
     resourceResultWithParent(final String type,
                              final String value) {
         return (parentAttr, attrResult) ->
-                new ExplainResourceResultImpl(parentAttr, new SimpleAuthorizationAttribute(type, value), attrResult);
+                new ExplainResourceResult(parentAttr, new SimpleAuthorizationAttribute(type, value), attrResult);
     }
 
     private static ExplainAttributeResult withRestrictedAccess(final String... retailerIds) {
-        return new ExplainAttributeResultImpl(RESTRICTED_ACCESS, MATCHING_EVENT_DISCRIMINATORS,
+        return new ExplainAttributeResult(RESTRICTED_ACCESS, MATCHING_EVENT_DISCRIMINATORS,
                 "", retailerDiscriminators(retailerIds));
     }
 
     private static ExplainAttributeResult withFullAccess(final String... retailerIds) {
-        return new ExplainAttributeResultImpl(FULL_ACCESS, MATCHING_EVENT_DISCRIMINATORS,
+        return new ExplainAttributeResult(FULL_ACCESS, MATCHING_EVENT_DISCRIMINATORS,
                 "", retailerDiscriminators(retailerIds));
     }
 
     private static ExplainAttributeResult withNoAccess(final String... retailerIds) {
-        return new ExplainAttributeResultImpl(NO_ACCESS, MATCHING_EVENT_DISCRIMINATORS,
+        return new ExplainAttributeResult(NO_ACCESS, MATCHING_EVENT_DISCRIMINATORS,
                 "", retailerDiscriminators(retailerIds));
     }
 
     private static List<MatchingEventDiscriminator> retailerDiscriminators(final String... retailerIds) {
-       return List.of(new MatchingEventDiscriminatorImpl("retailer_id",
+       return List.of(new MatchingEventDiscriminator("retailer_id",
                new HashSet<>(List.of(retailerIds))));
     }
 }

@@ -325,11 +325,8 @@ public class TokenAuthorizationService implements AuthorizationService {
     }
 
     @Override
-    public List<ExplainResourceResult> explainAuthorization(final Operation operation,
-                                                            final Resource resource) throws PluginException {
-        if (operation != Operation.READ) {
-            throw new IllegalArgumentException("Only read operation is supported for explain authorization!");
-        }
+    public List<ExplainResourceResult> explainAuthorization(final Resource resource)
+            throws PluginException {
 
         if (!resource.getType().equals(EVENT_TYPE_RESOURCE)) {
             throw new IllegalArgumentException("Only resource of type " + EVENT_TYPE_RESOURCE + " is supported!");
@@ -415,14 +412,14 @@ public class TokenAuthorizationService implements AuthorizationService {
             final var reason = getReason(subjectRetailersPair.getKey().getValue(), accessLevel);
 
             final List<MatchingEventDiscriminator> retailerIdDiscriminators =
-                    List.of(new MatchingEventDiscriminatorImpl(EOS_RETAILER_ID,
+                    List.of(new MatchingEventDiscriminator(EOS_RETAILER_ID,
                             subjectRetailersPair.getValue()));
 
             final var explainAttrResult =
-                    new ExplainAttributeResultImpl(accessLevel,
+                    new ExplainAttributeResult(accessLevel,
                             ExplainAttributeResult.AccessRestrictionType.MATCHING_EVENT_DISCRIMINATORS,
                             reason, retailerIdDiscriminators);
-            resultList.add(new ExplainResourceResultImpl(teamAttr, subjectRetailersPair.getKey(), explainAttrResult));
+            resultList.add(new ExplainResourceResult(teamAttr, subjectRetailersPair.getKey(), explainAttrResult));
         }
         return resultList;
     }

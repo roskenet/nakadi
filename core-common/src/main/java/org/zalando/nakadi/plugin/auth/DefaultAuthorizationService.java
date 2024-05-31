@@ -37,8 +37,8 @@ public class DefaultAuthorizationService implements AuthorizationService {
     }
 
     @Override
-    public List<ExplainResourceResult> explainAuthorization(final Operation operation,
-                                                            final Resource resource) throws PluginException {
+    public List<ExplainResourceResult> explainAuthorization(final Resource resource)
+            throws PluginException {
         return Collections.emptyList();
     }
 

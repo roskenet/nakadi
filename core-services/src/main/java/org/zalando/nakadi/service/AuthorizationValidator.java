@@ -267,6 +267,6 @@ public class AuthorizationValidator {
     }
 
     public List<ExplainResourceResult> explainReadAuthorization(final Resource resource) {
-        return authorizationService.explainAuthorization(AuthorizationService.Operation.READ, resource);
+        return authorizationService.explainAuthorization(resource);
     }
 }
