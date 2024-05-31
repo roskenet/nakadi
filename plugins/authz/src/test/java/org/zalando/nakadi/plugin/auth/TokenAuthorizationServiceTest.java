@@ -535,13 +535,13 @@ public class TokenAuthorizationServiceTest {
                 (sub, parent) -> sub.toString() + (parent == null? "": parent.toString());
         final var subject = explainList.stream().
                 collect(Collectors.
-                        groupingBy(res -> getKey.apply(res.getAuthAttribute(), res.getParentAuthAttribute()))).
+                        groupingBy(res -> getKey.apply(res.getAuthAttribute().get(), res.getParentAuthAttribute()))).
                 entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().get(0)));
 
         for (final var expected : expectedResults) {
             assertThat(subject.get(
                             getKey.apply(
-                                    expected.getAuthAttribute(),
+                                    expected.getAuthAttribute().get(),
                                     expected.getParentAuthAttribute())),
                     equalTo(expected));
         }

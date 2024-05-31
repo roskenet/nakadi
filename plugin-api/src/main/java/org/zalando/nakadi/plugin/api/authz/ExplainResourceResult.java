@@ -1,6 +1,7 @@
 package org.zalando.nakadi.plugin.api.authz;
 
 import java.util.Objects;
+import java.util.Optional;
 
 public class ExplainResourceResult {
     private final AuthorizationAttribute parentAuthAttribute;
@@ -19,8 +20,8 @@ public class ExplainResourceResult {
         return parentAuthAttribute;
     }
 
-    public AuthorizationAttribute getAuthAttribute() {
-        return authAttribute;
+    public Optional<AuthorizationAttribute> getAuthAttribute() {
+        return Optional.ofNullable(authAttribute);
     }
 
     public ExplainAttributeResult getResult() {
