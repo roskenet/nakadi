@@ -17,6 +17,7 @@ import org.zalando.nakadi.exceptions.runtime.UnableProcessException;
 import org.zalando.nakadi.exceptions.runtime.UnprocessableEntityException;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
+import org.zalando.nakadi.plugin.api.authz.ExplainResourceResult;
 import org.zalando.nakadi.plugin.api.authz.Resource;
 import org.zalando.nakadi.plugin.api.exceptions.AuthorizationInvalidException;
 import org.zalando.nakadi.plugin.api.exceptions.OperationOnResourceNotPermittedException;
@@ -263,5 +264,9 @@ public class AuthorizationValidator {
                     "Changing authorization object to `null` is not possible due to existing one");
         }
         validateAuthorization(newValue);
+    }
+
+    public List<ExplainResourceResult> explainReadAuthorization(final Resource resource) {
+        return authorizationService.explainAuthorization(resource);
     }
 }

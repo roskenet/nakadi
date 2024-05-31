@@ -3,15 +3,19 @@ package org.zalando.nakadi.plugin.auth;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.zalando.nakadi.plugin.api.SystemProperties;
 import org.zalando.nakadi.plugin.api.exceptions.PluginException;
 
 import java.net.URISyntaxException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 public class ServiceFactory {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(ServiceFactory.class);
     private final SystemProperties properties;
     private HttpClient httpClient;
     private TokenProvider tokenProvider;
@@ -29,6 +33,27 @@ public class ServiceFactory {
             throw new PluginException("Property " + key + " isn't specified");
         }
         return property;
+    }
+
+    public <T> T getOrDefaultProperty(final String key, final Function<String, T> converter, final T defValue) {
+        final String value = properties.getProperty(key);
+        if (null == value) {
+            LOGGER.info("Using default value for {}: {}", key, defValue);
+            return defValue;
+        }
+        final T result;
+        try {
+            result = converter.apply(value);
+            LOGGER.info("Using custom value for {}: {}", key, value);
+        } catch (RuntimeException ex) {
+            LOGGER.warn("Property {} can not be converted to value from {}, will use {}", key, value, defValue, ex);
+            return defValue;
+        }
+        if (null == result) {
+            LOGGER.warn("Property {} is null after conversion from {}. will use {}", key, value, defValue);
+            return defValue;
+        }
+        return result;
     }
 
     public HttpClient getOrCreateHttpClient() {

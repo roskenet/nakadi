@@ -10,17 +10,27 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
+import org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult;
+import org.zalando.nakadi.plugin.api.authz.ExplainResourceResult;
+import org.zalando.nakadi.plugin.api.authz.MatchingEventDiscriminator;
 import org.zalando.nakadi.plugin.api.authz.Resource;
 import org.zalando.nakadi.plugin.api.exceptions.AuthorizationInvalidException;
 import org.zalando.nakadi.plugin.api.exceptions.OperationOnResourceNotPermittedException;
 import org.zalando.nakadi.plugin.auth.attribute.SimpleAuthorizationAttribute;
 import org.zalando.nakadi.plugin.auth.subject.EmployeeSubject;
 import org.zalando.nakadi.plugin.auth.subject.Principal;
+import org.zalando.nakadi.plugin.auth.utils.ResourceBuilder;
 import org.zalando.nakadi.plugin.auth.utils.SimpleEventResource;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 
 import static junit.framework.TestCase.assertTrue;
 import static org.hamcrest.CoreMatchers.equalTo;
@@ -31,6 +41,10 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessLevel.FULL_ACCESS;
+import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessLevel.NO_ACCESS;
+import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessLevel.RESTRICTED_ACCESS;
+import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessRestrictionType.MATCHING_EVENT_DISCRIMINATORS;
 import static org.zalando.nakadi.plugin.auth.ResourceType.ALL_DATA_ACCESS_RESOURCE;
 import static org.zalando.nakadi.plugin.auth.utils.ResourceBuilder.rb;
 
@@ -57,6 +71,9 @@ public class TokenAuthorizationServiceTest {
     @Mock
     private ZalandoTeamService teamService;
 
+    @Mock
+    private OPAClient opaClient;
+
     @Before
     public void setUp() {
         when(authentication.getPrincipal()).thenReturn(principal);
@@ -66,6 +83,7 @@ public class TokenAuthorizationServiceTest {
                 SERVICES_TYPE, serviceRegistry,
                 BUSINESS_PARTNER_TYPE, merchantRegistry,
                 teamService,
+                opaClient,
                 Arrays.asList("stups_merchant-uid"));
 
         SecurityContextHolder.getContext().setAuthentication(new OAuth2Authentication(null, authentication));
@@ -389,5 +407,196 @@ public class TokenAuthorizationServiceTest {
                 .thenReturn(new EmployeeSubject("jdoe", Collections::emptySet, "users", teamService));
         assertFalse("jdoe should not be authorized",
                 authzService.isAuthorized(AuthorizationService.Operation.WRITE, r));
+    }
+
+
+    @Test
+    public void testExplainAuthorizationOnlySupportsEventTypeResource() {
+        final Resource r = rb("myResource1", "subscription")
+                .build();
+        final var exception = assertThrows(IllegalArgumentException.class,
+                () -> authzService.explainAuthorization(r));
+        assertThat(exception.getMessage(), equalTo("Only resource of type event-type is supported!"));
+    }
+
+    @Test
+    public void testExplainAuthorizationMCFClassification() {
+        final var fooAppRestricted = explainResource(
+                authAttr("service", "foo_app_with_r_ids"),
+                withRestrictedAccess("retailer_1", "retailer_2"));
+
+        final var barFullAccess = explainResource(
+                authAttr("user", "bar_user_star_r_id"),
+                withFullAccess("*"));
+
+        testExplainAuthorization("mcf-aspd", true, fooAppRestricted, barFullAccess);
+    }
+
+    @Test
+    public void testExplainAuthorizationMCFClassificationWithEOS() {
+        final var fooAppNoAccess = explainResource(
+                authAttr("service", "foo_app_with_r_ids"),
+                withNoAccess("retailer_1", "retailer_2"));
+
+        final var barFullAccess = explainResource(
+                authAttr("user", "bar_user_star_r_id"),
+                withFullAccess("*"));
+
+        testExplainAuthorization("mcf-aspd", false, fooAppNoAccess, barFullAccess);
+    }
+
+    @Test
+    public void testExplainAuthorizationASPDClassification() {
+        final var fooAppNoAccess = explainResource(
+                authAttr("service", "foo_app_with_r_ids"),
+                withNoAccess("retailer_1", "retailer_2"));
+
+        final var barFullAccess = explainResource(
+                authAttr("user", "bar_user_star_r_id"),
+                withFullAccess("*"));
+        testExplainAuthorization("aspd", false, fooAppNoAccess, barFullAccess);
+    }
+
+    @Test
+    public void testExplainAuthorizationNoneClassification() {
+        final var fooAppFullAccess = explainResource(
+                authAttr("service", "foo_app_with_r_ids"),
+                withFullAccess("retailer_1", "retailer_2"));
+
+        final var barFullAccess = explainResource(
+                authAttr("user", "bar_user_star_r_id"),
+                withFullAccess("*"));
+        testExplainAuthorization("none", false, fooAppFullAccess, barFullAccess);
+    }
+
+    @Test
+    public void testExplainAuthorizationMCFClassificationWithTeam() {
+        final var fooAppRestricted =
+                explainResource(
+                        authAttr("service", "foo_app_with_r_ids"),
+                        withRestrictedAccess("retailer_1", "retailer_2"));
+
+        final var memberNoAccess = explainResource(
+                authAttr("team", "aruha"),
+                authAttr("user", "aruha_member_no_r_ids"),
+                withNoAccess());
+
+        final var memberFullAccess = explainResource(
+                authAttr("team", "aruha"),
+                authAttr("user", "aruha_member_star_r_id"),
+                withFullAccess("*"));
+
+        testExplainAuthorization("mcf-aspd", true, fooAppRestricted, memberNoAccess, memberFullAccess);
+    }
+
+    // this tests the response when a user is specified as directly in auth section
+    // and as well as part of team
+    @Test
+    public void testExplainAuthorizationMCFClassificationWithTeamMemberDirect() {
+        final var fooApp = explainResource(authAttr("service", "foo_app_with_r_ids"),
+                withRestrictedAccess("retailer_1", "retailer_2"));
+
+        final var memberNoAccess = explainResource(
+                authAttr("team", "aruha"),
+                authAttr("user", "aruha_member_no_r_ids"),
+                withNoAccess());
+
+        final var memberFullAcess = explainResource(
+                authAttr("team", "aruha"),
+                authAttr("user", "aruha_member_star_r_id"),
+                withFullAccess("*"));
+
+        final var directMemberFullAccess = explainResource(
+                authAttr("team", "aruha"),
+                authAttr("user", "aruha_member_star_r_id"),
+                withFullAccess("*"));
+
+        testExplainAuthorization("mcf-aspd", true,
+                fooApp, memberNoAccess, memberFullAcess, directMemberFullAccess);
+    }
+
+    public void testExplainAuthorization(final String classification, final boolean eosPathExists,
+                                         final ExplainResourceResult... expectedResults) {
+        final ResourceBuilder rb = rb("myResource1", "event-type")
+                .add(AuthorizationService.Operation.READ, "service", "foo_app_with_r_ids")
+                .add(AuthorizationService.Operation.READ, "team", "aruha")
+                .add(AuthorizationService.Operation.READ, "user", "bar_user_star_r_id")
+                .add(AuthorizationService.Operation.READ, "user", "aruha_member_no_r_ids")
+                .add(AuthorizationService.Operation.READ, "user", "aruha_member_star_r_id")
+                .add(AuthorizationService.Operation.READ, "user", "direct_aruha_member_star_r_id");
+
+        if (classification != null) {
+            rb.add(AuthorizationService.Operation.READ, "aspd-classification", classification);
+        }
+        if (eosPathExists) {
+            rb.add(AuthorizationService.Operation.READ, "event_owner_selector.name", "some-path");
+        }
+
+        when(teamService.getTeamMembers("aruha"))
+                .thenReturn(List.of(
+                        "aruha_member_no_r_ids",
+                        "aruha_member_star_r_id",
+                        "direct_aruha_member_star_r_id"));
+
+        final Resource r = rb.build();
+
+        when(opaClient.getRetailerIdsForService(eq("foo_app_with_r_ids"))).
+                thenReturn(Set.of("retailer_1", "retailer_2"));
+        when(opaClient.getRetailerIdsForUser(eq("bar_user_star_r_id"))).thenReturn(Set.of("*"));
+        when(opaClient.getRetailerIdsForUser(eq("aruha_member_no_r_ids"))).thenReturn(new HashSet<>());
+        when(opaClient.getRetailerIdsForUser(eq("aruha_member_star_r_id"))).thenReturn(Set.of("*"));
+
+        final var explainList = authzService.explainAuthorization(r);
+
+        final BiFunction<AuthorizationAttribute, Optional<AuthorizationAttribute>, String> getKey =
+                (sub, target) -> sub.toString() + (target.isEmpty() ? "" : target.get().toString());
+        final var subject = explainList.stream().
+                collect(Collectors.
+                        groupingBy(res -> getKey.apply(res.getPrimaryAttribute(), res.getTargetAttribute()))).
+                entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().get(0)));
+
+        for (final var expected : expectedResults) {
+            assertThat(subject.get(
+                            getKey.apply(
+                                    expected.getPrimaryAttribute(),
+                                    expected.getTargetAttribute())),
+                    equalTo(expected));
+        }
+    }
+
+    private static ExplainResourceResult explainResource(final AuthorizationAttribute authAttr,
+                                                         final AuthorizationAttribute targetAttr,
+                                                         final ExplainAttributeResult result) {
+        return new ExplainResourceResult(targetAttr, authAttr, result);
+    }
+
+    private static ExplainResourceResult explainResource(final AuthorizationAttribute authAttr,
+                                                         final ExplainAttributeResult result) {
+        return explainResource(authAttr, null, result);
+    }
+
+    private static ExplainAttributeResult withRestrictedAccess(final String... retailerIds) {
+        return new ExplainAttributeResult(RESTRICTED_ACCESS, MATCHING_EVENT_DISCRIMINATORS,
+                "", retailerDiscriminators(retailerIds));
+    }
+
+    private static ExplainAttributeResult withFullAccess(final String... retailerIds) {
+        return new ExplainAttributeResult(FULL_ACCESS, MATCHING_EVENT_DISCRIMINATORS,
+                "", retailerDiscriminators(retailerIds));
+    }
+
+    private static ExplainAttributeResult withNoAccess(final String... retailerIds) {
+        return new ExplainAttributeResult(NO_ACCESS, MATCHING_EVENT_DISCRIMINATORS,
+                "", retailerDiscriminators(retailerIds));
+    }
+
+    private static List<MatchingEventDiscriminator> retailerDiscriminators(final String... retailerIds) {
+       return List.of(new MatchingEventDiscriminator("retailer_id",
+               new HashSet<>(List.of(retailerIds))));
+    }
+
+    private static AuthorizationAttribute authAttr(final String type,
+                                                   final String value) {
+        return new SimpleAuthorizationAttribute(type, value);
     }
 }

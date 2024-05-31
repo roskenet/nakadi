@@ -2,6 +2,7 @@ package org.zalando.nakadi.plugin.auth;
 
 
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
+import org.zalando.nakadi.plugin.api.authz.ExplainResourceResult;
 import org.zalando.nakadi.plugin.api.authz.Resource;
 import org.zalando.nakadi.plugin.api.authz.Subject;
 import org.zalando.nakadi.plugin.api.exceptions.AuthorizationInvalidException;
@@ -9,6 +10,7 @@ import org.zalando.nakadi.plugin.api.exceptions.OperationOnResourceNotPermittedE
 import org.zalando.nakadi.plugin.api.exceptions.PluginException;
 
 import javax.annotation.Nullable;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,6 +34,12 @@ public class DefaultAuthorizationService implements AuthorizationService {
     @Nullable
     public Optional<Subject> getSubject() {
         return Optional.empty();
+    }
+
+    @Override
+    public List<ExplainResourceResult> explainAuthorization(final Resource resource)
+            throws PluginException {
+        return Collections.emptyList();
     }
 
     @Override
