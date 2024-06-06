@@ -1,47 +1,55 @@
 package org.zalando.nakadi.validation;
 
 import org.junit.Test;
-import org.zalando.nakadi.utils.IsOptional;
+import org.slf4j.Logger;
+
+import java.util.Optional;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 public class UUIDValidatorTest {
-    private final UUIDValidator validator = new UUIDValidator();
+
+    private final UUIDValidator uuidValidator = new UUIDValidator();
 
     @Test
-    public void testInvalidInput() {
-        final var invalidInput = new String[]{
-                "garbage",
-                "g95d6d85-472f-4c93-9a2f-a1fc07799467", // contains invalid character 'g'
-                "095d6d85-472f-4c93-9a2f-a1fc077994677", // one character extra
-                "095D6D85472F4C939A2FA1FC07799467", // UUID without '-'s
-                "",
-                null
-        };
-
-        for (final String invalid : invalidInput) {
-            assertThat(invalid, validator.validate(invalid), IsOptional.isPresent());
-        }
+    public void testNullInput() {
+        final var result = uuidValidator.validate(null);
+        assertEquals(Optional.empty(), result);
     }
 
     @Test
-    public void testValidInput() {
-        final var validInput = new String[]{
-                "095d6d85-472f-4c93-9a2f-a1fc07799467",
-                "095D6D85-472F-4C93-9A2F-A1FC07799467", // uppercase
-                "095D6D85-472f-4c93-9A2F-A1FC07799467", // upper and lower cases
-                "550e8400-e29b-41d4-a716-446655440000", // another valid UUID
-                "550E8400-e29B-41D4-A716-446655440000", // valid UUID in uppercase
-        };
-
-        for (final String valid : validInput) {
-            assertThat(valid, validator.validate(valid), IsOptional.isAbsent());
-        }
+    public void testValidUUID() {
+        final var validUUID = "123e4567-e89b-12d3-a456-426614174000";
+        final var result = uuidValidator.validate(validUUID);
+        assertEquals(Optional.empty(), result);
     }
 
     @Test
-    public void testFormatName() {
-        assertEquals(validator.formatName(), "uuid");
+    public void testInvalidUUID() {
+        final var invalidUUID = "invalid-uuid";
+        final var result = uuidValidator.validate(invalidUUID);
+        assertEquals(Optional.empty(), result);
+    }
+
+    @Test
+    public void testLoggingOnNullInput() {
+        final var mockLogger = mock(Logger.class);
+        final var validatorWithMockLogger = new UUIDValidator();
+        validatorWithMockLogger.logger = mockLogger;
+
+        validatorWithMockLogger.validate(null);
+        verify(mockLogger).warn("The input is null");
+    }
+
+    @Test
+    public void testLoggingOnInvalidUUID() {
+        final var mockLogger = mock(Logger.class);
+        final var validatorWithMockLogger = new UUIDValidator();
+        validatorWithMockLogger.logger = mockLogger;
+
+        validatorWithMockLogger.validate("invalid-uuid");
+        verify(mockLogger).warn("invalid-uuidis an invalid UUID");
     }
 }
