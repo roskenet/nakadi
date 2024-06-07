@@ -346,9 +346,8 @@ public class TokenAuthorizationService implements AuthorizationService {
         final var teamAuthAttributes = authsByType.getOrDefault(AUTH_TEAM, Collections.emptyList());
         final var userAuthAttributes = authsByType.getOrDefault(AUTH_USER, Collections.emptyList());
         final var serviceAuthAttributes = authsByType.getOrDefault(AUTH_SERVICE, Collections.emptyList());
-        final var classficationType = authsByType.get(ASPD_DATA_CLASSIFICATION) == null ?
-                "none" : authsByType.get(ASPD_DATA_CLASSIFICATION).get(0).getValue();
         final boolean eosPathExists = authsByType.get(EOS_NAME) != null;
+        final var classificationType = getClassificationType(authsByType, eosPathExists);
 
         final BiFunction<String, String, Set<String>> retailersFn = (type, subject) -> type.equals("user") ?
                 opaClient.getRetailerIdsForUser(subject) :
@@ -365,15 +364,26 @@ public class TokenAuthorizationService implements AuthorizationService {
         final var resultList = new ArrayList<ExplainResourceResult>();
         for (final var teamAttr : teamAttrToUserAttributes.keySet()) {
             final var usrAttrList = teamAttrToUserAttributes.get(teamAttr);
-            resultList.addAll(explainUsers(classficationType, teamAttr, usrAttrList, eosPathExists, retailersFn));
+            resultList.addAll(explainUsers(classificationType, teamAttr, usrAttrList, eosPathExists, retailersFn));
         }
 
         //repeat for users
-        resultList.addAll(explainUsers(classficationType,null, userAuthAttributes, eosPathExists, retailersFn));
+        resultList.addAll(explainUsers(classificationType,null, userAuthAttributes, eosPathExists, retailersFn));
 
         //repeat for services
-        resultList.addAll(explainServices(classficationType, serviceAuthAttributes, eosPathExists, retailersFn));
+        resultList.addAll(explainServices(classificationType, serviceAuthAttributes, eosPathExists, retailersFn));
         return resultList;
+    }
+
+    private static String getClassificationType(final Map<String, List<AuthorizationAttribute>> authsByType,
+                                                final boolean eosPathExists) {
+        //adapt old EOS to current
+        if (authsByType.get(ASPD_DATA_CLASSIFICATION) == null && eosPathExists) {
+            return "mcf-aspd";
+        }
+
+        return authsByType.get(ASPD_DATA_CLASSIFICATION) == null? "none" :
+                authsByType.get(ASPD_DATA_CLASSIFICATION).get(0).getValue();
     }
 
     private List<ExplainResourceResult> explainUsers(final String classification,
@@ -438,16 +448,22 @@ public class TokenAuthorizationService implements AuthorizationService {
             return ExplainAttributeResult.AccessLevel.FULL_ACCESS;
         }
 
-        if (retailerIds.contains("*")) {
-            return ExplainAttributeResult.AccessLevel.FULL_ACCESS;
-        } else if (retailerIds.isEmpty()) {
-            return ExplainAttributeResult.AccessLevel.NO_ACCESS;
-        } else if (!eosPathExists) {
-            return ExplainAttributeResult.AccessLevel.NO_ACCESS;
-        } else if (eosPathExists && classification.equals("aspd")) {
-            //eos path is only supported for mcf for now
-            return ExplainAttributeResult.AccessLevel.NO_ACCESS;
+        if (classification.equalsIgnoreCase("mcf-aspd")) {
+            if (!eosPathExists && !retailerIds.contains("*") || retailerIds.isEmpty()) {
+                return ExplainAttributeResult.AccessLevel.NO_ACCESS;
+            }
+
+            if (retailerIds.contains("*")) {
+                return ExplainAttributeResult.AccessLevel.FULL_ACCESS;
+            }
         }
+
+        //eos path is only supported for mcf for now
+        if (classification.equalsIgnoreCase("aspd")) {
+            return retailerIds.isEmpty() ? ExplainAttributeResult.AccessLevel.NO_ACCESS:
+                    ExplainAttributeResult.AccessLevel.FULL_ACCESS;
+        }
+
         return ExplainAttributeResult.AccessLevel.RESTRICTED_ACCESS;
     }
 

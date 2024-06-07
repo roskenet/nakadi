@@ -429,7 +429,14 @@ public class TokenAuthorizationServiceTest {
                 authAttr("user", "bar_user_star_r_id"),
                 withFullAccess("*"));
 
-        testExplainAuthorization("mcf-aspd", true, fooAppRestricted, barFullAccess);
+        final var memberNoAccess = explainResource(
+                authAttr("user", "aruha_member_no_r_ids"),
+                withNoAccess());
+
+        testExplainAuthorization("mcf-aspd", true,
+                fooAppRestricted,
+                barFullAccess,
+                memberNoAccess);
     }
 
     @Test
@@ -442,19 +449,32 @@ public class TokenAuthorizationServiceTest {
                 authAttr("user", "bar_user_star_r_id"),
                 withFullAccess("*"));
 
-        testExplainAuthorization("mcf-aspd", false, fooAppNoAccess, barFullAccess);
+        final var memberNoAccess = explainResource(
+                authAttr("user", "aruha_member_no_r_ids"),
+                withNoAccess());
+
+        testExplainAuthorization("mcf-aspd", false,
+                fooAppNoAccess,
+                barFullAccess,
+                memberNoAccess);
     }
 
     @Test
     public void testExplainAuthorizationASPDClassification() {
-        final var fooAppNoAccess = explainResource(
+        final var fooAppFullAccess = explainResource(
                 authAttr("service", "foo_app_with_r_ids"),
-                withNoAccess("retailer_1", "retailer_2"));
+                withFullAccess("retailer_1", "retailer_2"));
 
         final var barFullAccess = explainResource(
                 authAttr("user", "bar_user_star_r_id"),
                 withFullAccess("*"));
-        testExplainAuthorization("aspd", false, fooAppNoAccess, barFullAccess);
+
+        final var memberNoAccess = explainResource(
+                authAttr("user", "aruha_member_no_r_ids"),
+                withNoAccess());
+        testExplainAuthorization("aspd", false,
+                fooAppFullAccess,
+                barFullAccess, memberNoAccess);
     }
 
     @Test
@@ -467,6 +487,35 @@ public class TokenAuthorizationServiceTest {
                 authAttr("user", "bar_user_star_r_id"),
                 withFullAccess("*"));
         testExplainAuthorization("none", false, fooAppFullAccess, barFullAccess);
+    }
+
+    @Test
+    public void testExplainAuthorizationNullClassificationButPathExists() {
+        final var fooAppRestrictedAccess = explainResource(
+                authAttr("service", "foo_app_with_r_ids"),
+                withRestrictedAccess("retailer_1", "retailer_2"));
+
+        final var barFullAccess = explainResource(
+                authAttr("user", "bar_user_star_r_id"),
+                withFullAccess("*"));
+        testExplainAuthorization(null, true, fooAppRestrictedAccess, barFullAccess);
+    }
+
+    @Test
+    public void testExplainAuthorizationNullClassification() {
+        //everyone should have full access
+        final var fooAppRestrictedAccess = explainResource(
+                authAttr("service", "foo_app_with_r_ids"),
+                withFullAccess("retailer_1", "retailer_2"));
+        final var barFullAccess = explainResource(
+                authAttr("user", "bar_user_star_r_id"),
+                withFullAccess("*"));
+        final var memberFullAccess = explainResource(
+                authAttr("user", "aruha_member_no_r_ids"),
+                withFullAccess());
+        testExplainAuthorization(null, false,
+                fooAppRestrictedAccess,
+                barFullAccess, memberFullAccess);
     }
 
     @Test
