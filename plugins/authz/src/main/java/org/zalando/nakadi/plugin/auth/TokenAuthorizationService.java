@@ -454,7 +454,7 @@ public class TokenAuthorizationService implements AuthorizationService {
         } else if (classification.get().equalsIgnoreCase("mcf-aspd")) {
             if (retailerIds.contains("*")) {
                 return ExplainAttributeResult.AccessLevel.FULL_ACCESS;
-            } else if (eosPaths.isEmpty()) {
+            } else if (retailerIds.isEmpty() || eosPaths.isEmpty()) {
                 return ExplainAttributeResult.AccessLevel.NO_ACCESS;
             }
         } else if (classification.get().equalsIgnoreCase("aspd")) {

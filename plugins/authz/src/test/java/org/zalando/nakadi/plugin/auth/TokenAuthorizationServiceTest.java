@@ -429,14 +429,14 @@ public class TokenAuthorizationServiceTest {
                 authAttr("user", "bar_user_star_r_id"),
                 withFullAccess("*"));
 
-        final var memberRestricted = explainResource(
+        final var memberNoAccess = explainResource(
                 authAttr("user", "aruha_member_no_r_ids"),
-                withRestrictedAccess());
+                withNoAccess());
 
         testExplainAuthorization("mcf-aspd", true,
                 fooAppRestricted,
                 barFullAccess,
-                memberRestricted);
+                memberNoAccess);
     }
 
     @Test
@@ -528,7 +528,7 @@ public class TokenAuthorizationServiceTest {
         final var memberNoAccess = explainResource(
                 authAttr("team", "aruha"),
                 authAttr("user", "aruha_member_no_r_ids"),
-                withRestrictedAccess());
+                withNoAccess());
 
         final var memberFullAccess = explainResource(
                 authAttr("team", "aruha"),
@@ -545,10 +545,10 @@ public class TokenAuthorizationServiceTest {
         final var fooApp = explainResource(authAttr("service", "foo_app_with_r_ids"),
                 withRestrictedAccess("retailer_1", "retailer_2"));
 
-        final var memberRestricted = explainResource(
+        final var memberNoAccess = explainResource(
                 authAttr("team", "aruha"),
                 authAttr("user", "aruha_member_no_r_ids"),
-                withRestrictedAccess());
+                withNoAccess());
 
         final var memberFullAcess = explainResource(
                 authAttr("team", "aruha"),
@@ -561,7 +561,7 @@ public class TokenAuthorizationServiceTest {
                 withFullAccess("*"));
 
         testExplainAuthorization("mcf-aspd", true,
-                fooApp, memberRestricted, memberFullAcess, directMemberFullAccess);
+                fooApp, memberNoAccess, memberFullAcess, directMemberFullAccess);
     }
 
     public void testExplainAuthorization(final String classification, final boolean eosPathExists,
