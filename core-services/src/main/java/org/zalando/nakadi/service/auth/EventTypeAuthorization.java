@@ -47,8 +47,10 @@ class EventTypeAuthorization implements ValidatableAuthorization {
             final var extendedAttributes = new ArrayList<AuthorizationAttribute>();
             attributes.ifPresent(extendedAttributes::addAll);
             // TODO: this is coupling in the core code with Auth plugin logic.
-            extendedAttributes.add(
-                    new ResourceAuthorizationAttribute("aspd-classification", aspdDataClassification));
+            if (aspdDataClassification != null) {
+                extendedAttributes.add(
+                        new ResourceAuthorizationAttribute("aspd-classification", aspdDataClassification));
+            }
             if (eventOwnerSelector != null) {
                 extendedAttributes.add(
                         new ResourceAuthorizationAttribute("event_owner_selector.name", eventOwnerSelector.getName()));
