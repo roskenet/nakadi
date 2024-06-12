@@ -45,6 +45,7 @@ import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeTyp
 import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.AUTH_USER;
 import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.EOS_NAME;
 import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.EOS_RETAILER_ID;
+import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessLevel;
 
 public class TokenAuthorizationService implements AuthorizationService {
 
@@ -380,7 +381,8 @@ public class TokenAuthorizationService implements AuthorizationService {
         if (authsByType.get(ASPD_DATA_CLASSIFICATION) == null) {
             return eosPaths.isEmpty()? Optional.of("none"): Optional.empty();
         }
-        return Optional.of(authsByType.get(ASPD_DATA_CLASSIFICATION).get(0).getValue());
+        return Optional.of(authsByType.get(ASPD_DATA_CLASSIFICATION).get(0).getValue()).
+                map(String::toLowerCase);
     }
 
     private List<ExplainResourceResult> explainUsers(final Optional<String> classification,
@@ -441,29 +443,28 @@ public class TokenAuthorizationService implements AuthorizationService {
     private ExplainAttributeResult.AccessLevel decideAccessLevel(final Optional<String> classification,
                                                                  final List<AuthorizationAttribute> eosPaths,
                                                                  final Set<String> retailerIds) {
-        if (classification.isEmpty() && eosPaths.isEmpty() ||
-                classification.orElse("").equalsIgnoreCase("none")) {
-            return ExplainAttributeResult.AccessLevel.FULL_ACCESS;
-        }
-
-        //legacy case, classification should never be null otherwise
         if (classification.isEmpty()) {
-            if (retailerIds.contains("*")) {
-                return ExplainAttributeResult.AccessLevel.FULL_ACCESS;
+            if (retailerIds.contains("*")) { //legacy case
+                return AccessLevel.FULL_ACCESS;
             }
-        } else if (classification.get().equalsIgnoreCase("mcf-aspd")) {
-            if (retailerIds.contains("*")) {
-                return ExplainAttributeResult.AccessLevel.FULL_ACCESS;
-            } else if (retailerIds.isEmpty() || eosPaths.isEmpty()) {
-                return ExplainAttributeResult.AccessLevel.NO_ACCESS;
-            }
-        } else if (classification.get().equalsIgnoreCase("aspd")) {
-            //eos path is only supported for mcf for now
-            return retailerIds.isEmpty() ? ExplainAttributeResult.AccessLevel.NO_ACCESS :
-                    ExplainAttributeResult.AccessLevel.FULL_ACCESS;
+            return AccessLevel.RESTRICTED_ACCESS;
         }
 
-        return ExplainAttributeResult.AccessLevel.RESTRICTED_ACCESS;
+        switch (classification.get()) {
+            case "none":
+                return AccessLevel.FULL_ACCESS;
+            case "mcf-aspd":
+                if (retailerIds.contains("*")) {
+                    return AccessLevel.FULL_ACCESS;
+                }
+                return (retailerIds.isEmpty() || eosPaths.isEmpty()) ?
+                        AccessLevel.NO_ACCESS : AccessLevel.RESTRICTED_ACCESS;
+            case "aspd":
+                return retailerIds.isEmpty() ? AccessLevel.NO_ACCESS :
+                        AccessLevel.FULL_ACCESS;
+            default:
+                return AccessLevel.NO_ACCESS;
+        }
     }
 
     private static String getReason(final String subject, final ExplainAttributeResult.AccessLevel accessLevel) {
