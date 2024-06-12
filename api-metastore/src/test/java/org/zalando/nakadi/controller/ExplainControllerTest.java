@@ -111,7 +111,7 @@ public class ExplainControllerTest {
                 "some reason", discriminator);
         final ExplainResourceResult result = new ExplainResourceResult(null, userAttrs.get(0), attrResult);
 
-        when(authorizationValidator.explainReadAuthorization(any())).
+        when(authorizationValidator.explainAuthorization(any())).
                 thenReturn(List.of(result));
 
         postEvenTypeAuthExplain(request).andExpect(status().is2xxSuccessful()).

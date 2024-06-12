@@ -1,10 +1,12 @@
 package org.zalando.nakadi.plugin.auth.subject;
 
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
+import org.zalando.nakadi.plugin.api.authz.AuthorizationProperty;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.Subject;
 import org.zalando.nakadi.plugin.api.exceptions.PluginException;
 import org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType;
+import org.zalando.nakadi.plugin.auth.property.AuthorizationPropertyType;
 
 import java.util.List;
 import java.util.Objects;
@@ -34,12 +36,13 @@ public abstract class Principal implements Subject {
     public boolean isAuthorized(
             final String resourceType,
             final AuthorizationService.Operation operation,
-            final Optional<List<AuthorizationAttribute>> attributes) {
+            final Optional<List<AuthorizationAttribute>> attributes,
+            final List<AuthorizationProperty> properties) {
         if (!isOperationAllowed(resourceType, operation, attributes)) {
             return false;
         }
         if (operation == AuthorizationService.Operation.READ && Objects.equals(EVENT_TYPE_RESOURCE, resourceType)) {
-            if (!isEventTypeAccessAllowedByDataAccessPolicy(attributes)) {
+            if (!isEventTypeAccessAllowedByDataAccessPolicy(properties)) {
                 return false;
             }
         }
@@ -52,13 +55,13 @@ public abstract class Principal implements Subject {
             Optional<List<AuthorizationAttribute>> attributes);
 
     private boolean isEventTypeAccessAllowedByDataAccessPolicy(
-            final Optional<List<AuthorizationAttribute>> attributes) {
-        if (!attributes.isPresent() || attributes.get().isEmpty()) {
+            final List<AuthorizationProperty> properties) {
+        if (properties.isEmpty()) {
             return true;
         }
 
-        final var aspdDataClassification = findAuthorizationAttribute(
-                attributes.get(), AuthorizationAttributeType.ASPD_DATA_CLASSIFICATION);
+        final var aspdDataClassification = findAuthorizationProperty(
+                properties, AuthorizationPropertyType.ASPD_DATA_CLASSIFICATION);
         if (aspdDataClassification.isEmpty()) {
             return true;
         }
@@ -78,8 +81,8 @@ public abstract class Principal implements Subject {
                 if (retailerIds.contains("*")) {
                     return true;
                 }
-                final var eosName = findAuthorizationAttribute(
-                        attributes.get(), AuthorizationAttributeType.EOS_NAME);
+                final var eosName = findAuthorizationProperty(
+                        properties, AuthorizationPropertyType.EOS_NAME);
                 if (eosName.isPresent() && eosName.get().equals(AuthorizationAttributeType.EOS_RETAILER_ID)) {
                     return true;
                 }
@@ -90,12 +93,12 @@ public abstract class Principal implements Subject {
         }
     }
 
-    private Optional<String> findAuthorizationAttribute(
-            final List<AuthorizationAttribute> attributes,
-            final String dataType) {
-        return attributes.stream()
-                .filter(attr -> attr.getDataType().equals(dataType))
-                .map(AuthorizationAttribute::getValue)
+    private static Optional<String> findAuthorizationProperty(
+            final List<AuthorizationProperty> properties,
+            final String name) {
+        return properties.stream()
+                .filter(property -> property.getName().equals(name))
+                .map(AuthorizationProperty::getValue)
                 .findFirst();
     }
 

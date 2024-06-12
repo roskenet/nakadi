@@ -6,6 +6,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
+import org.zalando.nakadi.plugin.api.authz.AuthorizationProperty;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.EventTypeAuthz;
 import org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult;
@@ -39,11 +40,11 @@ import static org.zalando.nakadi.plugin.auth.ResourceType.ALL_DATA_ACCESS_RESOUR
 import static org.zalando.nakadi.plugin.auth.ResourceType.EVENT_TYPE_RESOURCE;
 import static org.zalando.nakadi.plugin.auth.ResourceType.PERMISSION_RESOURCE;
 import static org.zalando.nakadi.plugin.auth.ResourceType.SUBSCRIPTION_RESOURCE;
-import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.ASPD_DATA_CLASSIFICATION;
+import static org.zalando.nakadi.plugin.auth.property.AuthorizationPropertyType.ASPD_DATA_CLASSIFICATION;
 import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.AUTH_SERVICE;
 import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.AUTH_TEAM;
 import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.AUTH_USER;
-import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.EOS_NAME;
+import static org.zalando.nakadi.plugin.auth.property.AuthorizationPropertyType.EOS_NAME;
 import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.EOS_RETAILER_ID;
 import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessLevel;
 
@@ -97,7 +98,11 @@ public class TokenAuthorizationService implements AuthorizationService {
     public boolean isAuthorized(final Operation operation, final Resource resource)
             throws PluginException {
         return getPrincipal(true)
-                .isAuthorized(resource.getType(), operation, resource.getAttributesForOperation(operation));
+                .isAuthorized(
+                        resource.getType(),
+                        operation,
+                        resource.getAttributesForOperation(operation),
+                        resource.getProperties());
     }
 
     private Principal getPrincipal(final boolean throwOnError) {
@@ -347,8 +352,10 @@ public class TokenAuthorizationService implements AuthorizationService {
         final var teamAuthAttributes = authsByType.getOrDefault(AUTH_TEAM, Collections.emptyList());
         final var userAuthAttributes = authsByType.getOrDefault(AUTH_USER, Collections.emptyList());
         final var serviceAuthAttributes = authsByType.getOrDefault(AUTH_SERVICE, Collections.emptyList());
-        final var eosPaths = authsByType.getOrDefault(EOS_NAME, Collections.emptyList());
-        final var classificationOpt = getClassificationType(authsByType, eosPaths);
+
+        final List<AuthorizationProperty> properties = resource.getProperties();
+        final var eosPaths = getPropertyValues(properties, EOS_NAME);
+        final var classificationOpt = getClassificationType(properties, eosPaths);
 
         final BiFunction<String, String, Set<String>> retailersFn = (type, subject) -> type.equals("user") ?
                 opaClient.getRetailerIdsForUser(subject) :
@@ -376,19 +383,19 @@ public class TokenAuthorizationService implements AuthorizationService {
         return resultList;
     }
 
-    private static Optional<String> getClassificationType(final Map<String, List<AuthorizationAttribute>> authsByType,
-                                                          final List<AuthorizationAttribute> eosPaths) {
-        if (authsByType.get(ASPD_DATA_CLASSIFICATION) == null) {
+    private static Optional<String> getClassificationType(final List<AuthorizationProperty> properties,
+                                                          final List<String> eosPaths) {
+        final var dataClassification = getPropertyValues(properties, ASPD_DATA_CLASSIFICATION).stream().findFirst();
+        if (dataClassification.isEmpty()) {
             return eosPaths.isEmpty()? Optional.of("none"): Optional.empty();
         }
-        return Optional.of(authsByType.get(ASPD_DATA_CLASSIFICATION).get(0).getValue()).
-                map(String::toLowerCase);
+        return dataClassification.map(String::toLowerCase);
     }
 
     private List<ExplainResourceResult> explainUsers(final Optional<String> classification,
                                                      final AuthorizationAttribute teamAttr,
                                                      final List<? extends AuthorizationAttribute> subjectAttrList,
-                                                     final List<AuthorizationAttribute> eosPaths,
+                                                     final List<String> eosPaths,
                                                      final BiFunction<String, String, Set<String>>
                                                              fetchRetailersFn) {
         return explainSubjects(classification, teamAttr, "user", subjectAttrList, eosPaths, fetchRetailersFn);
@@ -396,7 +403,7 @@ public class TokenAuthorizationService implements AuthorizationService {
 
     private List<ExplainResourceResult> explainServices(final Optional<String> classification,
                                                         final List<? extends AuthorizationAttribute> subjectAttrList,
-                                                        final List<AuthorizationAttribute> eosPaths,
+                                                        final List<String> eosPaths,
                                                         final BiFunction<String, String, Set<String>>
                                                                 fetchRetailersFn) {
         return explainSubjects(classification,null, "service", subjectAttrList, eosPaths, fetchRetailersFn);
@@ -406,7 +413,7 @@ public class TokenAuthorizationService implements AuthorizationService {
                                                         final AuthorizationAttribute teamAttr,
                                                         final String subjectType,
                                                         final List<? extends AuthorizationAttribute> subjectAttrList,
-                                                        final List<AuthorizationAttribute> eosPaths,
+                                                        final List<String> eosPaths,
                                                         final BiFunction<String, String, Set<String>>
                                                                 fetchRetailersFn) {
         final var resultList = new ArrayList<ExplainResourceResult>();
@@ -441,7 +448,7 @@ public class TokenAuthorizationService implements AuthorizationService {
      * TODO: consider merchant id too in future to decide access.
      */
     private ExplainAttributeResult.AccessLevel decideAccessLevel(final Optional<String> classification,
-                                                                 final List<AuthorizationAttribute> eosPaths,
+                                                                 final List<String> eosPaths,
                                                                  final Set<String> retailerIds) {
         if (classification.isEmpty()) {
             if (retailerIds.contains("*")) { //legacy case
@@ -465,6 +472,13 @@ public class TokenAuthorizationService implements AuthorizationService {
             default:
                 return AccessLevel.NO_ACCESS;
         }
+    }
+
+    private static List<String> getPropertyValues(final List<AuthorizationProperty> properties, final String name) {
+        return properties.stream()
+                .filter(property -> name.equals(property.getName()))
+                .map(AuthorizationProperty::getValue)
+                .collect(Collectors.toList());
     }
 
     private static String getReason(final String subject, final ExplainAttributeResult.AccessLevel accessLevel) {

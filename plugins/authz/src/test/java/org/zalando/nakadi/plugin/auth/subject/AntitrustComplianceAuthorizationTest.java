@@ -5,12 +5,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
+import org.zalando.nakadi.plugin.api.authz.AuthorizationProperty;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.exceptions.PluginException;
 import org.zalando.nakadi.plugin.auth.ResourceType;
 import org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType;
-import org.zalando.nakadi.plugin.auth.attribute.SimpleAuthorizationAttribute;
+import org.zalando.nakadi.plugin.auth.property.AuthorizationPropertyType;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -23,7 +25,7 @@ public class AntitrustComplianceAuthorizationTest {
     @MethodSource("getAuthorizationTests")
     public void testAuthorization(
             final String description,
-            final List<AuthorizationAttribute> attributes,
+            final List<AuthorizationProperty> properties,
             final Set<String> allowedRetailerIds,
             final boolean expectedResult
     ) {
@@ -33,7 +35,8 @@ public class AntitrustComplianceAuthorizationTest {
         final var result = principal.isAuthorized(
                 ResourceType.EVENT_TYPE_RESOURCE,
                 AuthorizationService.Operation.READ,
-                Optional.ofNullable(attributes));
+                Optional.ofNullable(Collections.emptyList()),
+                properties);
 
         Assertions.assertEquals(expectedResult, result, description);
     }
@@ -48,46 +51,46 @@ public class AntitrustComplianceAuthorizationTest {
                 ),
                 Arguments.of(
                         "ASPD annotation='none' -> allow non-conditional access",
-                        List.of(attribute(AuthorizationAttributeType.ASPD_DATA_CLASSIFICATION, "none")),
+                        List.of(property(AuthorizationPropertyType.ASPD_DATA_CLASSIFICATION, "none")),
                         Set.of(),
                         true
                 ),
 
                 Arguments.of(
                         "ASPD annotation='aspd', allowed retailer ids=none -> deny access",
-                        List.of(attribute(AuthorizationAttributeType.ASPD_DATA_CLASSIFICATION, "aspd")),
+                        List.of(property(AuthorizationPropertyType.ASPD_DATA_CLASSIFICATION, "aspd")),
                         Set.of(),
                         false
                 ),
                 Arguments.of(
                         "ASPD annotation='aspd', allowed retailer ids=some -> allow access",
-                        List.of(attribute(AuthorizationAttributeType.ASPD_DATA_CLASSIFICATION, "aspd")),
+                        List.of(property(AuthorizationPropertyType.ASPD_DATA_CLASSIFICATION, "aspd")),
                         Set.of("a-retailer-id"),
                         true
                 ),
 
                 Arguments.of(
                         "ASPD annotation='mcf-aspd', allowed retailer ids=none -> deny access",
-                        List.of(attribute(AuthorizationAttributeType.ASPD_DATA_CLASSIFICATION, "mcf-aspd")),
+                        List.of(property(AuthorizationPropertyType.ASPD_DATA_CLASSIFICATION, "mcf-aspd")),
                         Set.of(),
                         false
                 ),
                 Arguments.of(
                         "ASPD annotation='mcf-aspd', allowed retailer ids=some -> deny access",
-                        List.of(attribute(AuthorizationAttributeType.ASPD_DATA_CLASSIFICATION, "mcf-aspd")),
+                        List.of(property(AuthorizationPropertyType.ASPD_DATA_CLASSIFICATION, "mcf-aspd")),
                         Set.of("a-retailer-id"),
                         false
                 ),
                 Arguments.of(
                         "ASPD annotation='mcf-aspd', allowed retailer ids=all -> allow access",
-                        List.of(attribute(AuthorizationAttributeType.ASPD_DATA_CLASSIFICATION, "mcf-aspd")),
+                        List.of(property(AuthorizationPropertyType.ASPD_DATA_CLASSIFICATION, "mcf-aspd")),
                         Set.of("*"),
                         true
                 ),
                 Arguments.of(
                         "ASPD annotation='mcf-aspd', EOS='retailer_id', allowed retailer ids=some -> allow access",
-                        List.of(attribute(AuthorizationAttributeType.ASPD_DATA_CLASSIFICATION, "mcf-aspd"),
-                                attribute(AuthorizationAttributeType.EOS_NAME,
+                        List.of(property(AuthorizationPropertyType.ASPD_DATA_CLASSIFICATION, "mcf-aspd"),
+                                property(AuthorizationPropertyType.EOS_NAME,
                                         AuthorizationAttributeType.EOS_RETAILER_ID)),
                         Set.of("a-retailer-id"),
                         true
@@ -95,8 +98,28 @@ public class AntitrustComplianceAuthorizationTest {
         );
     }
 
-    private static AuthorizationAttribute attribute(final String dataType, final String value) {
-        return new SimpleAuthorizationAttribute(dataType, value);
+    private static AuthorizationProperty property(final String name, final String value) {
+        return new AuthorizationPropertyImpl(name, value);
+    }
+
+    private static class AuthorizationPropertyImpl implements AuthorizationProperty {
+        private final String name;
+        private final String value;
+
+        private AuthorizationPropertyImpl(final String name, final String value) {
+            this.name = name;
+            this.value = value;
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public String getValue() {
+            return value;
+        }
     }
 
     private static class TestPrincipal extends Principal {

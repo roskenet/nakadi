@@ -1,5 +1,6 @@
 package org.zalando.nakadi.plugin.api.authz;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -15,4 +16,8 @@ public interface Resource<T> {
     T get();
 
     Map<String, List<AuthorizationAttribute>> getAuthorization();
+
+    default List<AuthorizationProperty> getProperties() {
+        return Collections.emptyList();
+    }
 }
