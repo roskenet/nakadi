@@ -584,7 +584,7 @@ public class TokenAuthorizationServiceTest {
             rb.addProperty("aspd-classification", classification);
         }
         if (eosPathExists) {
-            rb.addProperty("event_owner_selector.name", "some-path");
+            rb.addProperty("event_owner_selector.name", "retailer_id");
         }
 
         when(teamService.getTeamMembers("aruha"))
