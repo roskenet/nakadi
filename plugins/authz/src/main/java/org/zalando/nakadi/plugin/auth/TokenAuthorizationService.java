@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
+import org.zalando.nakadi.plugin.api.authz.AccessLevel;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationProperty;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
@@ -46,7 +47,6 @@ import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeTyp
 import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.AUTH_USER;
 import static org.zalando.nakadi.plugin.auth.property.AuthorizationPropertyType.EOS_NAME;
 import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.EOS_RETAILER_ID;
-import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessLevel;
 
 public class TokenAuthorizationService implements AuthorizationService {
 
@@ -447,9 +447,9 @@ public class TokenAuthorizationService implements AuthorizationService {
     /**
      * TODO: consider merchant id too in future to decide access.
      */
-    private ExplainAttributeResult.AccessLevel decideAccessLevel(final Optional<String> classification,
-                                                                 final List<String> eosPaths,
-                                                                 final Set<String> retailerIds) {
+    private AccessLevel decideAccessLevel(final Optional<String> classification,
+                                          final List<String> eosPaths,
+                                          final Set<String> retailerIds) {
         if (classification.isEmpty()) {
             if (retailerIds.contains("*")) { //legacy case
                 return AccessLevel.FULL_ACCESS;
@@ -481,7 +481,7 @@ public class TokenAuthorizationService implements AuthorizationService {
                 .collect(Collectors.toList());
     }
 
-    private static String getReason(final String subject, final ExplainAttributeResult.AccessLevel accessLevel) {
+    private static String getReason(final String subject, final AccessLevel accessLevel) {
         switch (accessLevel) {
             case FULL_ACCESS:
                 return String.format("%s has full access to the event type", subject);
