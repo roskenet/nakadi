@@ -1,5 +1,6 @@
 package org.zalando.nakadi.plugin.auth.subject;
 
+import org.zalando.nakadi.plugin.api.authz.AccessLevel;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationProperty;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
@@ -42,7 +43,7 @@ public abstract class Principal implements Subject {
             return false;
         }
         if (operation == AuthorizationService.Operation.READ && Objects.equals(EVENT_TYPE_RESOURCE, resourceType)) {
-            if (!isEventTypeAccessAllowedByDataAccessPolicy(properties)) {
+            if (getEventTypeReadAccessLevel(properties, this::getRetailerIdsToRead) == AccessLevel.NO_ACCESS) {
                 return false;
             }
         }
@@ -54,42 +55,49 @@ public abstract class Principal implements Subject {
             AuthorizationService.Operation operation,
             Optional<List<AuthorizationAttribute>> attributes);
 
-    private boolean isEventTypeAccessAllowedByDataAccessPolicy(
-            final List<AuthorizationProperty> properties) {
-        if (properties.isEmpty()) {
-            return true;
-        }
+    public static AccessLevel getEventTypeReadAccessLevel(
+            final List<AuthorizationProperty> properties,
+            final Supplier<Set<String>> retailerIdsToRead) {
 
         final var aspdDataClassification = findAuthorizationProperty(
                 properties, AuthorizationPropertyType.ASPD_DATA_CLASSIFICATION);
         if (aspdDataClassification.isEmpty()) {
-            return true;
+            final var eosName = findAuthorizationProperty(
+                    properties, AuthorizationPropertyType.EOS_NAME);
+            if (eosName.isEmpty()) {
+                return AccessLevel.FULL_ACCESS;
+            }
+            final Set<String> retailerIds = retailerIdsToRead.get();
+            if (retailerIds.contains("*")) {
+                return AccessLevel.FULL_ACCESS;
+            }
+            return AccessLevel.RESTRICTED_ACCESS;
         }
         switch (aspdDataClassification.get()) {
             case "none":
-                return true;
+                return AccessLevel.FULL_ACCESS;
             case "aspd":
-                if (getRetailerIdsToRead().isEmpty()) {
-                    return false;
+                if (retailerIdsToRead.get().isEmpty()) {
+                    return AccessLevel.NO_ACCESS;
                 }
-                return true;
+                return AccessLevel.FULL_ACCESS;
             case "mcf-aspd":
-                final Set<String> retailerIds = getRetailerIdsToRead();
+                final Set<String> retailerIds = retailerIdsToRead.get();
                 if (retailerIds.isEmpty()) {
-                    return false;
+                    return AccessLevel.NO_ACCESS;
                 }
                 if (retailerIds.contains("*")) {
-                    return true;
+                    return AccessLevel.FULL_ACCESS;
                 }
                 final var eosName = findAuthorizationProperty(
                         properties, AuthorizationPropertyType.EOS_NAME);
                 if (eosName.isPresent() && eosName.get().equals(AuthorizationAttributeType.EOS_RETAILER_ID)) {
-                    return true;
+                    return AccessLevel.RESTRICTED_ACCESS;
                 }
-                return false;
+                return AccessLevel.NO_ACCESS;
             default:
                 // Other values are not supported or not implemented
-                return false;
+                return AccessLevel.NO_ACCESS;
         }
     }
 
