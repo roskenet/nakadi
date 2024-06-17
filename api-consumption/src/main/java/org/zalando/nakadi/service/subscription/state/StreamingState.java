@@ -104,6 +104,7 @@ class StreamingState extends State {
         bytesSentMeterPerSubscription = this.getContext().getMetricRegistry().meter(kafkaFlushedBytesMetricName);
 
         addTask(() -> getContext().subscribeToSessionListChangeAndRebalance());
+        scheduleTask(this::recheckSessions, getParameters().commitTimeoutMillis * 2, TimeUnit.MILLISECONDS);
 
         idleStreamWatcher = new IdleStreamWatcher(getParameters().commitTimeoutMillis * 2);
         this.eventConsumer = getContext().getTimelineService().createEventConsumer(null);
@@ -569,6 +570,22 @@ class StreamingState extends State {
         }
     }
 
+    // checks if we missed a session list change notification and may trigger rebalance if we did
+    void recheckSessions() {
+        final Partition[] unassignedPartitions = Stream.of(getZk().getTopology().getPartitions())
+                .filter(p -> p.getState() == Partition.State.UNASSIGNED)
+                .toArray(Partition[]::new);
+
+        if (unassignedPartitions.length > 0) {
+            LOG.warn("Some partitions are unassigned and we might have missed sessions notification - resubscribing.");
+            getContext().subscribeToSessionListChangeAndRebalance();
+        }
+
+        scheduleTask(
+                () -> addTask(this::recheckSessions),
+                getParameters().commitTimeoutMillis * 2, TimeUnit.MILLISECONDS);
+    }
+
     void reactOnTopologyChange() {
         if (null == topologyChangeSubscription) {
             return;
@@ -600,7 +617,7 @@ class StreamingState extends State {
                 .filter(p -> getSessionId().equalsIgnoreCase(p.getSession()))
                 .toArray(Partition[]::new);
         if (refreshTopologyUnlocked(partitions)) {
-            LOG.info("Topology changed not by event, but by schedule. Recreating zk listener");
+            LOG.warn("Topology changed not by event, but by schedule. Recreating zk listener");
             recreateTopologySubscription();
         }
         // addTask() is used to check if state is not changed.
