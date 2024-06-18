@@ -149,6 +149,10 @@ public class StreamingContext implements SubscriptionStreamer {
         return zkClient;
     }
 
+    public Session getSession() {
+        return session;
+    }
+
     public String getSessionId() {
         return session.getId();
     }
