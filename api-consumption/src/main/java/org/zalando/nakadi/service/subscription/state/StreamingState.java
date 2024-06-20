@@ -103,16 +103,15 @@ class StreamingState extends State {
         );
         bytesSentMeterPerSubscription = this.getContext().getMetricRegistry().meter(kafkaFlushedBytesMetricName);
 
+        recreateTopologySubscription();
         addTask(() -> getContext().subscribeToSessionListChangeAndRebalance());
-        scheduleTask(this::recheckSessions, getParameters().commitTimeoutMillis * 2, TimeUnit.MILLISECONDS);
 
         idleStreamWatcher = new IdleStreamWatcher(getParameters().commitTimeoutMillis * 2);
         this.eventConsumer = getContext().getTimelineService().createEventConsumer(null);
 
-        recreateTopologySubscription();
-        addTask(this::recheckTopology);
         addTask(this::initializeStream);
         addTask(this::pollDataFromKafka);
+        scheduleTask(this::recheckTopology, getParameters().commitTimeoutMillis, TimeUnit.MILLISECONDS);
         scheduleTask(this::checkBatchTimeouts, getParameters().batchTimeoutMillis, TimeUnit.MILLISECONDS);
         scheduleTask(this::autocommitPeriodically, AUTOCOMMIT_INTERVAL_SECONDS, TimeUnit.SECONDS);
 
@@ -141,7 +140,6 @@ class StreamingState extends State {
             topologyChangeSubscription.close();
         }
         topologyChangeSubscription = getZk().subscribeForTopologyChanges(() -> addTask(this::reactOnTopologyChange));
-        reactOnTopologyChange();
     }
 
     private void initializeStream() {
@@ -570,66 +568,47 @@ class StreamingState extends State {
         }
     }
 
-    // checks if we missed a session list change notification and may trigger rebalance if we did
-    void recheckSessions() {
-        final Partition[] unassignedPartitions = Stream.of(getZk().getTopology().getPartitions())
-                .filter(p -> p.getState() == Partition.State.UNASSIGNED)
-                .toArray(Partition[]::new);
-
-        if (unassignedPartitions.length > 0) {
-            LOG.warn("Some partitions are unassigned and we might have missed sessions notification - resubscribing.");
-            getContext().subscribeToSessionListChangeAndRebalance();
-        }
-
-        scheduleTask(
-                () -> addTask(this::recheckSessions),
-                getParameters().commitTimeoutMillis * 2, TimeUnit.MILLISECONDS);
-    }
-
     void reactOnTopologyChange() {
         if (null == topologyChangeSubscription) {
             return;
         }
-        final ZkSubscriptionClient.Topology topology = topologyChangeSubscription.getData();
-        final Partition[] assignedPartitions = Stream.of(topology.getPartitions())
-                .filter(p -> getSessionId().equals(p.getSession()))
-                .toArray(Partition[]::new);
-        addTask(() -> refreshTopologyUnlocked(assignedPartitions));
-        trackIdleness(topology);
-
-        if (getContext().getMaxEventSendCount() != null) {
-            failedCommitPartitions = Arrays.stream(assignedPartitions)
-                    .filter(p -> p.getFailedCommitsCount() > 0 || p.isLookingForDeadLetter())
-                    .collect(Collectors.toMap(
-                            p -> new EventTypePartition(p.getEventType(), p.getPartition()),
-                            p -> p));
-
-            failedCommitsDebugStringToFlush = failedCommitPartitions.values().stream()
-                    .map(Partition::toFailedCommitsTrackingString)
-                    .collect(Collectors.joining(", "));
-            LOG.debug("Failed commits tracking: {}", failedCommitsDebugStringToFlush);
-        }
+        refreshTopologyUnlocked(topologyChangeSubscription.getData());
     }
 
     void recheckTopology() {
         // Sometimes topology is not refreshed. One need to explicitly check that topology is still valid.
-        final Partition[] partitions = Stream.of(getZk().getTopology().getPartitions())
-                .filter(p -> getSessionId().equalsIgnoreCase(p.getSession()))
-                .toArray(Partition[]::new);
-        if (refreshTopologyUnlocked(partitions)) {
+        final ZkSubscriptionClient.Topology topology = getZk().getTopology();
+        if (refreshTopologyUnlocked(topology)) {
             LOG.warn("Topology changed not by event, but by schedule. Recreating zk listener");
             recreateTopologySubscription();
+        } else {
+            // unless using direct partition assignment: check if we missed a session list change notification,
+            // and trigger rebalance if we did
+            if (getContext().getSession().getRequestedPartitions().isEmpty()) {
+                final Partition[] unassignedPartitions = Stream.of(topology.getPartitions())
+                        .filter(p -> p.getState() == Partition.State.UNASSIGNED)
+                        .toArray(Partition[]::new);
+
+                if (unassignedPartitions.length > 0) {
+                    LOG.warn("Some partitions are unassigned and we might have missed sessions notification"
+                            + " - resubscribing.");
+                    getContext().subscribeToSessionListChangeAndRebalance();
+                }
+            }
         }
-        // addTask() is used to check if state is not changed.
-        scheduleTask(() -> addTask(this::recheckTopology), getParameters().commitTimeoutMillis, TimeUnit.MILLISECONDS);
+        scheduleTask(this::recheckTopology, getParameters().commitTimeoutMillis, TimeUnit.MILLISECONDS);
     }
 
-    boolean refreshTopologyUnlocked(final Partition[] assignedPartitions) {
-        final Map<EventTypePartition, Partition> newAssigned = Stream.of(assignedPartitions)
+    boolean refreshTopologyUnlocked(final ZkSubscriptionClient.Topology topology) {
+        final Partition[] thisSessionPartitions = Stream.of(topology.getPartitions())
+                .filter(p -> getSessionId().equalsIgnoreCase(p.getSession()))
+                .toArray(Partition[]::new);
+
+        final Map<EventTypePartition, Partition> newAssigned = Stream.of(thisSessionPartitions)
                 .filter(p -> p.getState() == Partition.State.ASSIGNED)
                 .collect(Collectors.toMap(Partition::getKey, p -> p));
 
-        final Map<EventTypePartition, Partition> newReassigning = Stream.of(assignedPartitions)
+        final Map<EventTypePartition, Partition> newReassigning = Stream.of(thisSessionPartitions)
                 .filter(p -> p.getState() == Partition.State.REASSIGNING)
                 .collect(Collectors.toMap(Partition::getKey, p -> p));
 
@@ -680,16 +659,40 @@ class StreamingState extends State {
 
             logPartitionAssignment("Topology refreshed");
         }
+
+        if (getContext().getMaxEventSendCount() != null) {
+            updateFailedCommitsTracking(thisSessionPartitions);
+        }
+
+        trackIdleness(topology);
+
         return modified;
+    }
+
+    private void updateFailedCommitsTracking(final Partition[] thisSessionPartitions) {
+        failedCommitPartitions = Arrays.stream(thisSessionPartitions)
+                .filter(p -> p.getFailedCommitsCount() > 0 || p.isLookingForDeadLetter())
+                .collect(Collectors.toMap(
+                                p -> new EventTypePartition(p.getEventType(), p.getPartition()),
+                                p -> p));
+
+        failedCommitsDebugStringToFlush = failedCommitPartitions.values().stream()
+                .map(Partition::toFailedCommitsTrackingString)
+                .collect(Collectors.joining(", "));
+
+        LOG.debug("Failed commits tracking: {}", failedCommitsDebugStringToFlush);
     }
 
     private void logPartitionAssignment(final String reason) {
         if (LOG.isInfoEnabled()) {
             LOG.info("{}. Streaming partitions: [{}]. Reassigning partitions: [{}]",
                     reason,
-                    offsets.keySet().stream().filter(p -> !releasingPartitions.containsKey(p))
-                            .map(EventTypePartition::toString).collect(Collectors.joining(",")),
-                    releasingPartitions.keySet().stream().map(EventTypePartition::toString)
+                    offsets.keySet().stream()
+                            .filter(p -> !releasingPartitions.containsKey(p))
+                            .map(EventTypePartition::toString)
+                            .collect(Collectors.joining(",")),
+                    releasingPartitions.keySet().stream()
+                            .map(EventTypePartition::toString)
                             .collect(Collectors.joining(", ")));
         }
     }
@@ -913,12 +916,12 @@ class StreamingState extends State {
     /**
      * If stream doesn't have any partitions - start timer that will close this session
      * in commitTimeout*2 if it doesn't get any partitions during that time
-     *
-     * @param topology the new topology
      */
     private void trackIdleness(final ZkSubscriptionClient.Topology topology) {
         final boolean hasAnyAssignment = Stream.of(topology.getPartitions())
-                .anyMatch(p -> getSessionId().equals(p.getSession()) || getSessionId().equals(p.getNextSession()));
+                .anyMatch(p ->
+                        getSessionId().equalsIgnoreCase(p.getSession()) ||
+                        getSessionId().equalsIgnoreCase(p.getNextSession()));
         if (hasAnyAssignment) {
             idleStreamWatcher.idleEnd();
         } else {
