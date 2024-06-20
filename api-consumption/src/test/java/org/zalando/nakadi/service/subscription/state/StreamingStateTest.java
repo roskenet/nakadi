@@ -30,6 +30,7 @@ import org.zalando.nakadi.service.subscription.StreamingContext;
 import org.zalando.nakadi.service.subscription.SubscriptionOutput;
 import org.zalando.nakadi.service.subscription.autocommit.AutocommitSupport;
 import org.zalando.nakadi.service.subscription.model.Partition;
+import org.zalando.nakadi.service.subscription.model.Session;
 import org.zalando.nakadi.service.subscription.zk.ZkSubscription;
 import org.zalando.nakadi.service.subscription.zk.ZkSubscriptionClient;
 import org.zalando.nakadi.service.timeline.HighLevelConsumer;
@@ -81,6 +82,7 @@ public class StreamingStateTest {
         when(timelineService.createEventConsumer(Mockito.any())).thenReturn(eventConsumer);
 
         when(contextMock.getCursorComparator()).thenReturn(Comparator.comparing(NakadiCursor::getOffset));
+        when(contextMock.getSession()).thenReturn(new Session(SESSION_ID, 0, Collections.emptyList()));
         when(contextMock.getSessionId()).thenReturn(SESSION_ID);
         when(contextMock.isInState(Mockito.same(state))).thenReturn(true);
 
@@ -128,11 +130,10 @@ public class StreamingStateTest {
         state.onEnter();
 
         verify(zkMock, times(1)).subscribeForTopologyChanges(Mockito.any());
-        verify(topologySubscription, times(1)).getData();
 
         state.reactOnTopologyChange();
 
-        verify(topologySubscription, times(2)).getData();
+        verify(topologySubscription, times(1)).getData();
         verify(topologySubscription, times(0)).close();
 
         state.onExit();
@@ -180,7 +181,9 @@ public class StreamingStateTest {
 
         // enter state and expect InvalidCursorException
         state.onEnter();
-        assertThrows(NakadiRuntimeException.class, () -> state.refreshTopologyUnlocked(partitions));
+        assertThrows(
+                NakadiRuntimeException.class,
+                () -> state.refreshTopologyUnlocked(new ZkSubscriptionClient.Topology(partitions, 0)));
     }
 
     @Test
@@ -212,9 +215,10 @@ public class StreamingStateTest {
         final NakadiCursor anyCursor = NakadiCursor.of(timeline, "0", "0");
         when(cursorConverter.convert((SubscriptionCursorWithoutToken) any())).thenReturn(anyCursor);
 
-        state.refreshTopologyUnlocked(new Partition[]{
-                new Partition(
-                        pk.getEventType(), pk.getPartition(), SESSION_ID, null, Partition.State.ASSIGNED)});
+        final Partition[] partitions = new Partition[]{
+            new Partition(pk.getEventType(), pk.getPartition(), SESSION_ID, null, Partition.State.ASSIGNED)};
+
+        state.refreshTopologyUnlocked(new ZkSubscriptionClient.Topology(partitions, 0));
 
         verify(zkMock, times(1)).subscribeForOffsetChanges(Mockito.eq(pk), Mockito.any());
         verify(offsetSubscription, times(0)).close();
@@ -226,7 +230,7 @@ public class StreamingStateTest {
         verify(offsetSubscription, times(1)).getData();
 
         // Verify that offset change listener is removed
-        state.refreshTopologyUnlocked(new Partition[0]);
+        state.refreshTopologyUnlocked(new ZkSubscriptionClient.Topology(new Partition[0], 0));
         verify(zkMock, times(1)).subscribeForOffsetChanges(Mockito.eq(pk), Mockito.any());
         verify(offsetSubscription, times(1)).close();
         verify(offsetSubscription, times(1)).getData();

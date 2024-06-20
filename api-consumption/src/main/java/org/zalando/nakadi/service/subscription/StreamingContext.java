@@ -149,6 +149,10 @@ public class StreamingContext implements SubscriptionStreamer {
         return zkClient;
     }
 
+    public Session getSession() {
+        return session;
+    }
+
     public String getSessionId() {
         return session.getId();
     }
@@ -266,6 +270,9 @@ public class StreamingContext implements SubscriptionStreamer {
 
     public void subscribeToSessionListChangeAndRebalance() throws NakadiRuntimeException {
         // Install re-balance hook on client list change.
+        if (null != sessionListSubscription) {
+            sessionListSubscription.close();
+        }
         sessionListSubscription = zkClient.subscribeForSessionListChanges(() -> addTask(this::rebalance));
         // Trigger re-balance explicitly as session list might have changed before scheduling hook
         rebalance();

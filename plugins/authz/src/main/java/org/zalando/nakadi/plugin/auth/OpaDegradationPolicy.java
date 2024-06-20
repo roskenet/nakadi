@@ -4,7 +4,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.zalando.nakadi.plugin.api.exceptions.PluginException;
 
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Optional;
 import java.util.Set;
 
 public enum OpaDegradationPolicy {
@@ -36,4 +38,9 @@ public enum OpaDegradationPolicy {
     public abstract Set<String> handle(String requestInfo, RuntimeException ex);
 
 
+    public static Optional<OpaDegradationPolicy> from(final String name) {
+        return Arrays.stream(OpaDegradationPolicy.values()).
+                filter(policy -> policy.name().equalsIgnoreCase(name)).
+                findFirst();
+    }
 }

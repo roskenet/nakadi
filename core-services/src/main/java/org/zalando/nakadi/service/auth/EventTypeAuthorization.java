@@ -43,12 +43,14 @@ class EventTypeAuthorization implements ValidatableAuthorization {
             final AuthorizationService.Operation operation) throws IllegalArgumentException {
         final Optional<List<AuthorizationAttribute>> attributes = authorization != null ?
                 authorization.getAttributesForOperation(operation) : Optional.empty();
-        if (operation == AuthorizationService.Operation.READ && aspdDataClassification != null) {
+        if (operation == AuthorizationService.Operation.READ) {
             final var extendedAttributes = new ArrayList<AuthorizationAttribute>();
             attributes.ifPresent(extendedAttributes::addAll);
             // TODO: this is coupling in the core code with Auth plugin logic.
-            extendedAttributes.add(
-                    new ResourceAuthorizationAttribute("aspd-classification", aspdDataClassification));
+            if (aspdDataClassification != null) {
+                extendedAttributes.add(
+                        new ResourceAuthorizationAttribute("aspd-classification", aspdDataClassification));
+            }
             if (eventOwnerSelector != null) {
                 extendedAttributes.add(
                         new ResourceAuthorizationAttribute("event_owner_selector.name", eventOwnerSelector.getName()));
