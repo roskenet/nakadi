@@ -12,10 +12,14 @@ public class UUIDValidator implements FormatValidator {
     private static final Logger LOG = LoggerFactory.getLogger(UUIDValidator.class);
 
     private final String eventTypeName;
+    private final String formatName;
+    private boolean loggedOnce;
 
-    // TODO: remove when actually enabling the validation
-    public UUIDValidator(final String eventTypeName) {
+    // TODO: remove the event type name parameter when actually enabling the validation
+    public UUIDValidator(final String eventTypeName, final String formatName) {
         this.eventTypeName = eventTypeName;
+        this.formatName = formatName;
+        this.loggedOnce = false;
     }
 
     @Override
@@ -24,13 +28,16 @@ public class UUIDValidator implements FormatValidator {
             UUID.fromString(input);
             return Optional.empty();
         } catch (final IllegalArgumentException e) {
-            LOG.warn("validating event schema for '{}' - not a valid UUID: {}", eventTypeName, input);
+            if (!loggedOnce) {
+                LOG.warn("validating event schema for '{}' - not a valid UUID: {}", eventTypeName, input);
+                loggedOnce = true;
+            }
             return Optional.empty();
         }
     }
 
     @Override
     public String formatName() {
-        return "uuid";
+        return formatName;
     }
 }

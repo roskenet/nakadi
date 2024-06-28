@@ -8,7 +8,7 @@ import static org.junit.Assert.assertEquals;
 
 public class UUIDValidatorTest {
 
-    private final UUIDValidator uuidValidator = new UUIDValidator("test-event-type");
+    private final UUIDValidator uuidValidator = new UUIDValidator("test-event-type", "uuid");
 
     @Test
     public void testValidUUID() {
