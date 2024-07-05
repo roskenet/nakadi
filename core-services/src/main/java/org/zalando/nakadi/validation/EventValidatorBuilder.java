@@ -35,6 +35,8 @@ public class EventValidatorBuilder {
                 .addFormatValidator(new RFC3339DateTimeValidator())
                 .addFormatValidator(new ISO4217CurrencyCodeValidator())
                 .addFormatValidator(new ISO4217CurrencyCodeValidator("ISO-4217"))
+                .addFormatValidator(new UUIDValidator(eventType.getName(), "uuid"))
+                .addFormatValidator(new UUIDValidator(eventType.getName(), "UUID"))
                 .build()
                 .load()
                 .build();
