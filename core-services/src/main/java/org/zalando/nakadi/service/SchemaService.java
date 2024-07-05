@@ -139,7 +139,7 @@ public class SchemaService implements SchemaProviderService {
     }
 
     public EventType getValidEvolvedEventType(final EventType originalEventType, final EventTypeBase updatedEventType) {
-        validateSchema(updatedEventType);
+        validateSchema(updatedEventType, true);
         return schemaEvolutionService.evolve(originalEventType, updatedEventType);
     }
 
@@ -182,13 +182,13 @@ public class SchemaService implements SchemaProviderService {
         return schemaRepository.getLatestSchemaByType(name, schemaType);
     }
 
-    public void validateSchema(final EventTypeBase eventType) throws SchemaValidationException {
+    public void validateSchema(final EventTypeBase eventType, final boolean eventTypeExists) throws SchemaValidationException {
         try {
             final String eventTypeSchema = eventType.getSchema().getSchema();
             final EventTypeSchemaBase.Type schemaType = eventType.getSchema().getType();
 
             if (schemaType.equals(EventTypeSchemaBase.Type.JSON_SCHEMA)) {
-                validateJsonTypeSchema(eventType, eventTypeSchema);
+                validateJsonTypeSchema(eventType, eventTypeSchema, eventTypeExists);
             } else if (schemaType.equals(EventTypeSchemaBase.Type.AVRO_SCHEMA)) {
                 validateAvroTypeSchema(eventTypeSchema);
             } else {
@@ -213,7 +213,8 @@ public class SchemaService implements SchemaProviderService {
         }
     }
 
-    private void validateJsonTypeSchema(final EventTypeBase eventType, final String eventTypeSchema) {
+    private void validateJsonTypeSchema(final EventTypeBase eventType, final String eventTypeSchema,
+                                        final boolean eventTypeExists) {
         final JSONObject schemaAsJson = parseJsonSchema(eventTypeSchema);
 
         if (schemaAsJson.has("type") && !Objects.equals("object", schemaAsJson.getString("type"))) {
@@ -257,8 +258,15 @@ public class SchemaService implements SchemaProviderService {
         validateFieldsInSchema("ordering_key_fields", orderingKeyFields, effectiveSchema);
         validateFieldsInSchema("ordering_instance_ids", orderingInstanceIds, effectiveSchema);
 
-        if (eventType.getCompatibilityMode() == CompatibilityMode.COMPATIBLE) {
+        try {
             validateJsonSchemaConstraints(schemaAsJson);
+        } catch (final SchemaValidationException e) {
+            LOG.error("error occured during validation schema", e);
+            if (eventTypeExists && eventType.getCompatibilityMode() == CompatibilityMode.FORWARD) {
+                LOG.warn("event type with name {} has invalid json schema", eventType.getName());
+            } else {
+                throw e;
+            }
         }
     }
 
