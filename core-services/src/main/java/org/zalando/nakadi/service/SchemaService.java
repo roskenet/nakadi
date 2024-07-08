@@ -262,7 +262,6 @@ public class SchemaService implements SchemaProviderService {
         try {
             validateJsonSchemaConstraints(schemaAsJson);
         } catch (final SchemaValidationException e) {
-            LOG.error("error occured during validation schema", e);
             if (eventTypeExists && eventType.getCompatibilityMode() == CompatibilityMode.FORWARD) {
                 LOG.warn("event type with name {} has invalid json schema", eventType.getName());
             } else {
