@@ -9,6 +9,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
+import org.zalando.nakadi.plugin.api.authz.AuthorizationProperty;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult;
 import org.zalando.nakadi.plugin.api.authz.ExplainResourceResult;
@@ -37,13 +38,14 @@ import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
+import static org.mockito.ArgumentMatchers.anyListOf;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.when;
-import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessLevel.FULL_ACCESS;
-import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessLevel.NO_ACCESS;
-import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessLevel.RESTRICTED_ACCESS;
+import static org.zalando.nakadi.plugin.api.authz.AccessLevel.FULL_ACCESS;
+import static org.zalando.nakadi.plugin.api.authz.AccessLevel.NO_ACCESS;
+import static org.zalando.nakadi.plugin.api.authz.AccessLevel.RESTRICTED_ACCESS;
 import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessRestrictionType.MATCHING_EVENT_DISCRIMINATORS;
 import static org.zalando.nakadi.plugin.auth.ResourceType.ALL_DATA_ACCESS_RESOURCE;
 import static org.zalando.nakadi.plugin.auth.utils.ResourceBuilder.rb;
@@ -158,7 +160,9 @@ public class TokenAuthorizationServiceTest {
                 principal.isAuthorized(
                         eq("event-type"),
                         eq(AuthorizationService.Operation.READ),
-                        eq(Optional.of(Arrays.asList(new SimpleAuthorizationAttribute(USERS_TYPE, "user1"))))))
+                        eq(Optional.of(Arrays.asList(new SimpleAuthorizationAttribute(USERS_TYPE, "user1")))),
+                        anyListOf(AuthorizationProperty.class)
+                        ))
                 .thenReturn(true);
 
         assertTrue(authzService.isAuthorized(AuthorizationService.Operation.READ, r));
@@ -173,7 +177,9 @@ public class TokenAuthorizationServiceTest {
                 principal.isAuthorized(
                         eq("event-type"),
                         eq(AuthorizationService.Operation.READ),
-                        eq(Optional.of(Arrays.asList(new SimpleAuthorizationAttribute(USERS_TYPE, "user1"))))))
+                        eq(Optional.of(Arrays.asList(new SimpleAuthorizationAttribute(USERS_TYPE, "user1")))),
+                        anyListOf(AuthorizationProperty.class)
+                ))
                 .thenReturn(false);
 
         assertFalse(authzService.isAuthorized(AuthorizationService.Operation.READ, r));
@@ -575,10 +581,10 @@ public class TokenAuthorizationServiceTest {
                 .add(AuthorizationService.Operation.READ, "user", "direct_aruha_member_star_r_id");
 
         if (classification != null) {
-            rb.add(AuthorizationService.Operation.READ, "aspd-classification", classification);
+            rb.addProperty("aspd-classification", classification);
         }
         if (eosPathExists) {
-            rb.add(AuthorizationService.Operation.READ, "event_owner_selector.name", "some-path");
+            rb.addProperty("event_owner_selector.name", "retailer_id");
         }
 
         when(teamService.getTeamMembers("aruha"))

@@ -18,7 +18,8 @@ public class UidSubjectTest {
         final Principal principal = new UidSubject("stups_nakadi", Collections::emptySet, "services");
 
         assertTrue(principal.isAuthorized("myResource1", AuthorizationService.Operation.READ,
-                Optional.of(Collections.singletonList(new SimpleAuthorizationAttribute("services", "stups_nakadi")))));
+                Optional.of(Collections.singletonList(new SimpleAuthorizationAttribute("services", "stups_nakadi"))),
+                Collections.emptyList()));
     }
 
     @Test
@@ -33,7 +34,8 @@ public class UidSubjectTest {
                                 new SimpleAuthorizationAttribute("users", "user2"),
                                 new SimpleAuthorizationAttribute("users", "user3"),
                                 new SimpleAuthorizationAttribute("services", "user1"))
-                        )));
+                        ),
+                        Collections.emptyList()));
     }
 
     @Test
@@ -43,7 +45,8 @@ public class UidSubjectTest {
                 principal.isAuthorized(
                         "event-type",
                         AuthorizationService.Operation.READ,
-                        Optional.of(Collections.singletonList(new SimpleAuthorizationAttribute("*", "*")))));
+                        Optional.of(Collections.singletonList(new SimpleAuthorizationAttribute("*", "*"))),
+                        Collections.emptyList()));
     }
 
 
@@ -54,7 +57,8 @@ public class UidSubjectTest {
                 principal.isAuthorized(
                         "event-type",
                         AuthorizationService.Operation.READ,
-                        Optional.of(Collections.singletonList(new SimpleAuthorizationAttribute("*", "*")))));
+                        Optional.of(Collections.singletonList(new SimpleAuthorizationAttribute("*", "*"))),
+                        Collections.emptyList()));
     }
 
 }

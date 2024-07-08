@@ -5,7 +5,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
+import org.zalando.nakadi.plugin.api.authz.AccessLevel;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
+import org.zalando.nakadi.plugin.api.authz.AuthorizationProperty;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.EventTypeAuthz;
 import org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult;
@@ -30,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -39,13 +40,10 @@ import static org.zalando.nakadi.plugin.auth.ResourceType.ALL_DATA_ACCESS_RESOUR
 import static org.zalando.nakadi.plugin.auth.ResourceType.EVENT_TYPE_RESOURCE;
 import static org.zalando.nakadi.plugin.auth.ResourceType.PERMISSION_RESOURCE;
 import static org.zalando.nakadi.plugin.auth.ResourceType.SUBSCRIPTION_RESOURCE;
-import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.ASPD_DATA_CLASSIFICATION;
 import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.AUTH_SERVICE;
 import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.AUTH_TEAM;
 import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.AUTH_USER;
-import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.EOS_NAME;
 import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.EOS_RETAILER_ID;
-import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessLevel;
 
 public class TokenAuthorizationService implements AuthorizationService {
 
@@ -97,7 +95,11 @@ public class TokenAuthorizationService implements AuthorizationService {
     public boolean isAuthorized(final Operation operation, final Resource resource)
             throws PluginException {
         return getPrincipal(true)
-                .isAuthorized(resource.getType(), operation, resource.getAttributesForOperation(operation));
+                .isAuthorized(
+                        resource.getType(),
+                        operation,
+                        resource.getAttributesForOperation(operation),
+                        resource.getProperties());
     }
 
     private Principal getPrincipal(final boolean throwOnError) {
@@ -347,12 +349,8 @@ public class TokenAuthorizationService implements AuthorizationService {
         final var teamAuthAttributes = authsByType.getOrDefault(AUTH_TEAM, Collections.emptyList());
         final var userAuthAttributes = authsByType.getOrDefault(AUTH_USER, Collections.emptyList());
         final var serviceAuthAttributes = authsByType.getOrDefault(AUTH_SERVICE, Collections.emptyList());
-        final var eosPaths = authsByType.getOrDefault(EOS_NAME, Collections.emptyList());
-        final var classificationOpt = getClassificationType(authsByType, eosPaths);
 
-        final BiFunction<String, String, Set<String>> retailersFn = (type, subject) -> type.equals("user") ?
-                opaClient.getRetailerIdsForUser(subject) :
-                opaClient.getRetailerIdsForService(subject);
+        final List<AuthorizationProperty> properties = resource.getProperties();
 
         //resolve team
         final var teamAttrToUserAttributes = teamAuthAttributes.stream().
@@ -365,59 +363,43 @@ public class TokenAuthorizationService implements AuthorizationService {
         final var resultList = new ArrayList<ExplainResourceResult>();
         for (final var teamAttr : teamAttrToUserAttributes.keySet()) {
             final var usrAttrList = teamAttrToUserAttributes.get(teamAttr);
-            resultList.addAll(explainUsers(classificationOpt, teamAttr, usrAttrList, eosPaths, retailersFn));
+            resultList.addAll(explainUsers(teamAttr, usrAttrList, properties));
         }
 
         //repeat for users
-        resultList.addAll(explainUsers(classificationOpt,null, userAuthAttributes, eosPaths, retailersFn));
+        resultList.addAll(explainUsers(null, userAuthAttributes, properties));
 
         //repeat for services
-        resultList.addAll(explainServices(classificationOpt, serviceAuthAttributes, eosPaths, retailersFn));
+        resultList.addAll(explainServices(serviceAuthAttributes, properties));
         return resultList;
     }
 
-    private static Optional<String> getClassificationType(final Map<String, List<AuthorizationAttribute>> authsByType,
-                                                          final List<AuthorizationAttribute> eosPaths) {
-        if (authsByType.get(ASPD_DATA_CLASSIFICATION) == null) {
-            return eosPaths.isEmpty()? Optional.of("none"): Optional.empty();
-        }
-        return Optional.of(authsByType.get(ASPD_DATA_CLASSIFICATION).get(0).getValue()).
-                map(String::toLowerCase);
-    }
-
-    private List<ExplainResourceResult> explainUsers(final Optional<String> classification,
-                                                     final AuthorizationAttribute teamAttr,
+    private List<ExplainResourceResult> explainUsers(final AuthorizationAttribute teamAttr,
                                                      final List<? extends AuthorizationAttribute> subjectAttrList,
-                                                     final List<AuthorizationAttribute> eosPaths,
-                                                     final BiFunction<String, String, Set<String>>
-                                                             fetchRetailersFn) {
-        return explainSubjects(classification, teamAttr, "user", subjectAttrList, eosPaths, fetchRetailersFn);
+                                                     final List<AuthorizationProperty> properties) {
+        return explainSubjects(teamAttr, subjectAttrList, properties, opaClient::getRetailerIdsForUser);
     }
 
-    private List<ExplainResourceResult> explainServices(final Optional<String> classification,
-                                                        final List<? extends AuthorizationAttribute> subjectAttrList,
-                                                        final List<AuthorizationAttribute> eosPaths,
-                                                        final BiFunction<String, String, Set<String>>
-                                                                fetchRetailersFn) {
-        return explainSubjects(classification,null, "service", subjectAttrList, eosPaths, fetchRetailersFn);
+    private List<ExplainResourceResult> explainServices(final List<? extends AuthorizationAttribute> subjectAttrList,
+                                                        final List<AuthorizationProperty> properties) {
+        return explainSubjects(null, subjectAttrList, properties, opaClient::getRetailerIdsForService);
     }
 
-    private List<ExplainResourceResult> explainSubjects(final Optional<String> classification,
-                                                        final AuthorizationAttribute teamAttr,
-                                                        final String subjectType,
+    private List<ExplainResourceResult> explainSubjects(final AuthorizationAttribute teamAttr,
                                                         final List<? extends AuthorizationAttribute> subjectAttrList,
-                                                        final List<AuthorizationAttribute> eosPaths,
-                                                        final BiFunction<String, String, Set<String>>
+                                                        final List<AuthorizationProperty> properties,
+                                                        final Function<String, Set<String>>
                                                                 fetchRetailersFn) {
         final var resultList = new ArrayList<ExplainResourceResult>();
         final var subjectAuthToRetailerIds = subjectAttrList.stream().
                 collect(Collectors.toMap(
                         Function.identity(),
-                        usrAttr -> fetchRetailersFn.apply(subjectType, usrAttr.getValue()))
+                        usrAttr -> fetchRetailersFn.apply(usrAttr.getValue()))
                 );
 
         for (final var subjectRetailersPair : subjectAuthToRetailerIds.entrySet()) {
-            final var accessLevel = decideAccessLevel(classification, eosPaths, subjectRetailersPair.getValue());
+            final var accessLevel = Principal.getEventTypeReadAccessLevel(
+                    properties, () -> subjectRetailersPair.getValue());
             final var reason = getReason(subjectRetailersPair.getKey().getValue(), accessLevel);
 
             final List<MatchingEventDiscriminator> retailerIdDiscriminators =
@@ -437,37 +419,7 @@ public class TokenAuthorizationService implements AuthorizationService {
         return resultList;
     }
 
-    /**
-     * TODO: consider merchant id too in future to decide access.
-     */
-    private ExplainAttributeResult.AccessLevel decideAccessLevel(final Optional<String> classification,
-                                                                 final List<AuthorizationAttribute> eosPaths,
-                                                                 final Set<String> retailerIds) {
-        if (classification.isEmpty()) {
-            if (retailerIds.contains("*")) { //legacy case
-                return AccessLevel.FULL_ACCESS;
-            }
-            return AccessLevel.RESTRICTED_ACCESS;
-        }
-
-        switch (classification.get()) {
-            case "none":
-                return AccessLevel.FULL_ACCESS;
-            case "mcf-aspd":
-                if (retailerIds.contains("*")) {
-                    return AccessLevel.FULL_ACCESS;
-                }
-                return (retailerIds.isEmpty() || eosPaths.isEmpty()) ?
-                        AccessLevel.NO_ACCESS : AccessLevel.RESTRICTED_ACCESS;
-            case "aspd":
-                return retailerIds.isEmpty() ? AccessLevel.NO_ACCESS :
-                        AccessLevel.FULL_ACCESS;
-            default:
-                return AccessLevel.NO_ACCESS;
-        }
-    }
-
-    private static String getReason(final String subject, final ExplainAttributeResult.AccessLevel accessLevel) {
+    private static String getReason(final String subject, final AccessLevel accessLevel) {
         switch (accessLevel) {
             case FULL_ACCESS:
                 return String.format("%s has full access to the event type", subject);
