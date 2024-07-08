@@ -30,7 +30,7 @@ dependencies {
     // validation
     compile("org.springframework.boot:spring-boot-starter-validation")
 
-    testImplementation(platform('org.junit:junit-bom:5.7.2'))
+    testImplementation(platform("org.junit:junit-bom:$junit5Version"))
     testImplementation('org.junit.jupiter:junit-jupiter')
     testRuntimeOnly('org.junit.platform:junit-platform-launcher')
     // TODO: remove after migrating to JUnit 5.
