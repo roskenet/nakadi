@@ -147,9 +147,22 @@ public class SchemaServiceTest {
         assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType, false));
     }
 
-    @EnumSource(value = CompatibilityMode.class, names = {"NONE", "COMPATIBLE"})
+    @Test
+    public void whenNotForwardModeAndInvalidJsonSchemaAlwaysThrows() throws Exception {
+        final String jsonSchemaString = Resources.toString(
+                Resources.getResource("invalid-json-schema-structure.json"),
+                Charsets.UTF_8);
+        eventType.getSchema().setSchema(jsonSchemaString);
+        assertThrows(SchemaValidationException.class,
+                () -> schemaService.validateSchema(eventType, false));
+        assertThrows(SchemaValidationException.class,
+                () -> schemaService.validateSchema(eventType, true));
+    }
+
+    @EnumSource(value = CompatibilityMode.class, names = {"NONE", "FORWARD"})
     @ParameterizedTest
-    public void whenNotForwardModeAndInvalidJsonSchemaAlwaysThrows(final CompatibilityMode mode) throws Exception {
+    public void whenNewEventTypeWithForwardModeAndInvalidJsonSchemaThenThrows(final CompatibilityMode mode)
+            throws Exception {
         final String jsonSchemaString = Resources.toString(
                 Resources.getResource("invalid-json-schema-structure.json"),
                 Charsets.UTF_8);
@@ -157,28 +170,17 @@ public class SchemaServiceTest {
         eventType.setCompatibilityMode(mode);
         assertThrows(SchemaValidationException.class,
                 () -> schemaService.validateSchema(eventType, false));
-        assertThrows(SchemaValidationException.class,
-                () -> schemaService.validateSchema(eventType, true));
     }
 
-    @Test
-    public void whenNewEventTypeWithForwardModeAndInvalidJsonSchemaThenThrows() throws Exception {
+    @EnumSource(value = CompatibilityMode.class, names = {"NONE", "FORWARD"})
+    @ParameterizedTest
+    public void whenExistingEventTypeWithForwardModeAndInvalidJsonSchemaThenDontThrow(final CompatibilityMode mode)
+            throws Exception {
         final String jsonSchemaString = Resources.toString(
                 Resources.getResource("invalid-json-schema-structure.json"),
                 Charsets.UTF_8);
         eventType.getSchema().setSchema(jsonSchemaString);
-        eventType.setCompatibilityMode(CompatibilityMode.FORWARD);
-        assertThrows(SchemaValidationException.class,
-                () -> schemaService.validateSchema(eventType, false));
-    }
-
-    @Test
-    public void whenExistingEventTypeWithForwardModeAndInvalidJsonSchemaThenDontThrow() throws Exception {
-        final String jsonSchemaString = Resources.toString(
-                Resources.getResource("invalid-json-schema-structure.json"),
-                Charsets.UTF_8);
-        eventType.getSchema().setSchema(jsonSchemaString);
-        eventType.setCompatibilityMode(CompatibilityMode.FORWARD);
+        eventType.setCompatibilityMode(mode);
         assertDoesNotThrow(() -> schemaService.validateSchema(eventType, true));
     }
 
