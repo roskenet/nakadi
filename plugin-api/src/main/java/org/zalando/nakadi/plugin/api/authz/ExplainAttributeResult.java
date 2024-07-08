@@ -5,10 +5,6 @@ import java.util.Objects;
 
 public class ExplainAttributeResult {
 
-    public enum AccessLevel {
-        FULL_ACCESS, RESTRICTED_ACCESS, NO_ACCESS
-    }
-
     public enum AccessRestrictionType {
         MATCHING_EVENT_DISCRIMINATORS
     }
