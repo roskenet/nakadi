@@ -182,7 +182,8 @@ public class SchemaService implements SchemaProviderService {
         return schemaRepository.getLatestSchemaByType(name, schemaType);
     }
 
-    public void validateSchema(final EventTypeBase eventType, final boolean eventTypeExists) throws SchemaValidationException {
+    public void validateSchema(final EventTypeBase eventType,
+                               final boolean eventTypeExists) throws SchemaValidationException {
         try {
             final String eventTypeSchema = eventType.getSchema().getSchema();
             final EventTypeSchemaBase.Type schemaType = eventType.getSchema().getType();

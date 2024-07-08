@@ -78,11 +78,13 @@ public class SchemaServiceTest {
     }
 
     private SchemaEvolutionService createSchemaEvolutionServiceSpy() throws IOException {
-        final List<SchemaEvolutionConstraint> evolutionConstraints = Lists.newArrayList(Mockito.mock(SchemaEvolutionConstraint.class));
+        final List<SchemaEvolutionConstraint> evolutionConstraints =
+                Lists.newArrayList(Mockito.mock(SchemaEvolutionConstraint.class));
         final JSONObject metaSchemaJson = new JSONObject(Resources.toString(Resources.getResource("schema.json"),
                 Charsets.UTF_8));
         final Schema metaSchema = SchemaLoader.load(metaSchemaJson);
-        return Mockito.spy(new SchemaEvolutionService(metaSchema, evolutionConstraints, Mockito.mock(SchemaDiff.class), Mockito.mock(BiFunction.class),
+        return Mockito.spy(new SchemaEvolutionService(metaSchema, evolutionConstraints,
+                Mockito.mock(SchemaDiff.class), Mockito.mock(BiFunction.class),
                 new HashMap<>(), Mockito.mock(AvroSchemaCompatibility.class)));
     }
 
@@ -122,7 +124,8 @@ public class SchemaServiceTest {
                 new Version(eventType.getSchema().getVersion()).bump(Version.Level.MINOR).toString();
         Mockito.when(schemaRepository.getSchemaVersion(eventType.getName(), newVersion))
                 .thenThrow(NoSuchSchemaException.class);
-        assertThrows(NoSuchSchemaException.class, () -> schemaService.getSchemaVersion(eventType.getName(), newVersion));
+        assertThrows(NoSuchSchemaException.class,
+                () -> schemaService.getSchemaVersion(eventType.getName(), newVersion));
     }
 
     @Test
@@ -251,37 +254,47 @@ public class SchemaServiceTest {
 
     @Test
     public void testValidateSchemaEndingBracket() {
-        assertThrows(SchemaValidationException.class, () -> SchemaService.parseJsonSchema("{\"additionalProperties\": true}}"));
+        assertThrows(SchemaValidationException.class,
+                () -> SchemaService.parseJsonSchema("{\"additionalProperties\": true}}"));
     }
 
     @Test
     public void testValidateSchemaMultipleRoots() {
-        assertThrows(SchemaValidationException.class, () -> SchemaService.parseJsonSchema("{\"additionalProperties\": true}{\"additionalProperties\": true}"));
+        assertThrows(SchemaValidationException.class,
+                () -> SchemaService.
+                        parseJsonSchema("{\"additionalProperties\": true}{\"additionalProperties\": true}"));
     }
 
     @Test
     public void testValidateSchemaArbitraryEnding() {
-        assertThrows(SchemaValidationException.class, () -> SchemaService.parseJsonSchema("{\"additionalProperties\": true}NakadiRocks"));
+        assertThrows(SchemaValidationException.class,
+                () -> SchemaService.
+                        parseJsonSchema("{\"additionalProperties\": true}NakadiRocks"));
     }
 
     @Test
     public void testValidateSchemaArrayEnding() {
-        assertThrows(SchemaValidationException.class, () -> SchemaService.parseJsonSchema("[{\"additionalProperties\": true}]]"));
+        assertThrows(SchemaValidationException.class,
+                () -> SchemaService.
+                        parseJsonSchema("[{\"additionalProperties\": true}]]"));
     }
 
     @Test
     public void testValidateSchemaEndingCommaArray() {
-        assertThrows(SchemaValidationException.class, () -> SchemaService.parseJsonSchema("[{\"test\": true},]"));
+        assertThrows(SchemaValidationException.class,
+                () -> SchemaService.parseJsonSchema("[{\"test\": true},]"));
     }
 
     @Test
     public void testValidateSchemaEndingCommaArray2() {
-        assertThrows(SchemaValidationException.class, () -> SchemaService.parseJsonSchema("[\"test\",]"));
+        assertThrows(SchemaValidationException.class,
+                () -> SchemaService.parseJsonSchema("[\"test\",]"));
     }
 
     @Test
     public void testValidateSchemaEndingCommaObject() {
-        assertThrows(SchemaValidationException.class, () -> SchemaService.parseJsonSchema("{\"test\": true,}"));
+        assertThrows(SchemaValidationException.class,
+                () -> SchemaService.parseJsonSchema("{\"test\": true,}"));
     }
 
     @Test
@@ -333,7 +346,8 @@ public class SchemaServiceTest {
         Mockito.when(schemaRepository.getAllSchemas("nakadi.batch.published"))
                 .thenReturn(Collections.emptyList());
 
-        assertThrows(NoSuchSchemaException.class, () -> schemaService.getAvroSchemaVersion("nakadi.batch.published", NakadiBatchPublished.getClassSchema()));
+        assertThrows(NoSuchSchemaException.class, () -> schemaService.
+                getAvroSchemaVersion("nakadi.batch.published", NakadiBatchPublished.getClassSchema()));
         Mockito.reset(schemaRepository);
     }
 
