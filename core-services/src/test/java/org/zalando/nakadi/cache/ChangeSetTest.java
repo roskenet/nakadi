@@ -20,22 +20,22 @@ public class ChangeSetTest {
         private final String name;
         private final Change[] initialChanges;
         private final Change[] changeSet;
-        private final String[] updatedEts;
-        private final String[] deleteChangeIds;
+        private final String[] expectedUpdatedEts;
+        private final String[] expectedDeleteChangeIds;
         private final long ttl;
 
         public TestCase(
                 final String name,
                 final Change[] initialChanges,
                 final Change[] changeSet,
-                final String[] updatedEts,
-                final String[] deleteChangeIds,
+                final String[] expectedUpdatedEts,
+                final String[] expectedDeleteChangeIds,
                 final long ttl) {
             this.name = name;
             this.initialChanges = initialChanges;
             this.changeSet = changeSet;
-            this.updatedEts = updatedEts;
-            this.deleteChangeIds = deleteChangeIds;
+            this.expectedUpdatedEts = expectedUpdatedEts;
+            this.expectedDeleteChangeIds = expectedDeleteChangeIds;
             this.ttl = ttl;
         }
 
@@ -52,7 +52,7 @@ public class ChangeSetTest {
     public static Iterable<TestCase> testCases() {
         final Date date1 = new Date(System.currentTimeMillis() - 4000);
         final Date date2 = new Date();
-
+        System.out.println("date1: " + date1 + " and date2: " + date2);
         final Change change1et1 = new Change("change1", "et1", date1);
         final Change change2et1 = new Change("change2", "et1", date2);
         final Change change3et2 = new Change("change3", "et2", date1);
@@ -90,15 +90,15 @@ public class ChangeSetTest {
 
         final Collection<String> changedEventTypes = changeSet.getUpdatedEventTypes(newChanges);
         System.out.println("changedEventTypes: " + changedEventTypes);
-        System.out.println("valueToTest ets: " + Arrays.asList(valueToTest.updatedEts));
-        Assert.assertEquals(changedEventTypes.size(), valueToTest.updatedEts.length);
-        Stream.of(valueToTest.updatedEts).forEach(v -> Assert.assertTrue(changedEventTypes.contains(v)));
+        System.out.println("valueToTest ets: " + Arrays.asList(valueToTest.expectedUpdatedEts));
+        Assert.assertEquals(valueToTest.expectedUpdatedEts.length, changedEventTypes.size());
+        Stream.of(valueToTest.expectedUpdatedEts).forEach(v -> Assert.assertTrue(changedEventTypes.contains(v)));
 
         final Collection<Change> changesToDelete = changeSet.getChangesToRemove(newChanges, valueToTest.ttl);
         final Set<String> realChangesToDelete = changesToDelete.stream().map(Change::getId).collect(Collectors.toSet());
         System.out.println("realChangesToDelete: " + realChangesToDelete);
-        System.out.println("valueToTest deletes: " + Arrays.asList(valueToTest.deleteChangeIds));
-        Assert.assertEquals(realChangesToDelete.size(), valueToTest.deleteChangeIds.length);
-        Stream.of(valueToTest.deleteChangeIds).forEach(d -> Assert.assertTrue(realChangesToDelete.contains(d)));
+        System.out.println("valueToTest deletes: " + Arrays.asList(valueToTest.expectedDeleteChangeIds));
+        Assert.assertEquals(valueToTest.expectedDeleteChangeIds.length, realChangesToDelete.size());
+        Stream.of(valueToTest.expectedDeleteChangeIds).forEach(d -> Assert.assertTrue(realChangesToDelete.contains(d)));
     }
 }
