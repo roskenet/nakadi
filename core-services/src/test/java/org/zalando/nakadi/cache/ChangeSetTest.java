@@ -89,11 +89,15 @@ public class ChangeSetTest {
         final List<Change> newChanges = Arrays.asList(valueToTest.changeSet);
 
         final Collection<String> changedEventTypes = changeSet.getUpdatedEventTypes(newChanges);
+        System.out.println("changedEventTypes: " + changedEventTypes);
+        System.out.println("valueToTest ets: " + valueToTest.updatedEts);
         Assert.assertEquals(changedEventTypes.size(), valueToTest.updatedEts.length);
         Stream.of(valueToTest.updatedEts).forEach(v -> Assert.assertTrue(changedEventTypes.contains(v)));
 
         final Collection<Change> changesToDelete = changeSet.getChangesToRemove(newChanges, valueToTest.ttl);
         final Set<String> realChangesToDelete = changesToDelete.stream().map(Change::getId).collect(Collectors.toSet());
+        System.out.println("realChangesToDelete: " + realChangesToDelete);
+        System.out.println("valueToTest deletes: " + valueToTest.deleteChangeIds);
         Assert.assertEquals(realChangesToDelete.size(), valueToTest.deleteChangeIds.length);
         Stream.of(valueToTest.deleteChangeIds).forEach(d -> Assert.assertTrue(realChangesToDelete.contains(d)));
     }
