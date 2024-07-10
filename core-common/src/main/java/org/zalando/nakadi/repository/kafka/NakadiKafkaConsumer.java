@@ -7,6 +7,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.zalando.nakadi.domain.KafkaHeaderTagSerde;
 import org.zalando.nakadi.domain.EventOwnerHeader;
 import org.zalando.nakadi.domain.NakadiCursor;
+import org.zalando.nakadi.domain.TestProjectIdHeader;
 import org.zalando.nakadi.exceptions.runtime.InvalidCursorException;
 import org.zalando.nakadi.repository.LowLevelConsumer;
 
@@ -81,7 +82,8 @@ public class NakadiKafkaConsumer implements LowLevelConsumer {
                     record.offset(),
                     record.timestamp(),
                     EventOwnerHeader.deserialize(record),
-                    KafkaHeaderTagSerde.deserialize(record)));
+                    KafkaHeaderTagSerde.deserialize(record),
+                    TestProjectIdHeader.deserialize(record)));
         }
         return result;
     }

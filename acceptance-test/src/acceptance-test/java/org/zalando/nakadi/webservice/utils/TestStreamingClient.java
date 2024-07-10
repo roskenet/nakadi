@@ -4,11 +4,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.zalando.nakadi.config.JsonConfig;
 import org.zalando.nakadi.generated.avro.ConsumptionBatch;
 import org.zalando.nakadi.util.ThreadUtils;
+import org.zalando.nakadi.utils.TestUtils;
 import org.zalando.nakadi.view.SubscriptionCursor;
 import org.zalando.nakadi.webservice.BaseAT;
 import org.zalando.nakadi.webservice.hila.StreamBatch;
@@ -30,6 +32,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import static java.text.MessageFormat.format;
 
@@ -184,6 +187,20 @@ public class TestStreamingClient {
         synchronized (jsonBatches) {
             return new ArrayList<>(jsonBatches);
         }
+    }
+
+    public List<JSONObject> getJSONEvents() {
+        return getJsonBatches()
+                .stream()
+                .flatMap(b -> b.getEvents().stream())
+                .collect(Collectors.toList());
+    }
+
+    public List<String> getJSONEIDs() {
+        return getJSONEvents()
+                .stream()
+                .map(TestUtils::getEventEid)
+                .collect(Collectors.toList());
     }
 
     public List<ConsumptionBatch> getBinaryBatches() {

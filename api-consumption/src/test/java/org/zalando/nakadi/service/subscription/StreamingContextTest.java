@@ -24,6 +24,7 @@ import org.zalando.nakadi.generated.avro.Envelope;
 import org.zalando.nakadi.generated.avro.Metadata;
 import org.zalando.nakadi.mapper.NakadiRecordMapper;
 import org.zalando.nakadi.repository.kafka.KafkaRecordDeserializer;
+import org.zalando.nakadi.security.Client;
 import org.zalando.nakadi.service.EventStreamChecks;
 import org.zalando.nakadi.service.FeatureToggleService;
 import org.zalando.nakadi.service.LocalSchemaRegistry;
@@ -42,6 +43,7 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -252,12 +254,28 @@ public class StreamingContextTest {
         when(etCache.getEventType(eq(supportedEventTypeName))).thenReturn(et);
         when(featureToggleService.isFeatureEnabled(Feature.SKIP_MISPLACED_EVENTS)).thenReturn(true);
 
+        final Client client = mock(Client.class);
+        when(client.getClientId()).thenReturn("consumingAppId");
+
+        final StreamParameters spMock = StreamParametersTest.createStreamParameters(
+                1000,
+                100L,
+                0L,
+                100,
+                100L,
+                100,
+                100,
+                100,
+                client
+        );
+
         final StreamingContext context = new StreamingContext.Builder()
                 .setSubscription(subscription)
                 .setEventStreamChecks(eventStreamCheck)
                 .setKafkaRecordDeserializer(deserializer)
                 .setEventTypeCache(etCache)
                 .setKafkaPollTimeout(0)
+                .setParameters(spMock)
                 .setFeatureToggleService(featureToggleService)
                 .build();
 
@@ -273,7 +291,7 @@ public class StreamingContextTest {
                         null, null);
         final Predicate<byte[]> isConsumptionBlocked =
                 bytes -> context.isConsumptionBlocked(
-                        new ConsumedEvent(bytes, cursor, 0L, null, Collections.emptyMap()));
+                        new ConsumedEvent(bytes, cursor, 0L, null, Collections.emptyMap(), Optional.empty()));
 
         Assert.assertEquals(true, isConsumptionBlocked.test(noMetadataEvent.getBytes()));
         Assert.assertEquals(true, isConsumptionBlocked.test(noEventTypeEvent.getBytes()));

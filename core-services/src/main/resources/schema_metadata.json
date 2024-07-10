@@ -43,7 +43,8 @@
         "type": "string"
       },
       "test_project_id": {
-        "type": "string"
+        "type": "string",
+        "minLength": 1
       }
     },
     "required": [
@@ -99,7 +100,8 @@
         "type": "string"
       },
       "test_project_id": {
-        "type": "string"
+        "type": "string",
+        "minLength": 1
       }
     },
     "required": [
@@ -156,7 +158,8 @@
         "type": "string"
       },
       "test_project_id": {
-        "type": "string"
+        "type": "string",
+        "minLength": 1
       }
     },
     "required": [

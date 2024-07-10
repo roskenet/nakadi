@@ -161,6 +161,16 @@ public class TestUtils {
         return new JSONObject(json);
     }
 
+    // for events with no EID it returns an empty string, this is consistent with some existing parts of Nakadi.
+    public static String getEventEid(final JSONObject event) {
+        final JSONObject metadata = event.optJSONObject("metadata");
+        if (metadata == null) {
+            return "";
+        } else {
+            return metadata.optString("eid");
+        }
+    }
+
     public static EventType loadEventType(final String filename) throws IOException {
         final String json = readFile(filename);
         return OBJECT_MAPPER.readValue(json, EventType.class);

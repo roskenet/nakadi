@@ -71,7 +71,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.zalando.nakadi.utils.TestUtils.buildTimelineWithTopic;
-
 import com.google.common.base.Charsets;
 
 public class KafkaTopicRepositoryTest {
@@ -212,6 +211,28 @@ public class KafkaTopicRepositoryTest {
             final Header kafkaHeader = recordSent.headers().lastHeader(TestProjectIdHeader.HEADER_NAME);
             Assert.assertNotNull(kafkaHeader);
             Assert.assertEquals(testProjectId, new String(kafkaHeader.value(), Charsets.UTF_8));
+        }
+    }
+
+    @Test
+    public void testIfKafkaRecordHeaderIsAbsentForNonTestEvent() {
+        final String myTopic = "event-owner-selector-events";
+        final BatchItem item = new BatchItem("{}", null,
+                null,
+                Collections.emptyList());
+        item.setPartition("1");
+        final List<BatchItem> batch = ImmutableList.of(item);
+
+        when(kafkaProducer.partitionsFor(myTopic)).thenReturn(ImmutableList.of(
+                new PartitionInfo(myTopic, 1, NODE, null, null)));
+
+        try {
+            kafkaTopicRepository.syncPostBatch(myTopic, batch, "random", null, false);
+            fail();
+        } catch (final EventPublishingException e) {
+            final ProducerRecord<byte[], byte[]> recordSent = captureProducerRecordSent();
+            final Header kafkaHeader = recordSent.headers().lastHeader(TestProjectIdHeader.HEADER_NAME);
+            Assert.assertNull(kafkaHeader);
         }
     }
 

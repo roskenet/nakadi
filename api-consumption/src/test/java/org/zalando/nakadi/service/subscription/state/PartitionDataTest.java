@@ -13,6 +13,7 @@ import org.zalando.nakadi.service.timeline.TimelineService;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static java.lang.System.currentTimeMillis;
@@ -68,7 +69,8 @@ public class PartitionDataTest {
         final PartitionData pd = new PartitionData(COMP, null, createCursor(100L), System.currentTimeMillis(), 0L,
                 new CursorOperationsService(timelineService));
         for (long i = 0; i < 100; ++i) {
-            pd.addEvent(new ConsumedEvent(("test_" + i).getBytes(), createCursor(100L + i + 1), 0, null, null));
+            pd.addEvent(new ConsumedEvent(("test_" + i).getBytes(), createCursor(100L + i + 1), 0, null,
+                    null, Optional.empty()));
         }
         // Now say to it that it was sent
         pd.takeEventsToStream(currentTimeMillis(), 1000, 0L, false);
@@ -89,7 +91,8 @@ public class PartitionDataTest {
             pd.takeEventsToStream(currentTimeMillis(), 10, 0L, false);
             assertEquals(i + 1, pd.getKeepAliveInARow());
         }
-        pd.addEvent(new ConsumedEvent("".getBytes(), createCursor(101L), 0, null, null));
+        pd.addEvent(new ConsumedEvent("".getBytes(), createCursor(101L), 0, null,
+                null, Optional.empty()));
         assertEquals(100, pd.getKeepAliveInARow());
         pd.takeEventsToStream(currentTimeMillis(), 10, 0L, false);
         assertEquals(0, pd.getKeepAliveInARow());
@@ -105,7 +108,8 @@ public class PartitionDataTest {
         final PartitionData pd = new PartitionData(COMP, null, createCursor(100L), currentTime, 0L,
                 new CursorOperationsService(timelineService));
         for (int i = 0; i < 100; ++i) {
-            pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(i + 100L + 1), 0, null, null));
+            pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(i + 100L + 1), 0, null,
+                    null, Optional.empty()));
         }
         List<ConsumedEvent> data = pd.takeEventsToStream(currentTime, 1000, timeout, false);
         assertNull(data);
@@ -118,7 +122,8 @@ public class PartitionDataTest {
         assertEquals(100, data.size());
 
         for (int i = 100; i < 200; ++i) {
-            pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(i + 100L + 1), 0, null, null));
+            pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(i + 100L + 1), 0, null,
+                    null, Optional.empty()));
         }
         data = pd.takeEventsToStream(currentTime, 1000, timeout, false);
         assertNull(data);
@@ -137,7 +142,8 @@ public class PartitionDataTest {
         final PartitionData pd = new PartitionData(COMP, null, createCursor(100L), System.currentTimeMillis(), 0L,
                 new CursorOperationsService(timelineService));
         for (int i = 0; i < 100; ++i) {
-            pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(i + 100L + 1), 0, null, null));
+            pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(i + 100L + 1), 0, null,
+                    null, Optional.empty()));
         }
         assertNull(pd.takeEventsToStream(currentTimeMillis(), 1000, timeout, false));
         final List<ConsumedEvent> eventsToStream = pd.takeEventsToStream(currentTimeMillis(), 99, timeout, false);
@@ -151,11 +157,13 @@ public class PartitionDataTest {
         final PartitionData pd = new PartitionData(COMP, null, createCursor(100L), currentTime, 5,
                 new CursorOperationsService(timelineService));
 
-        pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(0), currentTime + 1, null, null));
+        pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(0), currentTime + 1, null,
+                null, Optional.empty()));
 
         assertEquals(null, pd.takeEventsToStream(currentTime, 100, 100, false)); // initialize window to [1, 6)
 
-        pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(1), currentTime + 12, null, null));
+        pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(1), currentTime + 12, null,
+                null, Optional.empty()));
 
         assertEquals(1, pd.takeEventsToStream(currentTime, 100, 100, false).size()); // [1, 6)
         assertEquals(1, pd.takeEventsToStream(currentTime, 100, 100, false).size()); // [6, 11)
@@ -170,7 +178,8 @@ public class PartitionDataTest {
         final int[] timestamps = new int[]{2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 14, 17, 19, 20, 30};
 
         for (int i = 0; i < timestamps.length; ++i) {
-            pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(i), timestamps[i], null, null));
+            pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(i), timestamps[i], null,
+                    null, Optional.empty()));
         }
 
         final int[] sizes = new int[]{
@@ -185,7 +194,8 @@ public class PartitionDataTest {
             assertEquals(sizes[i], pd.takeEventsToStream(currentTimeMillis(), 100, timeout, true).size());
         }
 
-        pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(timestamps.length), 35, null, null));
+        pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(timestamps.length), 35, null,
+                null, Optional.empty()));
         assertEquals(1, pd.takeEventsToStream(currentTimeMillis(), 100, timeout, true).size());
     }
 
@@ -200,7 +210,8 @@ public class PartitionDataTest {
         final int[] timestamps = new int[]{2, 3, 4, 5, 2, 4, 4, 2, 9, 1};
 
         for (int i = 0; i < timestamps.length; ++i) {
-            pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(i), timestamps[i], null, null));
+            pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(i), timestamps[i], null,
+                    null, Optional.empty()));
         }
 
         // Nothing is streamed, even though there is one event whose timestamp is 9 (higher than the minimum of 7
@@ -208,7 +219,8 @@ public class PartitionDataTest {
         assertEquals(null, pd.takeEventsToStream(currentTimeMillis(), 100, timeout, false));
 
         // Even though 7 triggers the flushing, it only streams until it finds 9
-        pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(timestamps.length), 8, null, null));
+        pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(timestamps.length), 8, null,
+                null, Optional.empty()));
         assertEquals(8, pd.takeEventsToStream(currentTimeMillis(), 100, timeout, false)
                 .size()); // [2, 7)
 
@@ -220,7 +232,8 @@ public class PartitionDataTest {
         final PartitionData pd = new PartitionData(COMP, null, createCursor(100L), System.currentTimeMillis(), 0L,
                 new CursorOperationsService(timelineService));
         for (int i = 0; i < 10; ++i) {
-            pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(i), 0, null, null));
+            pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(i), 0, null,
+                    null, Optional.empty()));
         }
         assertEquals(10, pd.takeEventsToStream(currentTimeMillis(), 100, timeout, true).size());
     }
@@ -231,7 +244,8 @@ public class PartitionDataTest {
         final PartitionData pd = new PartitionData(COMP, null, createCursor(100L), System.currentTimeMillis(), 0L,
                 new CursorOperationsService(timelineService));
         for (int i = 0; i < 10; ++i) {
-            pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(i), 0, null, null));
+            pd.addEvent(new ConsumedEvent("test".getBytes(), createCursor(i), 0, null,
+                    null, Optional.empty()));
         }
         assertNull(pd.takeEventsToStream(currentTimeMillis(), 0, timeout, true));
     }
