@@ -52,7 +52,6 @@ public class ChangeSetTest {
     public static Iterable<TestCase> testCases() {
         final Date date1 = new Date(System.currentTimeMillis() - 4000);
         final Date date2 = new Date();
-        System.out.println("date1: " + date1 + " and date2: " + date2);
         final Change change1et1 = new Change("change1", "et1", date1);
         final Change change2et1 = new Change("change2", "et1", date2);
         final Change change3et2 = new Change("change3", "et2", date1);
@@ -89,15 +88,11 @@ public class ChangeSetTest {
         final List<Change> newChanges = Arrays.asList(valueToTest.changeSet);
 
         final Collection<String> changedEventTypes = changeSet.getUpdatedEventTypes(newChanges);
-        System.out.println("changedEventTypes: " + changedEventTypes);
-        System.out.println("valueToTest ets: " + Arrays.asList(valueToTest.expectedUpdatedEts));
         Assert.assertEquals(valueToTest.expectedUpdatedEts.length, changedEventTypes.size());
         Stream.of(valueToTest.expectedUpdatedEts).forEach(v -> Assert.assertTrue(changedEventTypes.contains(v)));
 
         final Collection<Change> changesToDelete = changeSet.getChangesToRemove(newChanges, valueToTest.ttl);
         final Set<String> realChangesToDelete = changesToDelete.stream().map(Change::getId).collect(Collectors.toSet());
-        System.out.println("realChangesToDelete: " + realChangesToDelete);
-        System.out.println("valueToTest deletes: " + Arrays.asList(valueToTest.expectedDeleteChangeIds));
         Assert.assertEquals(valueToTest.expectedDeleteChangeIds.length, realChangesToDelete.size());
         Stream.of(valueToTest.expectedDeleteChangeIds).forEach(d -> Assert.assertTrue(realChangesToDelete.contains(d)));
     }
