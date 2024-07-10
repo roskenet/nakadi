@@ -279,4 +279,8 @@ public class BatchItem implements Resource<BatchItem> {
         return idx;
     }
 
+    public Optional<String> getTestProjectId() {
+        return Optional.ofNullable(event.optJSONObject("metadata"))
+                .map(metadata -> metadata.optString("test_project_id"));
+    }
 }
