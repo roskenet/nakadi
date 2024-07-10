@@ -61,24 +61,24 @@ public class ChangeSetTest {
         return Arrays.asList(
                 new TestCase("emptyLists", new Change[]{}, new Change[]{}, new String[]{}, new String[]{}, 5000),
                 new TestCase("notificationAddedBySomeone",
-                        new Change[]{}, new Change[]{change1et1}, new String[]{"et1"}, new String[]{}, 5000),
+                        new Change[]{}, new Change[]{change1et1}, new String[]{"et1"}, new String[]{}, 7000),
                 new TestCase("notificationRemovedBySomeone",
-                        new Change[]{change1et1}, new Change[]{}, new String[]{}, new String[]{}, 5000),
+                        new Change[]{change1et1}, new Change[]{}, new String[]{}, new String[]{}, 7000),
                 new TestCase("secondNotificationAddedBySomeone",
                         new Change[]{change1et1}, new Change[]{change1et1, change2et1},
-                        new String[]{"et1"}, new String[]{"change1"}, 5000),
+                        new String[]{"et1"}, new String[]{"change1"}, 7000),
                 new TestCase("2EventTypesUpdated",
                         new Change[]{}, new Change[]{change1et1, change3et2},
-                        new String[]{"et1", "et2"}, new String[]{}, 5000),
+                        new String[]{"et1", "et2"}, new String[]{}, 7000),
                 new TestCase("OldChangesAreRemovedBecauseTheyAreOld",
                         new Change[]{}, new Change[]{change1et1},
                         new String[]{"et1"}, new String[]{"change1"}, 2000),
                 new TestCase("OnlyLatestChangeIsKeptInZk",
                         new Change[]{}, new Change[]{change1et1, change2et1, change3et2, change4et2},
-                        new String[]{"et1", "et2"}, new String[]{"change1", "change3"}, 5000),
+                        new String[]{"et1", "et2"}, new String[]{"change1", "change3"}, 7000),
                 new TestCase("NoChangesInCaseIfDataTheSame",
                         new Change[]{change1et1, change3et2}, new Change[]{change3et2, change1et1},
-                        new String[]{}, new String[]{}, 5000)
+                        new String[]{}, new String[]{}, 7000)
         );
     }
 
