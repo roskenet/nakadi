@@ -134,4 +134,7 @@ jar {
 
 test{
     useJUnitPlatform()
+    testLogging {
+                showStandardStreams = true
+    }
 }
