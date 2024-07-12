@@ -191,7 +191,7 @@ public class SchemaServiceTest {
                 Charsets.UTF_8);
         eventType.getSchema().setSchema(jsonSchemaString);
         eventType.setCompatibilityMode(mode);
-        assertDoesNotThrow(() -> schemaService.validateSchema(eventType, true));
+        assertDoesNotThrow(() -> schemaService.validateSchema(eventType, false));
     }
 
     @EnumSource(value = CompatibilityMode.class, names = {"NONE", "FORWARD"})

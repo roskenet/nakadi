@@ -149,7 +149,13 @@
         "format": { "type": "string" },
         "allOf": { "$ref": "#/definitions/schemaArray" },
         "anyOf": { "$ref": "#/definitions/schemaArray" },
-        "oneOf": { "$ref": "#/definitions/schemaArray" }
+        "oneOf": { "$ref": "#/definitions/schemaArray" },
+        "x-extensible-enum": {
+            "type": "array",
+            "items": { "type": "string" },
+            "uniqueItems": true,
+            "default": []
+        }
     },
     "dependencies": {
         "exclusiveMaximum": [ "maximum" ],
