@@ -260,7 +260,7 @@ public class SchemaService implements SchemaProviderService {
         validateFieldsInSchema("ordering_instance_ids", orderingInstanceIds, effectiveSchema);
 
         try {
-            validateJsonSchemaConstraints(schemaAsJson);
+            validateJsonSchemaConstraints(schemaAsJson, eventType.getCompatibilityMode());
         } catch (final SchemaValidationException e) {
             if (eventTypeExists &&
                     (eventType.getCompatibilityMode() != CompatibilityMode.COMPATIBLE)) {
@@ -272,8 +272,10 @@ public class SchemaService implements SchemaProviderService {
         }
     }
 
-    private void validateJsonSchemaConstraints(final JSONObject schema) throws SchemaValidationException {
-        final List<SchemaIncompatibility> incompatibilities = schemaEvolutionService.collectIncompatibilities(schema);
+    private void validateJsonSchemaConstraints(final JSONObject schema,
+                                               final CompatibilityMode mode) throws SchemaValidationException {
+        final List<SchemaIncompatibility> incompatibilities =
+                schemaEvolutionService.collectMetaSchemaIncompatibilities(schema, mode);
 
         if (!incompatibilities.isEmpty()) {
             final String errorMessage = incompatibilities.stream().map(Object::toString)
