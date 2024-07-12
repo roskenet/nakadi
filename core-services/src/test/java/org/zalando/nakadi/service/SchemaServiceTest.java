@@ -3,10 +3,7 @@ package org.zalando.nakadi.service;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 import com.google.common.io.Resources;
-import org.everit.json.schema.Schema;
-import org.everit.json.schema.loader.SchemaLoader;
 import org.joda.time.DateTime;
-import org.json.JSONObject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +27,7 @@ import org.zalando.nakadi.kpi.event.NakadiBatchPublished;
 import org.zalando.nakadi.repository.db.EventTypeRepository;
 import org.zalando.nakadi.repository.db.SchemaRepository;
 import org.zalando.nakadi.service.timeline.TimelineSync;
+import org.zalando.nakadi.util.JsonUtils;
 import org.zalando.nakadi.utils.TestUtils;
 import org.zalando.nakadi.validation.JsonSchemaEnrichment;
 import org.zalando.nakadi.validation.schema.SchemaEvolutionConstraint;
@@ -80,10 +78,9 @@ public class SchemaServiceTest {
     private SchemaEvolutionService createSchemaEvolutionServiceSpy() throws IOException {
         final List<SchemaEvolutionConstraint> evolutionConstraints =
                 Lists.newArrayList(Mockito.mock(SchemaEvolutionConstraint.class));
-        final JSONObject metaSchemaJson = new JSONObject(Resources.toString(Resources.getResource("schema.json"),
-                Charsets.UTF_8));
-        final Schema metaSchema = SchemaLoader.load(metaSchemaJson);
-        return Mockito.spy(new SchemaEvolutionService(metaSchema, evolutionConstraints,
+        return Mockito.spy(new SchemaEvolutionService(JsonUtils.loadJsonSchema("schema_compatible.json"),
+                JsonUtils.loadJsonSchema("schema_non_compatible.json"),
+                evolutionConstraints,
                 Mockito.mock(SchemaDiff.class), Mockito.mock(BiFunction.class),
                 new HashMap<>(), Mockito.mock(AvroSchemaCompatibility.class)));
     }
@@ -148,11 +145,12 @@ public class SchemaServiceTest {
     }
 
     @Test
-    public void whenNotForwardModeAndInvalidJsonSchemaAlwaysThrows() throws Exception {
+    public void whenCompatibleModeAndInvalidJsonSchemaAlwaysThrows() throws Exception {
         final String jsonSchemaString = Resources.toString(
                 Resources.getResource("invalid-json-schema-structure.json"),
                 Charsets.UTF_8);
         eventType.getSchema().setSchema(jsonSchemaString);
+        eventType.setCompatibilityMode(CompatibilityMode.COMPATIBLE);
         assertThrows(SchemaValidationException.class,
                 () -> schemaService.validateSchema(eventType, false));
         assertThrows(SchemaValidationException.class,
@@ -161,7 +159,7 @@ public class SchemaServiceTest {
 
     @EnumSource(value = CompatibilityMode.class, names = {"NONE", "FORWARD"})
     @ParameterizedTest
-    public void whenNewEventTypeWithForwardModeAndInvalidJsonSchemaThenThrows(final CompatibilityMode mode)
+    public void whenNewEventTypeWithInvalidJsonSchemaThenThrows(final CompatibilityMode mode)
             throws Exception {
         final String jsonSchemaString = Resources.toString(
                 Resources.getResource("invalid-json-schema-structure.json"),
@@ -174,7 +172,7 @@ public class SchemaServiceTest {
 
     @EnumSource(value = CompatibilityMode.class, names = {"NONE", "FORWARD"})
     @ParameterizedTest
-    public void whenExistingEventTypeWithForwardModeAndInvalidJsonSchemaThenDontThrow(final CompatibilityMode mode)
+    public void whenExistingEventTypeWithInvalidJsonSchemaThenDontThrow(final CompatibilityMode mode)
             throws Exception {
         final String jsonSchemaString = Resources.toString(
                 Resources.getResource("invalid-json-schema-structure.json"),
@@ -182,6 +180,42 @@ public class SchemaServiceTest {
         eventType.getSchema().setSchema(jsonSchemaString);
         eventType.setCompatibilityMode(mode);
         assertDoesNotThrow(() -> schemaService.validateSchema(eventType, true));
+    }
+
+    @EnumSource(value = CompatibilityMode.class, names = {"NONE", "FORWARD"})
+    @ParameterizedTest
+    public void whenNewNonCompatibleEventTypeAndExtensibleEnumThenDontThrow(final CompatibilityMode mode)
+            throws Exception {
+        final String jsonSchemaString = Resources.toString(
+                Resources.getResource("sample-extensible-enum.json"),
+                Charsets.UTF_8);
+        eventType.getSchema().setSchema(jsonSchemaString);
+        eventType.setCompatibilityMode(mode);
+        assertDoesNotThrow(() -> schemaService.validateSchema(eventType, true));
+    }
+
+    @EnumSource(value = CompatibilityMode.class, names = {"NONE", "FORWARD"})
+    @ParameterizedTest
+    public void whenNewNonCompatibleEventTypeAndInvalidExtensibleEnumThenThrows(final CompatibilityMode mode)
+            throws Exception {
+        final String jsonSchemaString = Resources.toString(
+                Resources.getResource("sample-invalid-extensible-enum.json"),
+                Charsets.UTF_8);
+        eventType.getSchema().setSchema(jsonSchemaString);
+        eventType.setCompatibilityMode(mode);
+        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType, false));
+    }
+
+    @Test
+    public void whenCompatibleEventTypeWithExtensibleEnumThenThrows()
+            throws Exception {
+        final String jsonSchemaString = Resources.toString(
+                Resources.getResource("sample-extensible-enum.json"),
+                Charsets.UTF_8);
+        eventType.getSchema().setSchema(jsonSchemaString);
+        eventType.setCompatibilityMode(CompatibilityMode.COMPATIBLE);
+        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType, false));
+        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType, true));
     }
 
     @Test
@@ -203,7 +237,7 @@ public class SchemaServiceTest {
     @Test
     public void whenSchemaHasIncompatibilitiesThenThrows() throws Exception {
         Mockito.doThrow(SchemaEvolutionException.class)
-                .when(schemaEvolutionService).collectIncompatibilities(any());
+                .when(schemaEvolutionService).collectMetaSchemaIncompatibilities(any(), any());
 
         assertThrows(SchemaEvolutionException.class,
                 () -> schemaService.validateSchema(eventType, false));
