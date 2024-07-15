@@ -1,0 +1,5 @@
+{
+  "type": "object",
+  "foo": "bar",
+  "order_id": {"type": "string"}
+}

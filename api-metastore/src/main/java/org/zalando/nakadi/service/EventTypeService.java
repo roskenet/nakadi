@@ -175,7 +175,7 @@ public class EventTypeService {
         eventTypeOptionsValidator.checkRetentionTime(eventType.getOptions());
         setDefaultEventTypeOptions(eventType);
         try {
-            schemaService.validateSchema(eventType);
+            schemaService.validateSchema(eventType, false);
         } catch (final SchemaValidationException e) {
             throw new InvalidEventTypeException(e);
         }
@@ -461,7 +461,7 @@ public class EventTypeService {
             authorizationValidator.validateAuthorization(mapToResource(original), mapToResource(eventTypeBase));
             validateName(eventTypeName, eventTypeBase);
             validateCompactionUpdate(original, eventTypeBase);
-            schemaService.validateSchema(eventTypeBase);
+            schemaService.validateSchema(eventTypeBase, true);
             validateAudience(original, eventTypeBase);
             partitionResolver.validate(eventTypeBase);
             validateOwningApplication(original.getOwningApplication(), eventTypeBase.getOwningApplication());

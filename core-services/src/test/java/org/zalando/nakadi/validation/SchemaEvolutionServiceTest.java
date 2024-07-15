@@ -1,10 +1,6 @@
 package org.zalando.nakadi.validation;
 
-import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
-import com.google.common.io.Resources;
-import org.everit.json.schema.Schema;
-import org.everit.json.schema.loader.SchemaLoader;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Assert;
@@ -20,6 +16,7 @@ import org.zalando.nakadi.domain.Version;
 import org.zalando.nakadi.exceptions.runtime.SchemaEvolutionException;
 import org.zalando.nakadi.service.AvroSchemaCompatibility;
 import org.zalando.nakadi.service.SchemaEvolutionService;
+import org.zalando.nakadi.util.JsonUtils;
 import org.zalando.nakadi.utils.EventTypeTestBuilder;
 import org.zalando.nakadi.utils.TestUtils;
 import org.zalando.nakadi.validation.schema.SchemaEvolutionConstraint;
@@ -73,10 +70,8 @@ public class SchemaEvolutionServiceTest {
     @Before
     public void setUp() throws IOException {
         final List<SchemaEvolutionConstraint> evolutionConstraints = Lists.newArrayList(evolutionConstraint);
-        final JSONObject metaSchemaJson = new JSONObject(Resources.toString(Resources.getResource("schema.json"),
-                Charsets.UTF_8));
-        final Schema metaSchema = SchemaLoader.load(metaSchemaJson);
-        this.service = new SchemaEvolutionService(metaSchema, evolutionConstraints, schemaDiff, levelResolver,
+        this.service = new SchemaEvolutionService(JsonUtils.loadJsonSchema("schema_compatible.json"),
+                JsonUtils.loadJsonSchema("schema_non_compatible.json"), evolutionConstraints, schemaDiff, levelResolver,
                 errorMessages, avroSchemaCompatibility);
 
         Mockito.doReturn("error").when(errorMessages).get(any());
@@ -278,7 +273,9 @@ public class SchemaEvolutionServiceTest {
                     .collect(toList());
             final String description = testCase.getString("description");
 
-            Assert.assertThat(description, service.collectIncompatibilities(schemaJson).stream().map(Object::toString)
+            Assert.assertThat(description,
+                    service.collectMetaSchemaIncompatibilities(schemaJson, CompatibilityMode.COMPATIBLE).
+                            stream().map(Object::toString)
                     .collect(toList()), is(errorMessages));
         }
     }
