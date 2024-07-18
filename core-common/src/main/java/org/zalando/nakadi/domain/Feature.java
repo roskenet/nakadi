@@ -22,7 +22,8 @@ public enum Feature {
     VALIDATE_EVENT_TYPE_OWNING_APPLICATION("validate_event_type_owning_app"),
     SKIP_MISPLACED_EVENTS("skip_misplaced_events"),
     DLQ_REDRIVE_EVENT_TYPE_ATTACHMENT_JOB("dlq_redrive_event_type_attachment_job"),
-    FORCE_DATA_LAKE_ANNOTATIONS;
+    FORCE_DATA_LAKE_ANNOTATIONS,
+    FORCE_EVENT_TYPE_CREATE_SCHEMA_VALIDATION;
 
     private final String id;
 

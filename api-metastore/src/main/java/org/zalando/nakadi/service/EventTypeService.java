@@ -175,7 +175,9 @@ public class EventTypeService {
         eventTypeOptionsValidator.checkRetentionTime(eventType.getOptions());
         setDefaultEventTypeOptions(eventType);
         try {
-            schemaService.validateSchema(eventType, false);
+            final boolean forceEventTypeCreateSchemaValidation =
+                    featureToggleService.isFeatureEnabled(Feature.FORCE_EVENT_TYPE_CREATE_SCHEMA_VALIDATION);
+            schemaService.validateSchema(eventType, !forceEventTypeCreateSchemaValidation);
         } catch (final SchemaValidationException e) {
             throw new InvalidEventTypeException(e);
         }

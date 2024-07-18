@@ -264,8 +264,8 @@ public class SchemaService implements SchemaProviderService {
         } catch (final SchemaValidationException e) {
             if (eventTypeExists &&
                     (eventType.getCompatibilityMode() != CompatibilityMode.COMPATIBLE)) {
-                LOG.warn("event type {} with compatibility mode {} has invalid json schema",
-                        eventType.getName(), eventType.getCompatibilityMode());
+                LOG.warn("event type {} with compatibility mode {} has invalid json schema: {}",
+                        eventType.getName(), eventType.getCompatibilityMode(), e.toString());
             } else {
                 throw e;
             }
