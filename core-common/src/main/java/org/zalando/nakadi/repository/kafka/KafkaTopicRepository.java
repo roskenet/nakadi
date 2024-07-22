@@ -36,6 +36,7 @@ import org.zalando.nakadi.domain.NakadiRecordResult;
 import org.zalando.nakadi.domain.PartitionEndStatistics;
 import org.zalando.nakadi.domain.PartitionStatistics;
 import org.zalando.nakadi.domain.Timeline;
+import org.zalando.nakadi.domain.TestProjectIdHeader;
 import org.zalando.nakadi.exceptions.runtime.CannotAddPartitionToTopicException;
 import org.zalando.nakadi.exceptions.runtime.EventPublishingException;
 import org.zalando.nakadi.exceptions.runtime.InternalNakadiException;
@@ -170,6 +171,8 @@ public class KafkaTopicRepository implements TopicRepository {
             if (null != item.getOwner()) {
                 item.getOwner().serialize(kafkaRecord);
             }
+
+            item.getTestProjectId().ifPresent(x -> new TestProjectIdHeader(x).serialize(kafkaRecord));
 
             if (null != consumerTags && !consumerTags.isEmpty()) {
                 KafkaHeaderTagSerde.serialize(consumerTags, kafkaRecord);
@@ -641,10 +644,10 @@ public class KafkaTopicRepository implements TopicRepository {
             throws Exception {
         return unmodifiableList(
                 adminClient.describeTopics(Set.of(topicId)).allTopicNames().get(5000, TimeUnit.MILLISECONDS)
-                .get(topicId).partitions()
-                .stream()
-                .map(partitionInfo -> KafkaCursor.toNakadiPartition(partitionInfo.partition()))
-                .collect(toList()));
+                        .get(topicId).partitions()
+                        .stream()
+                        .map(partitionInfo -> KafkaCursor.toNakadiPartition(partitionInfo.partition()))
+                        .collect(toList()));
     }
 
     @Override

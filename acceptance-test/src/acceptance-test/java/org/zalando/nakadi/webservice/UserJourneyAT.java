@@ -9,6 +9,7 @@ import com.google.common.io.Resources;
 import com.jayway.restassured.RestAssured;
 import com.jayway.restassured.http.ContentType;
 import com.jayway.restassured.response.Header;
+import com.jayway.restassured.response.Response;
 import com.jayway.restassured.specification.RequestSpecification;
 import org.echocat.jomon.runtime.concurrent.RetryForSpecifiedTimeStrategy;
 import org.json.JSONArray;
@@ -52,6 +53,7 @@ import static org.zalando.nakadi.utils.TestUtils.randomValidEventTypeName;
 import static org.zalando.nakadi.utils.TestUtils.waitFor;
 import static org.zalando.nakadi.webservice.utils.NakadiTestUtils.commitCursors;
 import static org.zalando.nakadi.webservice.utils.NakadiTestUtils.createSubscription;
+import static uk.co.datumedge.hamcrest.json.SameJSONAs.sameJSONObjectAs;
 
 public class UserJourneyAT extends RealEnvironmentAT {
 
@@ -66,11 +68,14 @@ public class UserJourneyAT extends RealEnvironmentAT {
 
     private String eventTypeNameBusiness;
     private String eventTypeBodyBusiness;
+    private static String businessEvent1;
+    private static String businessEvent2;
+    private static String businessEvent3;
 
     public static String getEventTypeJsonFromFile(final String resourceName, final String eventTypeName,
                                                   final String owningApp)
             throws IOException {
-        final String json = Resources.toString(Resources.getResource(resourceName), Charsets.UTF_8);
+        final String json = getJsonFromResource(resourceName);
         return json
                 .replace("NAME_PLACEHOLDER", eventTypeName)
                 .replace("OWNING_APP_PLACEHOLDER", owningApp);
@@ -83,6 +88,9 @@ public class UserJourneyAT extends RealEnvironmentAT {
         eventTypeBodyUpdate = getEventTypeJsonFromFile("sample-event-type-update.json", eventTypeName, owningApp);
         createEventType(eventTypeBody);
 
+        businessEvent1 = getJsonFromResource("business_events/sample_business_event_1.json");
+        businessEvent2 = getJsonFromResource("business_events/sample_business_event_2.json");
+        businessEvent3 = getJsonFromResource("business_events/sample_business_event_3.json");
         eventTypeNameBusiness = eventTypeName + ".business";
         eventTypeBodyBusiness = getEventTypeJsonFromFile(
                 "sample-event-type-business.json", eventTypeNameBusiness, owningApp);
@@ -173,7 +181,7 @@ public class UserJourneyAT extends RealEnvironmentAT {
                         .withWaitBetweenEachTry(500));
 
         // push two events to event-type
-        postEvents(EVENT1, EVENT2);
+        postEvents(eventTypeName, EVENT1, EVENT2);
 
         // get offsets for partition
         jsonRequestSpec()
@@ -243,6 +251,78 @@ public class UserJourneyAT extends RealEnvironmentAT {
                 .body("newest_available_offset[0]", equalTo("001-0001-000000000000000001"))
                 .body("oldest_available_offset[0]", equalTo("001-0001-000000000000000000"))
                 .body("unconsumed_events[0]", equalTo(1));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test(timeout = 15000)
+    public void userJourneyM2ForBusinessEvent() throws InterruptedException, IOException {
+
+        // get event type
+        jsonRequestSpec()
+                .when()
+                .get("/event-types/" + eventTypeNameBusiness)
+                .then()
+                .statusCode(OK.value())
+                .body("name", equalTo(eventTypeNameBusiness))
+                .body("owning_application", equalTo(owningApp))
+                .body("category", equalTo("business"))
+                .body("audience", equalTo("external-public"))
+                .body("ordering_key_fields", equalTo(Lists.newArrayList("foo", "bar.baz")))
+                .body("cleanup_policy", equalTo("delete"))
+                .body("schema.type", equalTo("json_schema"))
+                .body("enrichment_strategies", equalTo(ImmutableList.of("metadata_enrichment")))
+                .body("schema.schema", equalTo("{\"type\": \"object\", \"properties\": {\"foo\": " +
+                        "{\"type\": \"string\"}, \"bar\": {\"type\": \"object\", \"properties\": " +
+                        "{\"baz\": {\"type\": \"string\"}}}}, \"required\": [\"foo\"]}"));
+
+        // list event types
+        jsonRequestSpec()
+                .when()
+                .get("/event-types")
+                .then()
+                .statusCode(OK.value())
+                .body("size()", greaterThan(0))
+                .body("name[0]", notNullValue())
+                .body("owning_application[0]", notNullValue())
+                .body("category[0]", notNullValue())
+                .body("schema.type[0]", notNullValue())
+                .body("schema.schema[0]", notNullValue());
+
+        // send events to event-type
+        postEvents(eventTypeNameBusiness, businessEvent1, businessEvent2, businessEvent3);
+
+        // get offsets for partition
+        jsonRequestSpec()
+                .when()
+                .get("/event-types/" + eventTypeNameBusiness + "/partitions/0")
+                .then()
+                .statusCode(OK.value())
+                .body("partition", equalTo("0"))
+                .body("oldest_available_offset", equalTo("001-0001-000000000000000000"))
+                .body("newest_available_offset", equalTo("001-0001-000000000000000002"));
+
+        // get offsets for all partitions
+        jsonRequestSpec()
+                .when()
+                .get("/event-types/" + eventTypeNameBusiness + "/partitions")
+                .then()
+                .statusCode(OK.value())
+                .body("size()", equalTo(1)).body("partition[0]", notNullValue())
+                .body("oldest_available_offset[0]", notNullValue())
+                .body("newest_available_offset[0]", notNullValue());
+
+        // read events
+        final Response response = requestSpec()
+                .header(new Header("X-nakadi-cursors", "[{\"partition\": \"0\", \"offset\": \"BEGIN\"}]"))
+                .param("batch_limit", "3")
+                .param("stream_limit", "3")
+                .when()
+                .get("/event-types/" + eventTypeNameBusiness + "/events");
+
+        response.then()
+                .statusCode(OK.value());
+
+        validateBusinessEvents(response);
     }
 
     @Test(timeout = 3000)
@@ -316,7 +396,7 @@ public class UserJourneyAT extends RealEnvironmentAT {
 
     @Test(timeout = 15000)
     public void userJourneyHila() throws InterruptedException, IOException {
-        postEvents(rangeClosed(0, 3)
+        postEvents(eventTypeName, rangeClosed(0, 3)
                 .mapToObj(x -> "{\"foo\":\"bar" + x + "\"}")
                 .collect(Collectors.toList())
                 .toArray(new String[4]));
@@ -397,10 +477,10 @@ public class UserJourneyAT extends RealEnvironmentAT {
     public void userJourneyAvroTransition() throws InterruptedException, IOException {
 
         final EventType eventType = MAPPER.readValue(jsonRequestSpec()
-                    .header("accept", "application/json")
-                    .get(ENDPOINT + "/" + eventTypeNameBusiness)
-                    .getBody()
-                    .asString(),
+                        .header("accept", "application/json")
+                        .get(ENDPOINT + "/" + eventTypeNameBusiness)
+                        .getBody()
+                        .asString(),
                 EventType.class);
 
         final String validatedWithJsonSchemaVersion = eventType.getSchema().getVersion();
@@ -410,7 +490,7 @@ public class UserJourneyAT extends RealEnvironmentAT {
         final String eventInvalid = newEvent().put("bar", randomTextString()).toString();
 
         // push two JSON events to event-type
-        postEventsInternal(eventTypeNameBusiness, new String[]{event1, event2});
+        postEvents(eventTypeNameBusiness, new String[]{event1, event2});
 
         // try to push some invalid event
         tryPostInvalidEvents(eventTypeNameBusiness, new String[]{eventInvalid});
@@ -418,15 +498,15 @@ public class UserJourneyAT extends RealEnvironmentAT {
         // update schema => change to Avro
         jsonRequestSpec()
                 .body("{\"type\": \"avro_schema\", " +
-                      "\"schema\": \"{\\\"type\\\": \\\"record\\\", \\\"name\\\": \\\"Foo\\\", " +
-                      "\\\"fields\\\": [{\\\"name\\\": \\\"foo\\\", \\\"type\\\": \\\"string\\\"}]}\"}")
+                        "\"schema\": \"{\\\"type\\\": \\\"record\\\", \\\"name\\\": \\\"Foo\\\", " +
+                        "\\\"fields\\\": [{\\\"name\\\": \\\"foo\\\", \\\"type\\\": \\\"string\\\"}]}\"}")
                 .post("/event-types/" + eventTypeNameBusiness + "/schemas")
                 .then()
                 .body(equalTo(""))
                 .statusCode(OK.value());
 
         // push two more JSON events to Avro event-type
-        postEventsInternal(eventTypeNameBusiness, new String[]{event1, event2});
+        postEvents(eventTypeNameBusiness, new String[]{event1, event2});
 
         // test that JSON validation still works
         tryPostInvalidEvents(eventTypeNameBusiness, new String[]{eventInvalid});
@@ -460,6 +540,40 @@ public class UserJourneyAT extends RealEnvironmentAT {
                 .statusCode(NO_CONTENT.value());
     }
 
+    private static void validateBusinessEvents(final Response response) {
+        final List<JSONObject> expectedBusinessEvents = List.of(
+                new JSONObject(businessEvent1),
+                new JSONObject(businessEvent2),
+                new JSONObject(businessEvent3)
+        );
+
+        final JSONObject eventFetchResponse = new JSONObject(response.body().asString());
+        final JSONArray responseEvents = eventFetchResponse.getJSONArray("events");
+        assertThat(responseEvents.length(), equalTo(3));
+
+        for (int i = 0; i < 3; i++) {
+            final JSONObject event = responseEvents.getJSONObject(i);
+            // we expect the user submitted fields to propagate unaltered
+            final JSONObject metadata = event.getJSONObject("metadata");
+            final JSONObject metadataKnownFields = new JSONObject(
+                    metadata,
+                    new String[] {"eid", "occurred_at", "test_project_id"}
+            );
+            final JSONObject expectedMetadataKnownFields = expectedBusinessEvents.get(i).getJSONObject("metadata");
+            assertThat(metadataKnownFields, sameJSONObjectAs(expectedMetadataKnownFields));
+            // metadata fields set by the server
+            List.of("published_by", "event_type", "partition", "received_at", "flow_id", "version")
+                    .stream()
+                    .forEach(f -> assertThat(metadata.getString(f), notNullValue()));
+            // the payload itself should not be modified by the publishing process
+            final JSONObject eventWithoutMetadata = deepClone(event);
+            final JSONObject expectedEventWithoutMetadata = deepClone(expectedBusinessEvents.get(i));
+            eventWithoutMetadata.remove("metadata");
+            expectedEventWithoutMetadata.remove("metadata");
+            assertThat(eventWithoutMetadata, sameJSONObjectAs(expectedEventWithoutMetadata));
+        }
+    }
+
     private void createEventType(final String body) {
         jsonRequestSpec()
                 .body(body)
@@ -470,16 +584,12 @@ public class UserJourneyAT extends RealEnvironmentAT {
                 .statusCode(CREATED.value());
     }
 
-    private void postEvents(final String... events) {
-        postEventsInternal(eventTypeName, events);
-    }
-
-    private void postEventsInternal(final String name, final String[] events) {
+    private void postEvents(final String eventTypeName, final String... events) {
         final String batch = "[" + String.join(",", events) + "]";
         jsonRequestSpec()
                 .body(batch)
                 .when()
-                .post("/event-types/" + name + "/events")
+                .post("/event-types/" + eventTypeName + "/events")
                 .then()
                 .body(equalTo(""))
                 .statusCode(OK.value());
@@ -504,7 +614,15 @@ public class UserJourneyAT extends RealEnvironmentAT {
     private JSONObject newEvent() {
         return new JSONObject()
                 .put("metadata", new JSONObject()
-                         .put("eid", randomUUID())
-                         .put("occurred_at", randomDate().toString()));
+                        .put("eid", randomUUID())
+                        .put("occurred_at", randomDate().toString()));
+    }
+
+    private static JSONObject deepClone(final JSONObject source) {
+        return new JSONObject(source.toString());
+    }
+
+    private static String getJsonFromResource(final String resourceName) throws IOException {
+        return Resources.toString(Resources.getResource(resourceName), Charsets.UTF_8);
     }
 }
