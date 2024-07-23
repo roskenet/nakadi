@@ -19,16 +19,18 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
     private final NakadiCursor position;
     private final long timestamp;
     private final EventOwnerHeader owner;
-
     private final Map<HeaderTag, String> consumerTags;
+    private final Optional<TestProjectIdHeader> testProjectIdHeader;
 
     public ConsumedEvent(final byte[] event, final NakadiCursor position, final long timestamp,
-                         @Nullable final EventOwnerHeader owner, final Map<HeaderTag, String> consumerTags) {
+                         @Nullable final EventOwnerHeader owner, final Map<HeaderTag, String> consumerTags,
+                         final Optional<TestProjectIdHeader> testProjectIdHeader) {
         this.event = event;
         this.position = position;
         this.timestamp = timestamp;
         this.owner = owner;
         this.consumerTags = consumerTags;
+        this.testProjectIdHeader = testProjectIdHeader;
     }
 
     public byte[] getEvent() {
@@ -41,6 +43,10 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
 
     public long getTimestamp() {
         return timestamp;
+    }
+
+    public Optional<TestProjectIdHeader> getTestProjectIdHeader() {
+        return testProjectIdHeader;
     }
 
     @Override

@@ -1,6 +1,7 @@
 package org.zalando.nakadi.service.subscription;
 
 import org.zalando.nakadi.domain.EventTypePartition;
+import org.zalando.nakadi.domain.TestDataFilter;
 import org.zalando.nakadi.exceptions.runtime.InvalidStreamParametersException;
 import org.zalando.nakadi.security.Client;
 import org.zalando.nakadi.service.EventStreamConfig;
@@ -49,6 +50,8 @@ public class StreamParameters {
 
     private final List<EventTypePartition> partitions;
 
+    private final TestDataFilter testDataFilter;
+
     private StreamParameters(
             final UserStreamParameters userParameters,
             final long maxCommitTimeout,
@@ -77,6 +80,7 @@ public class StreamParameters {
             throw new InvalidStreamParametersException("commit_timeout can not be less than 0");
         }
         this.commitTimeoutMillis = TimeUnit.SECONDS.toMillis(commitTimeout == 0 ? maxCommitTimeout : commitTimeout);
+        this.testDataFilter = userParameters.getTestDataFilter().orElse(TestDataFilter.LIVE);
     }
 
     public long getMessagesAllowedToSend(final long limit, final long sentSoFar) {
@@ -105,4 +109,7 @@ public class StreamParameters {
         return new StreamParameters(userStreamParameters, maxCommitTimeoutSeconds, client);
     }
 
+    public TestDataFilter getTestDataFilter() {
+        return testDataFilter;
+    }
 }

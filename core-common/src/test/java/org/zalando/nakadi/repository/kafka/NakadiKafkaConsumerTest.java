@@ -146,13 +146,13 @@ public class NakadiKafkaConsumerTest {
                 consumedEvents.get(0),
                 equalTo(new LowLevelConsumer.Event(
                         event1, TOPIC, PARTITION, event1Offset, now, null,
-                        Collections.emptyMap())));
+                        Collections.emptyMap(), Optional.empty())));
 
         assertThat("The event we read second should have the same data as second mocked ConsumerRecord",
                 consumedEvents.get(1),
                 equalTo(new LowLevelConsumer.Event(
                         event2, TOPIC, PARTITION, event2Offset, now, null,
-                        Collections.emptyMap())));
+                        Collections.emptyMap(), Optional.empty())));
 
         assertThat("The kafka poll should be called with timeout we defined", pollTimeoutCaptor.getValue(),
                 equalTo(POLL_TIMEOUT));

@@ -279,8 +279,22 @@ public class BatchItem implements Resource<BatchItem> {
         return idx;
     }
 
+    /**
+     * Returns a string project id if the event has a $.metadata.project_id field and the value is a string.
+     * Returns none if $.metadata.project_id is not present (or any of the ancestors).
+     * Throws RuntimeException if the project_id is not a string.
+     */
     public Optional<String> getTestProjectId() {
         return Optional.ofNullable(event.optJSONObject("metadata"))
-                .map(metadata -> metadata.optString("test_project_id"));
+                .flatMap(metadata -> Optional.ofNullable(metadata.opt("test_project_id")))
+                .map(projectId -> {
+                    if (projectId instanceof String) {
+                        return (String) projectId;
+                    } else {
+                        // THIS IS NEVER GOING TO HAPPEN
+                        // The json-schema already guarantees it to be a string.
+                        throw new RuntimeException("$.metadata.test_project_id is not a string!");
+                    }
+                });
     }
 }

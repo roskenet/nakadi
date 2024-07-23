@@ -24,6 +24,7 @@ import org.zalando.nakadi.ShutdownHooks;
 import org.zalando.nakadi.cache.SubscriptionCache;
 import org.zalando.nakadi.config.NakadiSettings;
 import org.zalando.nakadi.domain.Subscription;
+import org.zalando.nakadi.domain.TestDataFilter;
 import org.zalando.nakadi.exceptions.runtime.AccessDeniedException;
 import org.zalando.nakadi.exceptions.runtime.ConflictException;
 import org.zalando.nakadi.exceptions.runtime.InternalNakadiException;
@@ -205,13 +206,14 @@ public class SubscriptionStreamController {
             @Nullable @RequestParam(value = "stream_keep_alive_limit", required = false) final Integer
                     streamKeepAliveLimit,
             @Nullable @RequestParam(value = "commit_timeout", required = false) final Long commitTimeout,
+            @Nullable @RequestParam(value = "test_data_filter", required = false) final TestDataFilter testDataFilter,
             @RequestHeader(name = "Accept", required = false,
                     defaultValue = "application/x-json-stream") final String acceptHeader,
             final HttpServletResponse response, final Client client) {
 
         final UserStreamParameters userParameters = new UserStreamParameters(batchLimit, streamLimit, batchTimespan,
                 batchTimeout, streamTimeout, streamKeepAliveLimit, maxUncommittedEvents, ImmutableList.of(),
-                commitTimeout);
+                commitTimeout, testDataFilter);
 
         final StreamParameters streamParameters = StreamParameters.of(userParameters,
                 nakadiSettings.getMaxCommitTimeout(), client);

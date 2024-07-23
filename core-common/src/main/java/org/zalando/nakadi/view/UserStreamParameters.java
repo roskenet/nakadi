@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import org.zalando.nakadi.domain.EventTypePartition;
+import org.zalando.nakadi.domain.TestDataFilter;
 
 import javax.annotation.Nullable;
 import java.util.List;
@@ -29,6 +30,7 @@ public class UserStreamParameters {
 
     private final Optional<Long> commitTimeoutSeconds;
 
+    private final Optional<TestDataFilter> testDataFilter;
 
     @JsonCreator
     public UserStreamParameters(@JsonProperty("batch_limit") @Nullable final Integer batchLimit,
@@ -39,7 +41,8 @@ public class UserStreamParameters {
                                 @JsonProperty("stream_keep_alive_limit") @Nullable final Integer streamKeepAliveLimit,
                                 @JsonProperty("max_uncommitted_events") @Nullable final Integer maxUncommittedEvents,
                                 @JsonProperty("partitions") @Nullable final List<EventTypePartition> partitions,
-                                @JsonProperty("commit_timeout") @Nullable final Long commitTimeoutSeconds) {
+                                @JsonProperty("commit_timeout") @Nullable final Long commitTimeoutSeconds,
+                                @JsonProperty("test_data_filter") @Nullable final TestDataFilter testDataFilter) {
         this.batchLimit = Optional.ofNullable(batchLimit);
         this.streamLimit = Optional.ofNullable(streamLimit);
         this.batchTimespan = Optional.ofNullable(batchTimespan);
@@ -49,6 +52,7 @@ public class UserStreamParameters {
         this.maxUncommittedEvents = Optional.ofNullable(maxUncommittedEvents);
         this.partitions = partitions == null ? ImmutableList.of() : partitions;
         this.commitTimeoutSeconds = Optional.ofNullable(commitTimeoutSeconds);
+        this.testDataFilter = Optional.ofNullable(testDataFilter);
     }
 
     public Optional<Integer> getBatchLimit() {
@@ -85,5 +89,9 @@ public class UserStreamParameters {
 
     public Optional<Long> getCommitTimeoutSeconds() {
         return commitTimeoutSeconds;
+    }
+
+    public Optional<TestDataFilter> getTestDataFilter() {
+        return testDataFilter;
     }
 }

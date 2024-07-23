@@ -44,7 +44,7 @@ public class TestProjectIdHeader {
             return false;
         }
         final TestProjectIdHeader that = (TestProjectIdHeader) o;
-        return value.equals(that.value);
+        return Objects.equals(value, that.value);
     }
 
     @Override

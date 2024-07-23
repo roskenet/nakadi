@@ -1,0 +1,11 @@
+{
+  "foo": "baaaar",
+  "bar": {
+    "baz": "fooooo"
+  },
+  "metadata": {
+    "eid": "651a4da6-3f20-4932-90cd-4d36c6d0491d",
+    "occurred_at": "2024-07-19T08:14:19.025Z",
+    "test_project_id": "beauty-identifier-pilot"
+  }
+}

@@ -1,8 +1,9 @@
 package org.zalando.nakadi.repository;
 
-import org.zalando.nakadi.domain.HeaderTag;
 import org.zalando.nakadi.domain.EventOwnerHeader;
+import org.zalando.nakadi.domain.HeaderTag;
 import org.zalando.nakadi.domain.NakadiCursor;
+import org.zalando.nakadi.domain.TestProjectIdHeader;
 import org.zalando.nakadi.domain.TopicPartition;
 import org.zalando.nakadi.exceptions.runtime.InvalidCursorException;
 
@@ -12,6 +13,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 public interface LowLevelConsumer extends Closeable {
@@ -30,6 +32,7 @@ public interface LowLevelConsumer extends Closeable {
         private final long timestamp;
         private final EventOwnerHeader eventOwnerHeader;
         private final Map<HeaderTag, String> consumerTags;
+        private final Optional<TestProjectIdHeader> testProjectIdHeader;
 
         public Event(final byte[] data,
                      final String topic,
@@ -37,7 +40,8 @@ public interface LowLevelConsumer extends Closeable {
                      final long offset,
                      final long timestamp,
                      final EventOwnerHeader eventOwnerHeader,
-                     final Map<HeaderTag, String> consumerTags) {
+                     final Map<HeaderTag, String> consumerTags,
+                     final Optional<TestProjectIdHeader> testProjectIdHeader) {
             this.data = data;
             this.topic = topic;
             this.partition = partition;
@@ -45,6 +49,7 @@ public interface LowLevelConsumer extends Closeable {
             this.timestamp = timestamp;
             this.eventOwnerHeader = eventOwnerHeader;
             this.consumerTags = consumerTags;
+            this.testProjectIdHeader = testProjectIdHeader;
         }
 
         public byte[] getData() {
@@ -75,29 +80,32 @@ public interface LowLevelConsumer extends Closeable {
             return consumerTags;
         }
 
+        public Optional<TestProjectIdHeader> getTestProjectIdHeader() {
+            return testProjectIdHeader;
+        }
+
         @Override
         public boolean equals(final Object o) {
             if (this == o) {
                 return true;
             }
-
-            if (o == null || getClass() != o.getClass()) {
+            if (!(o instanceof Event)) {
                 return false;
             }
-
             final Event event = (Event) o;
-            return timestamp == event.timestamp &&
-                    Arrays.equals(data, event.data) &&
-                    Objects.equals(topic, event.topic) &&
-                    Objects.equals(partition, event.partition) &&
-                    Objects.equals(offset, event.offset) &&
-                    Objects.equals(eventOwnerHeader, event.eventOwnerHeader) &&
-                    Objects.equals(consumerTags, event.consumerTags);
+            return partition == event.partition
+                    && offset == event.offset
+                    && timestamp == event.timestamp
+                    && Arrays.equals(data, event.data) && Objects.equals(topic, event.topic)
+                    && Objects.equals(eventOwnerHeader, event.eventOwnerHeader)
+                    && Objects.equals(consumerTags, event.consumerTags)
+                    && Objects.equals(testProjectIdHeader, event.testProjectIdHeader);
         }
 
         @Override
         public int hashCode() {
-            int result = Objects.hash(topic, partition, offset, timestamp, eventOwnerHeader, consumerTags);
+            int result = Objects.hash(topic, partition, offset, timestamp, eventOwnerHeader,
+                    consumerTags, testProjectIdHeader);
             result = 31 * result + Arrays.hashCode(data);
             return result;
         }

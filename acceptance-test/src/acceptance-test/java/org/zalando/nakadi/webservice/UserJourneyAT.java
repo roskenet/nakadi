@@ -288,7 +288,7 @@ public class UserJourneyAT extends RealEnvironmentAT {
                 .body("schema.type[0]", notNullValue())
                 .body("schema.schema[0]", notNullValue());
 
-        // send events to event-type
+        // push two events to event-type
         postEvents(eventTypeNameBusiness, businessEvent1, businessEvent2, businessEvent3);
 
         // get offsets for partition
@@ -477,10 +477,10 @@ public class UserJourneyAT extends RealEnvironmentAT {
     public void userJourneyAvroTransition() throws InterruptedException, IOException {
 
         final EventType eventType = MAPPER.readValue(jsonRequestSpec()
-                        .header("accept", "application/json")
-                        .get(ENDPOINT + "/" + eventTypeNameBusiness)
-                        .getBody()
-                        .asString(),
+                    .header("accept", "application/json")
+                    .get(ENDPOINT + "/" + eventTypeNameBusiness)
+                    .getBody()
+                    .asString(),
                 EventType.class);
 
         final String validatedWithJsonSchemaVersion = eventType.getSchema().getVersion();
@@ -498,8 +498,8 @@ public class UserJourneyAT extends RealEnvironmentAT {
         // update schema => change to Avro
         jsonRequestSpec()
                 .body("{\"type\": \"avro_schema\", " +
-                        "\"schema\": \"{\\\"type\\\": \\\"record\\\", \\\"name\\\": \\\"Foo\\\", " +
-                        "\\\"fields\\\": [{\\\"name\\\": \\\"foo\\\", \\\"type\\\": \\\"string\\\"}]}\"}")
+                      "\"schema\": \"{\\\"type\\\": \\\"record\\\", \\\"name\\\": \\\"Foo\\\", " +
+                      "\\\"fields\\\": [{\\\"name\\\": \\\"foo\\\", \\\"type\\\": \\\"string\\\"}]}\"}")
                 .post("/event-types/" + eventTypeNameBusiness + "/schemas")
                 .then()
                 .body(equalTo(""))
