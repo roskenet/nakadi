@@ -1502,6 +1502,7 @@ paths:
         - $ref: '#/parameters/StreamTimeout'
         - $ref: '#/parameters/StreamKeepAliveLimit'
         - $ref: '#/parameters/CommitTimeout'
+        - $ref: '#/parameters/TestDataFilter'
         - name: X-Flow-Id
           in: header
           description: |
@@ -1672,6 +1673,13 @@ paths:
                 default: 60
                 maximum: 60
                 minimum: 0
+              test_data_filter:
+                description: |
+                  Allows you to specify what data you wish to receive with respect to "Testing in Production".
+                  See https://nakadi.docs.zalando.net/nakadi-event-broker/testing-in-production/
+                type: string
+                enum: ['TEST', 'LIVE', 'LIVE_AND_TEST']
+                default: 'LIVE'
         - $ref: '#/parameters/SubscriptionId'
         - name: X-Flow-Id
           in: header
@@ -2409,6 +2417,12 @@ definitions:
         type: object
         additionalProperties:
           type: string
+      test_project_id:
+        description: |
+          ```suggestion
+          Indicates that the event is part of a test project. If the event is a non part of any test project simply omit the field.
+          Refer https://nakadi.docs.zalando.net/nakadi-event-broker/testing-in-production/
+        type: string
     required:
       - eid
       - occurred_at
@@ -3758,3 +3772,14 @@ parameters:
       - 'PRODUCER_ET': producer event type.
     type: string
     required: true
+
+  TestDataFilter:
+    name: test_data_filter
+    in: query
+    description: |
+      Allows you to specify what data you wish to receive with respect to "Testing in Production".
+      See https://nakadi.docs.zalando.net/nakadi-event-broker/testing-in-production/
+    type: string
+    enum: ['TEST', 'LIVE', 'LIVE_AND_TEST']
+    default: 'LIVE'
+    required: false
