@@ -296,8 +296,8 @@ public class KafkaTopicRepository implements TopicRepository {
             final String topicId, final List<BatchItem> batch, final String eventType,
             final Map<HeaderTag, String> consumerTags, final boolean delete)
             throws EventPublishingException {
+        final Map<BatchItem, CompletableFuture<Exception>> sendFutures = new HashMap<>();
         try {
-            final Map<BatchItem, CompletableFuture<Exception>> sendFutures = new HashMap<>();
             final Tracer.SpanBuilder sendBatchSpan = TracingService.buildNewSpan("send_batch_to_kafka")
                     .withTag(Tags.MESSAGE_BUS_DESTINATION.getKey(), topicId);
             try (Closeable ignore = TracingService.withActiveSpan(sendBatchSpan)) {
@@ -326,6 +326,8 @@ public class KafkaTopicRepository implements TopicRepository {
             failUnpublished(topicId, eventType, batch, "timed out");
             throw new EventPublishingException("Timeout publishing message to kafka", ex, topicId, eventType);
         } catch (final ExecutionException ex) {
+            //never happens because we never call completeExceptionally instead use complete(ex) or complete(null)
+            //but we keep this catch clause because compiler complains
             failUnpublished(topicId, eventType, batch, "internal error");
             throw new EventPublishingException("Internal error publishing message to kafka", ex, topicId, eventType);
         } catch (final InterruptedException ex) {
@@ -334,11 +336,17 @@ public class KafkaTopicRepository implements TopicRepository {
             throw new EventPublishingException("Interrupted publishing message to kafka", ex, topicId, eventType);
         }
 
-        final boolean atLeastOneFailed = batch.stream()
-                .anyMatch(item -> item.getResponse().getPublishingStatus() == EventPublishingStatus.FAILED);
-        if (atLeastOneFailed) {
+       final Optional<Exception> atLeastOneException = sendFutures.values().stream()
+               .filter(CompletableFuture::isDone)
+               // the null here doesnt matter, originally get should either return null because of success or exception
+               .map(f -> f.getNow(null))
+               .filter(Objects::nonNull)
+               .findFirst();
+
+        if (atLeastOneException.isPresent()) {
             failUnpublished(topicId, eventType, batch, "internal error");
-            throw new EventPublishingException("Internal error publishing message to kafka", topicId, eventType);
+            throw new EventPublishingException("Internal error publishing message to kafka",
+                    atLeastOneException.get(), topicId, eventType);
         }
     }
 
