@@ -440,9 +440,10 @@ public class KafkaTopicRepository implements TopicRepository {
                     }
                 }));
             }
-            final boolean recordsPublished = latch.await(createSendTimeout(), TimeUnit.MILLISECONDS);
+            final boolean allRecordsMarked = latch.await(createSendTimeout(), TimeUnit.MILLISECONDS);
+            logOnError(topic, nakadiRecords.get(0).getMetadata().getEventType(), responses, !allRecordsMarked);
             return prepareResponse(nakadiRecords, responses,
-                    recordsPublished ? null : new TimeoutException("timeout waiting for events to be sent to kafka"));
+                    allRecordsMarked ? null : new TimeoutException("timeout waiting for events to be sent to kafka"));
         } catch (final InterruptException | InterruptedException e) {
             Thread.currentThread().interrupt();
             return prepareResponse(nakadiRecords, responses, e);
@@ -453,6 +454,20 @@ public class KafkaTopicRepository implements TopicRepository {
             LOG.debug("IOException:{}", ioe.getMessage(), ioe);
             return prepareResponse(nakadiRecords, responses, ioe);
         }
+    }
+
+    private static void logOnError(final String topic, final String eventType,
+                                   final Map<NakadiRecord, NakadiRecordResult> responses,
+                                   final boolean requestTimedOut) {
+        if (requestTimedOut) {
+            LOG.error("Internal error publishing message to kafka: topic {} / {} due to timeout",
+                    topic, eventType);
+        }
+        responses.values()
+                .stream().map(NakadiRecordResult::getException)
+                .filter(Objects::nonNull).findFirst()
+                .ifPresent(e -> LOG.error("Internal error publishing message to kafka: topic {} / {}",
+                        topic, eventType, e));
     }
 
     private List<NakadiRecordResult> prepareResponse(
