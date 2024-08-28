@@ -297,7 +297,7 @@ public class KafkaTopicRepository implements TopicRepository {
             final Map<HeaderTag, String> consumerTags, final boolean delete)
             throws EventPublishingException {
         try {
-            final Map<BatchItem, CompletableFuture<Exception>> sendFutures = new HashMap<>();
+            final Map<BatchItem, CompletableFuture<Void>> sendFutures = new HashMap<>();
             final Tracer.SpanBuilder sendBatchSpan = TracingService.buildNewSpan("send_batch_to_kafka")
                     .withTag(Tags.MESSAGE_BUS_DESTINATION.getKey(), topicId);
             try (Closeable ignore = TracingService.withActiveSpan(sendBatchSpan)) {
