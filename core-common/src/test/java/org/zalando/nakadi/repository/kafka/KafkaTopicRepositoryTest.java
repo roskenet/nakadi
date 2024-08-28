@@ -446,8 +446,8 @@ public class KafkaTopicRepositoryTest {
             return item;
         };
 
-        final List<BatchItem> batch = ImmutableList
-                .copyOf(IntStream.rangeClosed(1, 4).mapToObj(itemGenerator).collect(toList()));
+        final List<BatchItem> batch = IntStream.rangeClosed(1, 4).mapToObj(itemGenerator)
+                .collect(Collectors.toUnmodifiableList());
 
         when(nakadiSettings.getKafkaSendTimeoutMs()).thenReturn((long) 300);
         when(kafkaProducer.partitionsFor(EXPECTED_PRODUCER_RECORD.topic())).thenReturn(ImmutableList.of(

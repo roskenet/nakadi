@@ -154,7 +154,7 @@ public class KafkaTopicRepository implements TopicRepository {
         }
     }
 
-    private CompletableFuture<Exception> sendItem(
+    private CompletableFuture<Void> sendItem(
             final Producer<byte[], byte[]> producer,
             final String topicId,
             final String eventType,
@@ -162,7 +162,7 @@ public class KafkaTopicRepository implements TopicRepository {
             final Map<HeaderTag, String> consumerTags,
             final boolean delete) throws EventPublishingException {
         try {
-            final CompletableFuture<Exception> result = new CompletableFuture<>();
+            final CompletableFuture<Void> result = new CompletableFuture<>();
             final ProducerRecord<byte[], byte[]> kafkaRecord = new ProducerRecord<>(
                     topicId,
                     KafkaCursor.toKafkaPartition(item.getPartition()),
