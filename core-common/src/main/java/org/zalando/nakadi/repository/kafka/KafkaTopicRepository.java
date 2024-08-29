@@ -154,7 +154,7 @@ public class KafkaTopicRepository implements TopicRepository {
         }
     }
 
-    private CompletableFuture<Exception> sendItem(
+    private CompletableFuture<Void> sendItem(
             final Producer<byte[], byte[]> producer,
             final String topicId,
             final String eventType,
@@ -162,7 +162,7 @@ public class KafkaTopicRepository implements TopicRepository {
             final Map<HeaderTag, String> consumerTags,
             final boolean delete) throws EventPublishingException {
         try {
-            final CompletableFuture<Exception> result = new CompletableFuture<>();
+            final CompletableFuture<Void> result = new CompletableFuture<>();
             final ProducerRecord<byte[], byte[]> kafkaRecord = new ProducerRecord<>(
                     topicId,
                     KafkaCursor.toKafkaPartition(item.getPartition()),
@@ -180,9 +180,9 @@ public class KafkaTopicRepository implements TopicRepository {
 
             producer.send(kafkaRecord, ((metadata, exception) -> {
                 if (null != exception) {
-                    LOG.warn("Failed to publish to kafka topic {}", topicId, exception);
+                    LOG.debug("Failed to publish to kafka topic {}", topicId, exception);
                     item.updateStatusAndDetail(EventPublishingStatus.FAILED, "internal error");
-                    result.complete(exception);
+                    result.completeExceptionally(exception);
                 } else {
                     item.updateStatusAndDetail(EventPublishingStatus.SUBMITTED, "");
                     result.complete(null);
@@ -297,7 +297,7 @@ public class KafkaTopicRepository implements TopicRepository {
             final Map<HeaderTag, String> consumerTags, final boolean delete)
             throws EventPublishingException {
         try {
-            final Map<BatchItem, CompletableFuture<Exception>> sendFutures = new HashMap<>();
+            final Map<BatchItem, CompletableFuture<Void>> sendFutures = new HashMap<>();
             final Tracer.SpanBuilder sendBatchSpan = TracingService.buildNewSpan("send_batch_to_kafka")
                     .withTag(Tags.MESSAGE_BUS_DESTINATION.getKey(), topicId);
             try (Closeable ignore = TracingService.withActiveSpan(sendBatchSpan)) {
@@ -318,6 +318,12 @@ public class KafkaTopicRepository implements TopicRepository {
             final Tracer.SpanBuilder waitForBatchSentSpan = TracingService.buildNewSpan("wait_for_batch_sent")
                     .withTag(Tags.MESSAGE_BUS_DESTINATION.getKey(), topicId);
             try (Closeable ignore = TracingService.withActiveSpan(waitForBatchSentSpan)) {
+                //It is important that we wait for all the futures to complete (regardless of status) ie
+                //we don't want to abort the Future#wait on the first exception instead we want to
+                //wait till at max timeout duration otherwise would incorrectly result in execution of logic in
+                //below catch clause which will mark statuses of published events as failed.
+                //Combination of CompletableFuture#allOf and CompletableFuture#get here exactly
+                //helps us avoid that scenario.
                 multiFuture.get(createSendTimeout(), TimeUnit.MILLISECONDS);
             } catch (final IOException io) {
                 throw new InternalNakadiException("Error closing active span scope", io);
@@ -332,13 +338,6 @@ public class KafkaTopicRepository implements TopicRepository {
             Thread.currentThread().interrupt();
             failUnpublished(topicId, eventType, batch, "interrupted");
             throw new EventPublishingException("Interrupted publishing message to kafka", ex, topicId, eventType);
-        }
-
-        final boolean atLeastOneFailed = batch.stream()
-                .anyMatch(item -> item.getResponse().getPublishingStatus() == EventPublishingStatus.FAILED);
-        if (atLeastOneFailed) {
-            failUnpublished(topicId, eventType, batch, "internal error");
-            throw new EventPublishingException("Internal error publishing message to kafka", topicId, eventType);
         }
     }
 
@@ -447,9 +446,10 @@ public class KafkaTopicRepository implements TopicRepository {
                     }
                 }));
             }
-            final boolean recordsPublished = latch.await(createSendTimeout(), TimeUnit.MILLISECONDS);
+            final boolean allRecordsMarked = latch.await(createSendTimeout(), TimeUnit.MILLISECONDS);
+            logOnError(topic, nakadiRecords.get(0).getMetadata().getEventType(), responses, !allRecordsMarked);
             return prepareResponse(nakadiRecords, responses,
-                    recordsPublished ? null : new TimeoutException("timeout waiting for events to be sent to kafka"));
+                    allRecordsMarked ? null : new TimeoutException("timeout waiting for events to be sent to kafka"));
         } catch (final InterruptException | InterruptedException e) {
             Thread.currentThread().interrupt();
             return prepareResponse(nakadiRecords, responses, e);
@@ -460,6 +460,22 @@ public class KafkaTopicRepository implements TopicRepository {
             LOG.debug("IOException:{}", ioe.getMessage(), ioe);
             return prepareResponse(nakadiRecords, responses, ioe);
         }
+    }
+
+    private static void logOnError(final String topic, final String eventType,
+                                   final Map<NakadiRecord, NakadiRecordResult> responses,
+                                   final boolean requestTimedOut) {
+        if (requestTimedOut) {
+            LOG.error("Timeout publishing message to kafka: topic {} / {}",
+                    topic, eventType);
+        }
+        responses.values()
+                .stream()
+                .map(NakadiRecordResult::getException)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .ifPresent(e -> LOG.error("Internal error publishing message to kafka: topic {} / {}",
+                        topic, eventType, e));
     }
 
     private List<NakadiRecordResult> prepareResponse(
