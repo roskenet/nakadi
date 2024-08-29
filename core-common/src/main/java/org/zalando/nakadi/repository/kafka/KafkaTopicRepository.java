@@ -318,6 +318,12 @@ public class KafkaTopicRepository implements TopicRepository {
             final Tracer.SpanBuilder waitForBatchSentSpan = TracingService.buildNewSpan("wait_for_batch_sent")
                     .withTag(Tags.MESSAGE_BUS_DESTINATION.getKey(), topicId);
             try (Closeable ignore = TracingService.withActiveSpan(waitForBatchSentSpan)) {
+                //It is important that we wait for all the futures to complete (regardless of status) ie
+                //we don't want to abort the Future#wait on the first exception instead we want to
+                //wait till at max timeout duration otherwise would incorrectly result in execution of logic in
+                //below catch clause which will mark statuses of published events as failed.
+                //Combination of CompletableFuture#allOf and CompletableFuture#get here exactly
+                //helps us avoid that scenario.
                 multiFuture.get(createSendTimeout(), TimeUnit.MILLISECONDS);
             } catch (final IOException io) {
                 throw new InternalNakadiException("Error closing active span scope", io);
