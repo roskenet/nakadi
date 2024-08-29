@@ -180,7 +180,7 @@ public class KafkaTopicRepository implements TopicRepository {
 
             producer.send(kafkaRecord, ((metadata, exception) -> {
                 if (null != exception) {
-                    LOG.warn("Failed to publish to kafka topic {}", topicId, exception);
+                    LOG.debug("Failed to publish to kafka topic {}", topicId, exception);
                     item.updateStatusAndDetail(EventPublishingStatus.FAILED, "internal error");
                     result.completeExceptionally(exception);
                 } else {
@@ -460,12 +460,14 @@ public class KafkaTopicRepository implements TopicRepository {
                                    final Map<NakadiRecord, NakadiRecordResult> responses,
                                    final boolean requestTimedOut) {
         if (requestTimedOut) {
-            LOG.error("Internal error publishing message to kafka: topic {} / {} due to timeout",
+            LOG.error("Timeout publishing message to kafka: topic {} / {}",
                     topic, eventType);
         }
         responses.values()
-                .stream().map(NakadiRecordResult::getException)
-                .filter(Objects::nonNull).findFirst()
+                .stream()
+                .map(NakadiRecordResult::getException)
+                .filter(Objects::nonNull)
+                .findFirst()
                 .ifPresent(e -> LOG.error("Internal error publishing message to kafka: topic {} / {}",
                         topic, eventType, e));
     }
