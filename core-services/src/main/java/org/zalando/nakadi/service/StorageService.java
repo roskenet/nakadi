@@ -199,9 +199,23 @@ public class StorageService {
             for (final Storage s : allStorages) {
                 if (s.isDefault() && !newDefaultStorage.getId().equals(s.getId())) {
                     storageDbRepository.setDefaultStorage(s.getId(), false);
+                    final Storage updatedStorage = Storage.copy(s, false);
+                    auditLogPublisher.publish(
+                            Optional.of(s),
+                            Optional.of(updatedStorage),
+                            NakadiAuditLogPublisher.ResourceType.STORAGE,
+                            NakadiAuditLogPublisher.ActionType.UPDATED,
+                            defaultStorageId);
                 }
             }
             storageDbRepository.setDefaultStorage(newDefaultStorage.getId(), true);
+            auditLogPublisher.publish(
+                    Optional.of(newDefaultStorage),
+                    Optional.of(Storage.copy(newDefaultStorage, true)),
+                    NakadiAuditLogPublisher.ResourceType.STORAGE,
+                    NakadiAuditLogPublisher.ActionType.UPDATED,
+                    defaultStorageId);
+
             return storageDbRepository.getStorage(newDefaultStorage.getId());
         }).get();
     }
