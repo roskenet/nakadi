@@ -23,6 +23,7 @@ public class ChangeSetTest {
         private final String[] expectedUpdatedEts;
         private final String[] expectedDeleteChangeIds;
         private final long ttl;
+        private final long currentTimeMillis;
 
         public TestCase(
                 final String name,
@@ -30,13 +31,15 @@ public class ChangeSetTest {
                 final Change[] changeSet,
                 final String[] expectedUpdatedEts,
                 final String[] expectedDeleteChangeIds,
-                final long ttl) {
+                final long ttl,
+                final long currentTimeMillis) {
             this.name = name;
             this.initialChanges = initialChanges;
             this.changeSet = changeSet;
             this.expectedUpdatedEts = expectedUpdatedEts;
             this.expectedDeleteChangeIds = expectedDeleteChangeIds;
             this.ttl = ttl;
+            this.currentTimeMillis = currentTimeMillis;
         }
 
         @Override
@@ -50,34 +53,45 @@ public class ChangeSetTest {
 
     @Parameterized.Parameters
     public static Iterable<TestCase> testCases() {
-        final Date date1 = new Date(System.currentTimeMillis() - 4000);
-        final Date date2 = new Date();
+        final long currentTimeMillis = System.currentTimeMillis();
+        final Date date1 = new Date(currentTimeMillis - 4000);
+        final Date date2 = new Date(currentTimeMillis);
         final Change change1et1 = new Change("change1", "et1", date1);
         final Change change2et1 = new Change("change2", "et1", date2);
         final Change change3et2 = new Change("change3", "et2", date1);
         final Change change4et2 = new Change("change4", "et2", date2);
 
         return Arrays.asList(
-                new TestCase("emptyLists", new Change[]{}, new Change[]{}, new String[]{}, new String[]{}, 5000),
+                new TestCase("emptyLists",
+                        new Change[]{}, new Change[]{}, new String[]{}, new String[]{}, 5000, currentTimeMillis),
+
                 new TestCase("notificationAddedBySomeone",
-                        new Change[]{}, new Change[]{change1et1}, new String[]{"et1"}, new String[]{}, 7000),
+                        new Change[]{}, new Change[]{change1et1}, new String[]{"et1"}, new String[]{},
+                        7000, currentTimeMillis),
+
                 new TestCase("notificationRemovedBySomeone",
-                        new Change[]{change1et1}, new Change[]{}, new String[]{}, new String[]{}, 7000),
+                        new Change[]{change1et1}, new Change[]{}, new String[]{}, new String[]{},
+                        7000, currentTimeMillis),
+
                 new TestCase("secondNotificationAddedBySomeone",
                         new Change[]{change1et1}, new Change[]{change1et1, change2et1},
-                        new String[]{"et1"}, new String[]{"change1"}, 7000),
+                        new String[]{"et1"}, new String[]{"change1"}, 7000, currentTimeMillis),
+
                 new TestCase("2EventTypesUpdated",
                         new Change[]{}, new Change[]{change1et1, change3et2},
-                        new String[]{"et1", "et2"}, new String[]{}, 7000),
+                        new String[]{"et1", "et2"}, new String[]{}, 7000, currentTimeMillis),
+
                 new TestCase("OldChangesAreRemovedBecauseTheyAreOld",
                         new Change[]{}, new Change[]{change1et1},
-                        new String[]{"et1"}, new String[]{"change1"}, 2000),
+                        new String[]{"et1"}, new String[]{"change1"}, 2000, currentTimeMillis),
+
                 new TestCase("OnlyLatestChangeIsKeptInZk",
                         new Change[]{}, new Change[]{change1et1, change2et1, change3et2, change4et2},
-                        new String[]{"et1", "et2"}, new String[]{"change1", "change3"}, 7000),
+                        new String[]{"et1", "et2"}, new String[]{"change1", "change3"}, 7000, currentTimeMillis),
+
                 new TestCase("NoChangesInCaseIfDataTheSame",
                         new Change[]{change1et1, change3et2}, new Change[]{change3et2, change1et1},
-                        new String[]{}, new String[]{}, 7000)
+                        new String[]{}, new String[]{}, 7000, currentTimeMillis)
         );
     }
 
@@ -88,11 +102,14 @@ public class ChangeSetTest {
         final List<Change> newChanges = Arrays.asList(valueToTest.changeSet);
 
         final Collection<String> changedEventTypes = changeSet.getUpdatedEventTypes(newChanges);
+
         Assert.assertEquals(valueToTest.expectedUpdatedEts.length, changedEventTypes.size());
         Stream.of(valueToTest.expectedUpdatedEts).forEach(v -> Assert.assertTrue(changedEventTypes.contains(v)));
 
-        final Collection<Change> changesToDelete = changeSet.getChangesToRemove(newChanges, valueToTest.ttl);
+        final Collection<Change> changesToDelete =
+                changeSet.getChangesToRemove(newChanges, valueToTest.ttl, valueToTest.currentTimeMillis);
         final Set<String> realChangesToDelete = changesToDelete.stream().map(Change::getId).collect(Collectors.toSet());
+
         Assert.assertEquals(valueToTest.expectedDeleteChangeIds.length, realChangesToDelete.size());
         Stream.of(valueToTest.expectedDeleteChangeIds).forEach(d -> Assert.assertTrue(realChangesToDelete.contains(d)));
     }
