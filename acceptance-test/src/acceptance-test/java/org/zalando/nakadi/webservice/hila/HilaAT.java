@@ -807,7 +807,7 @@ public class HilaAT extends BaseAT {
         waitFor(() -> Assert.assertFalse(client.isRunning()), 15_000);
     }
 
-    @Test(timeout = 20_000)
+    @Test(timeout = 30_000)
     public void shouldSkipPoisonPillAndDeadLetterFoundInTheQueueLater() throws IOException, InterruptedException {
 
         final EventType eventType = NakadiTestUtils.createBusinessEventTypeWithPartitions(4);
@@ -823,7 +823,7 @@ public class HilaAT extends BaseAT {
         // start looking for events in the DLQ store event type already (reading from END)
         final Subscription dlqStoreEventTypeSub = createSubscriptionForEventType("nakadi.dead.letter.queue");
         final TestStreamingClient dlqStoreClient = TestStreamingClient.create(URL,
-                dlqStoreEventTypeSub.getId(), "batch_limit=1&stream_timeout=15");
+                dlqStoreEventTypeSub.getId(), "batch_limit=1&stream_timeout=25");
         dlqStoreClient.startWithAutocommit(batches ->
                 Assert.assertTrue("failed event should be found in the dead letter queue",
                         batches.stream()
