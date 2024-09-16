@@ -26,7 +26,7 @@ public class KafkaFactory {
 
     private final List<Producer<byte[], byte[]>> producers;
 
-    private final BlockingQueue<Consumer<byte[], byte[]>> consumerPool;
+    private final BlockingQueue<KafkaConsumerProxy> consumerPool;
     private final Meter consumerCreateMeter;
     private final Meter consumerPoolTakeMeter;
     private final Meter consumerPoolReturnMeter;
@@ -46,7 +46,7 @@ public class KafkaFactory {
         }
 
         if (consumerPoolSize > 0) {
-            LOG.info("Preparing timelag checker pool of {} Kafka consumers for storage {}",
+            LOG.info("Preparing a pool of {} Kafka consumers for storage {}",
                     consumerPoolSize, storageId);
             this.consumerPool = new LinkedBlockingQueue(consumerPoolSize);
             for (int i = 0; i < consumerPoolSize; ++i) {
@@ -70,10 +70,30 @@ public class KafkaFactory {
         return getConsumer();
     }
 
+    /**
+     * If a pool of consumers is configured then a consumer is taken from the pool, otherwise a new consumer is created
+     * and returned.
+     *
+     * The caller *has* to close the consumer once done working with it.  In case of a pooled consumer, "closing" will
+     * result in it being returned to the pool for later re-use.
+     */
+    public Consumer<byte[], byte[]> getConsumer() {
+        if (consumerPool != null) {
+            return takeConsumer();
+        }
+
+        final Consumer<byte[], byte[]> consumer =
+                new KafkaConsumer<>(kafkaLocationManager.getKafkaConsumerProperties());
+
+        consumerCreateMeter.mark();
+
+        return consumer;
+    }
+
     private Consumer<byte[], byte[]> takeConsumer() {
         final Consumer<byte[], byte[]> consumer;
 
-        LOG.trace("Taking timelag consumer from the pool");
+        LOG.trace("Taking a consumer from the pool");
         try {
             consumer = consumerPool.poll(30, TimeUnit.SECONDS);
         } catch (final InterruptedException e) {
@@ -89,8 +109,8 @@ public class KafkaFactory {
         return consumer;
     }
 
-    private void returnConsumer(final Consumer<byte[], byte[]> consumer) {
-        LOG.trace("Returning timelag consumer to the pool");
+    private void returnConsumer(final KafkaConsumerProxy consumer) {
+        LOG.trace("Returning a consumer to the pool");
 
         consumer.assign(Collections.emptyList());
 
@@ -104,27 +124,12 @@ public class KafkaFactory {
         }
     }
 
-    public Consumer<byte[], byte[]> getConsumer() {
-        if (consumerPool != null) {
-            return takeConsumer();
-        }
-
-        return getConsumer(kafkaLocationManager.getKafkaConsumerProperties());
-    }
-
-    private Consumer<byte[], byte[]> getConsumer(final Properties properties) {
-
-        consumerCreateMeter.mark();
-
-        return new KafkaConsumer<byte[], byte[]>(properties);
-    }
-
     protected Producer<byte[], byte[]> createProducerInstance(@Nullable final String clientId) {
         return new KafkaProducer<>(kafkaLocationManager.getKafkaProducerProperties(
                 Optional.ofNullable(clientId)));
     }
 
-    protected Consumer<byte[], byte[]> createConsumerProxyInstance() {
+    protected KafkaConsumerProxy createConsumerProxyInstance() {
         return new KafkaConsumerProxy(kafkaLocationManager.getKafkaConsumerProperties());
     }
 
