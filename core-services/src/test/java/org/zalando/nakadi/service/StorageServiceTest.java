@@ -118,7 +118,7 @@ public class StorageServiceTest {
                         eq(Optional.of(Storage.copy(storage1, false))),
                         eq(STORAGE),
                         eq(UPDATED),
-                        eq(storage4.getId())
+                        eq(storage1.getId())
                 );
         verify(auditLogPublisher, times(1))
                 .publish(
@@ -126,7 +126,7 @@ public class StorageServiceTest {
                         eq(Optional.of(Storage.copy(storage2, false))),
                         eq(STORAGE),
                         eq(UPDATED),
-                        eq(storage4.getId())
+                        eq(storage2.getId())
                 );
         verify(auditLogPublisher, times(1))
                 .publish(
@@ -142,7 +142,7 @@ public class StorageServiceTest {
                         eq(Optional.of(Storage.copy(storage3, false))),
                         eq(STORAGE),
                         eq(UPDATED),
-                        eq(storage4.getId())
+                        eq(storage3.getId())
                 );
     }
 
