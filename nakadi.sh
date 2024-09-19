@@ -19,39 +19,39 @@ function waitForNakadi() {
 
 function startNakadi() {
   export SPRING_PROFILES_ACTIVE=local
-  docker-compose up -d --build
+  docker compose up -d --build
   waitForNakadi
 }
 
 function stopNakadi() {
-  docker-compose down
+  docker compose down
 }
 
 function startStorages() {
-  docker-compose up -d postgres zookeeper kafka
+  docker compose up -d postgres zookeeper kafka
 }
 
 function acceptanceTests() {
   export SPRING_PROFILES_ACTIVE=acceptanceTest
-  docker-compose up -d --build
+  docker compose up -d --build
   waitForNakadi
   if ./gradlew :acceptance-test:acceptanceTest
   then
       errcode=0
   else
       errcode=1
-      docker-compose logs nakadi
+      docker compose logs nakadi
   fi
-  docker-compose down
+  docker compose down
   return $errcode
 }
 
 function buildNakadi() {
-  ./gradlew clean app:bootJar authz:fatJar lightstep:fatJar
+  ./gradlew clean app:bootJar app:copyJolokiaAgent authz:fatJar lightstep:fatJar
 }
 
 function createBuildx() {
-  docker buildx rm -f cdpbuildx || true
+  docker buildx rm -f cdpbuildx &>/dev/null || true
   docker buildx create \
     --config "$1" \
     --driver-opt network=host \
