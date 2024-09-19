@@ -214,7 +214,7 @@ public class StorageService {
                     Optional.of(Storage.copy(newDefaultStorage, true)),
                     NakadiAuditLogPublisher.ResourceType.STORAGE,
                     NakadiAuditLogPublisher.ActionType.UPDATED,
-                    defaultStorageId);
+                    newDefaultStorage.getId());
 
             return storageDbRepository.getStorage(newDefaultStorage.getId());
         }).get();
