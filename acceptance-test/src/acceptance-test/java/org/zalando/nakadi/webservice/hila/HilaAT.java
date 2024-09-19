@@ -57,11 +57,13 @@ import static org.zalando.nakadi.domain.SubscriptionBase.InitialPosition.BEGIN;
 import static org.zalando.nakadi.domain.SubscriptionBase.InitialPosition.END;
 import static org.zalando.nakadi.domain.SubscriptionEventTypeStats.Partition.AssignmentType.AUTO;
 import static org.zalando.nakadi.domain.SubscriptionEventTypeStats.Partition.AssignmentType.DIRECT;
+import static org.zalando.nakadi.utils.TestUtils.randomTextString;
 import static org.zalando.nakadi.utils.TestUtils.waitFor;
 import static org.zalando.nakadi.webservice.utils.NakadiTestUtils.commitCursors;
 import static org.zalando.nakadi.webservice.utils.NakadiTestUtils.createEventType;
 import static org.zalando.nakadi.webservice.utils.NakadiTestUtils.createSubscription;
 import static org.zalando.nakadi.webservice.utils.NakadiTestUtils.createSubscriptionForEventType;
+import static org.zalando.nakadi.webservice.utils.NakadiTestUtils.createSubscriptionForEventTypeFromBegin;
 import static org.zalando.nakadi.webservice.utils.NakadiTestUtils.getNumberOfAssignedStreams;
 import static org.zalando.nakadi.webservice.utils.NakadiTestUtils.publishBusinessEventWithUserDefinedPartition;
 import static org.zalando.nakadi.webservice.utils.NakadiTestUtils.publishEvent;
@@ -807,30 +809,25 @@ public class HilaAT extends BaseAT {
         waitFor(() -> Assert.assertFalse(client.isRunning()), 15_000);
     }
 
-    @Test(timeout = 30_000)
+    @Test(timeout = 25_000)
     public void shouldSkipPoisonPillAndDeadLetterFoundInTheQueueLater() throws IOException, InterruptedException {
 
         final EventType eventType = NakadiTestUtils.createBusinessEventTypeWithPartitions(4);
 
+        // using random strings here allows us to scan the DLQ from BEGIN later, as there is (almost) no risk of false
+        // positives due to other tests leaving their values there
+        final int numValues = 50;
+        final String[] values = new String[numValues];
+        for (int i = 0; i < numValues; ++i) {
+            values[i] = randomTextString();
+        }
         publishBusinessEventWithUserDefinedPartition(eventType.getName(),
-                50, i -> String.format("bar%d", i), i -> String.valueOf(i % 4));
+                numValues, i -> values[i], i -> String.valueOf(i % 4));
 
-        final String poisonPillValue = "bar10";
+        final String poisonPillValue = values[10];
 
         final Subscription subscription =
                 createAutoDLQSubscription(eventType, UnprocessableEventPolicy.DEAD_LETTER_QUEUE, 3);
-
-        // start looking for events in the DLQ store event type already (reading from END)
-        final Subscription dlqStoreEventTypeSub = createSubscriptionForEventType("nakadi.dead.letter.queue");
-        final TestStreamingClient dlqStoreClient = TestStreamingClient.create(URL,
-                dlqStoreEventTypeSub.getId(), "batch_limit=1&stream_timeout=25");
-        dlqStoreClient.startWithAutocommit(batches ->
-                Assert.assertTrue("failed event should be found in the dead letter queue",
-                        batches.stream()
-                        .flatMap(b -> b.getEvents().stream())
-                        .anyMatch(e ->
-                                subscription.getId().equals(e.get("subscription_id")) &&
-                                poisonPillValue.equals(e.getJSONObject("event").getString("foo")))));
 
         final AtomicReference<SubscriptionCursor> cursorWithPoisonPill = new AtomicReference<>();
         while (true) {
@@ -862,6 +859,18 @@ public class HilaAT extends BaseAT {
             }
         }
 
+        // now we can trawl the dead letter queue from BEGIN to find our unique poison pill there
+        final Subscription dlqStoreEventTypeSub = createSubscriptionForEventTypeFromBegin("nakadi.dead.letter.queue");
+        final TestStreamingClient dlqStoreClient = TestStreamingClient.create(
+                URL, dlqStoreEventTypeSub.getId(), "batch_limit=1&stream_timeout=5");
+
+        dlqStoreClient.startWithAutocommit(batches ->
+                Assert.assertTrue("failed event should be found in the dead letter queue",
+                        batches.stream()
+                        .flatMap(b -> b.getEvents().stream())
+                        .anyMatch(e ->
+                                subscription.getId().equals(e.get("subscription_id")) &&
+                                poisonPillValue.equals(e.getJSONObject("event").getString("foo")))));
         waitFor(() -> Assert.assertFalse(dlqStoreClient.isRunning()));
     }
 
