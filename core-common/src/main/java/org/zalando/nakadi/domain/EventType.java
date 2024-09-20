@@ -69,4 +69,14 @@ public class EventType extends EventTypeBase {
     public void setCreatedAt(final DateTime createdAt) {
         this.createdAt = createdAt;
     }
+
+    public static EventType copy(final EventType eventType) {
+        final EventTypeBase eventTypeBase = new EventTypeBase(eventType);
+        return new EventType(
+                eventTypeBase,
+                eventType.schema.getVersion(),
+                eventType.createdAt,
+                eventType.updatedAt
+        );
+    }
 }

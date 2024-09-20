@@ -92,6 +92,14 @@ public class Storage {
         return null == data ? null : mapper.readValue(data, getType().positionClass);
     }
 
+    public static Storage copy(final Storage storage, final boolean isDefault) {
+        return new Storage(
+                storage.getId(),
+                storage.getType(),
+                isDefault
+        );
+    }
+
     @Override
     public boolean equals(final Object o) {
         if (this == o) {

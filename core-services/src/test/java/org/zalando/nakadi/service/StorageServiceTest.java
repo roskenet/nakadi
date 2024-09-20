@@ -26,8 +26,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.zalando.nakadi.service.publishing.NakadiAuditLogPublisher.ActionType.UPDATED;
+import static org.zalando.nakadi.service.publishing.NakadiAuditLogPublisher.ResourceType.STORAGE;
 
 @RunWith(MockitoJUnitRunner.class)
 public class StorageServiceTest {
@@ -85,12 +88,12 @@ public class StorageServiceTest {
 
     @Test
     public void whenMarkDefaultOthersAreUnmarked() {
-        final List<Storage> storages = Arrays.asList(
-                new Storage("id1", Storage.Type.KAFKA, true),
-                new Storage("id2", Storage.Type.KAFKA, true),
-                new Storage("id3", Storage.Type.KAFKA, false),
-                new Storage("id4", Storage.Type.KAFKA, false)
-        );
+        final Storage storage1 = new Storage("id1", Storage.Type.KAFKA, true);
+        final Storage storage2 = new Storage("id2", Storage.Type.KAFKA, true);
+        final Storage storage3 = new Storage("id3", Storage.Type.KAFKA, false);
+        final Storage storage4 = new Storage("id4", Storage.Type.KAFKA, false);
+        final List<Storage> storages = Arrays.asList(storage1, storage2, storage3, storage4);
+
         when(storageDbRepository.listStorages()).thenReturn(storages);
         when(storageDbRepository.getStorage(eq("id4"))).thenReturn(Optional.of(storages.get(3)));
         when(transactionTemplate.execute(any())).thenAnswer(
@@ -109,6 +112,38 @@ public class StorageServiceTest {
 
         verify(storageDbRepository).setDefaultStorage(eq("id4"), eq(true));
         verify(storageDbRepository, never()).setDefaultStorage(eq("id4"), eq(false));
+        verify(auditLogPublisher, times(1))
+                .publish(
+                        eq(Optional.of(storage1)),
+                        eq(Optional.of(Storage.copy(storage1, false))),
+                        eq(STORAGE),
+                        eq(UPDATED),
+                        eq(storage1.getId())
+                );
+        verify(auditLogPublisher, times(1))
+                .publish(
+                        eq(Optional.of(storage2)),
+                        eq(Optional.of(Storage.copy(storage2, false))),
+                        eq(STORAGE),
+                        eq(UPDATED),
+                        eq(storage2.getId())
+                );
+        verify(auditLogPublisher, times(1))
+                .publish(
+                        eq(Optional.of(storage4)),
+                        eq(Optional.of(Storage.copy(storage4, true))),
+                        eq(STORAGE),
+                        eq(UPDATED),
+                        eq(storage4.getId())
+                );
+        verify(auditLogPublisher, never())
+                .publish(
+                        eq(Optional.of(storage3)),
+                        eq(Optional.of(Storage.copy(storage3, false))),
+                        eq(STORAGE),
+                        eq(UPDATED),
+                        eq(storage3.getId())
+                );
     }
 
     private JSONObject createTestStorageJson(final String id) {
