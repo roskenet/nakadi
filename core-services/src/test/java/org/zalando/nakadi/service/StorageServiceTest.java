@@ -92,6 +92,12 @@ public class StorageServiceTest {
         final Storage storage2 = new Storage("id2", Storage.Type.KAFKA, true);
         final Storage storage3 = new Storage("id3", Storage.Type.KAFKA, false);
         final Storage storage4 = new Storage("id4", Storage.Type.KAFKA, false);
+        final KafkaConfiguration kafkaConfiguration = new KafkaConfiguration(
+                ZookeeperConnection.valueOf("zookeeper://localhost:8181/path/to/kafka"));
+        storage1.setConfiguration(kafkaConfiguration);
+        storage2.setConfiguration(kafkaConfiguration);
+        storage3.setConfiguration(kafkaConfiguration);
+        storage4.setConfiguration(kafkaConfiguration);
         final List<Storage> storages = Arrays.asList(storage1, storage2, storage3, storage4);
 
         when(storageDbRepository.listStorages()).thenReturn(storages);
@@ -115,7 +121,7 @@ public class StorageServiceTest {
         verify(auditLogPublisher, times(1))
                 .publish(
                         eq(Optional.of(storage1)),
-                        eq(Optional.of(Storage.copy(storage1, false))),
+                        eq(Optional.of(updateStorageState(storage1, false))),
                         eq(STORAGE),
                         eq(UPDATED),
                         eq(storage1.getId())
@@ -123,7 +129,7 @@ public class StorageServiceTest {
         verify(auditLogPublisher, times(1))
                 .publish(
                         eq(Optional.of(storage2)),
-                        eq(Optional.of(Storage.copy(storage2, false))),
+                        eq(Optional.of(updateStorageState(storage2, false))),
                         eq(STORAGE),
                         eq(UPDATED),
                         eq(storage2.getId())
@@ -131,7 +137,7 @@ public class StorageServiceTest {
         verify(auditLogPublisher, times(1))
                 .publish(
                         eq(Optional.of(storage4)),
-                        eq(Optional.of(Storage.copy(storage4, true))),
+                        eq(Optional.of(updateStorageState(storage4, true))),
                         eq(STORAGE),
                         eq(UPDATED),
                         eq(storage4.getId())
@@ -139,7 +145,7 @@ public class StorageServiceTest {
         verify(auditLogPublisher, never())
                 .publish(
                         eq(Optional.of(storage3)),
-                        eq(Optional.of(Storage.copy(storage3, false))),
+                        eq(Optional.of(updateStorageState(storage3, false))),
                         eq(STORAGE),
                         eq(UPDATED),
                         eq(storage3.getId())
@@ -165,5 +171,11 @@ public class StorageServiceTest {
                 new KafkaConfiguration(ZookeeperConnection.valueOf("zookeeper://localhost:8181/path/to/kafka"));
         storage.setConfiguration(configuration);
         return storage;
+    }
+
+    private Storage updateStorageState(final Storage storage, final boolean isDefault) {
+        final Storage newState = new Storage(storage);
+        newState.setDefault(isDefault);
+        return newState;
     }
 }

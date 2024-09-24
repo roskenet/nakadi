@@ -40,6 +40,13 @@ public class Storage {
         this.isDefault = isDefault;
     }
 
+    public Storage(final Storage other) {
+        this.id = other.id;
+        this.type = other.type;
+        this.configuration = other.configuration;
+        this.isDefault = other.isDefault;
+    }
+
     public String getId() {
         return id;
     }
@@ -90,14 +97,6 @@ public class Storage {
     public Timeline.StoragePosition restorePosition(
             final ObjectMapper mapper, @Nullable final String data) throws IOException {
         return null == data ? null : mapper.readValue(data, getType().positionClass);
-    }
-
-    public static Storage copy(final Storage storage, final boolean isDefault) {
-        return new Storage(
-                storage.getId(),
-                storage.getType(),
-                isDefault
-        );
     }
 
     @Override

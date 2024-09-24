@@ -1,6 +1,8 @@
 package org.zalando.nakadi.service;
 
 import com.google.common.collect.ImmutableSet;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -92,10 +94,11 @@ public class RepartitioningService {
         }
         LOG.info("Start repartitioning for {} to {} partitions", eventTypeName, partitions);
         final EventType eventType = eventTypeRepository.findByName(eventTypeName);
-        final EventType oldEvent = EventType.copy(eventType);
-
         eventType.setDefaultStatistic(Optional.ofNullable(eventType.getDefaultStatistic())
                 .orElse(new EventTypeStatistics(1, 1)));
+
+        final EventType originalEvent = EventType.copy(eventType);
+        originalEvent.setDefaultStatistic(new EventTypeStatistics(eventType.getDefaultStatistic()));
         final int currentPartitionsNumber =
                 timelineService.getTopicRepository(eventType).listPartitionNames(
                         timelineService.getActiveTimeline(eventType).getTopic()).size();
@@ -106,7 +109,10 @@ public class RepartitioningService {
         }
         Closeable closeable = null;
         try {
-            closeable = timelineSync.workWithEventType(eventType.getName(), nakadiSettings.getTimelineWaitTimeoutMs());
+            closeable = timelineSync.workWithEventType(
+                    eventType.getName(),
+                    nakadiSettings.getTimelineWaitTimeoutMs()
+            );
             // Increase kafka partitions count, increase partitions in database
             timelineService.updateTimeLineForRepartition(eventType, partitions);
 
@@ -121,13 +127,16 @@ public class RepartitioningService {
             // type, but it is skipped, because it is quite rare operation to change event type and repartition at the
             // same time
             try {
-                eventType.getDefaultStatistic().setReadParallelism(partitions);
-                eventType.getDefaultStatistic().setWriteParallelism(partitions);
+                final var defaultStatistics = new EventTypeStatistics(eventType.getDefaultStatistic());
+                defaultStatistics.setReadParallelism(partitions);
+                defaultStatistics.setWriteParallelism(partitions);
+                eventType.setDefaultStatistic(defaultStatistics);
+                eventType.setUpdatedAt(new DateTime(DateTimeZone.UTC));
                 eventTypeRepository.update(eventType);
                 eventTypeCache.invalidate(eventTypeName);
 
                 auditLogPublisher.publish(
-                        Optional.of(oldEvent),
+                        Optional.of(originalEvent),
                         Optional.of(eventType),
                         NakadiAuditLogPublisher.ResourceType.EVENT_TYPE,
                         NakadiAuditLogPublisher.ActionType.UPDATED,

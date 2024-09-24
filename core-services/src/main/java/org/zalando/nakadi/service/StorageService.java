@@ -199,7 +199,8 @@ public class StorageService {
             for (final Storage s : allStorages) {
                 if (s.isDefault() && !newDefaultStorage.getId().equals(s.getId())) {
                     storageDbRepository.setDefaultStorage(s.getId(), false);
-                    final Storage updatedStorage = Storage.copy(s, false);
+                    final Storage updatedStorage = new Storage(s);
+                    updatedStorage.setDefault(false);
                     auditLogPublisher.publish(
                             Optional.of(s),
                             Optional.of(updatedStorage),
@@ -209,9 +210,11 @@ public class StorageService {
                 }
             }
             storageDbRepository.setDefaultStorage(newDefaultStorage.getId(), true);
+            final Storage newState = new Storage(newDefaultStorage);
+            newState.setDefault(true);
             auditLogPublisher.publish(
                     Optional.of(newDefaultStorage),
-                    Optional.of(Storage.copy(newDefaultStorage, true)),
+                    Optional.of(newState),
                     NakadiAuditLogPublisher.ResourceType.STORAGE,
                     NakadiAuditLogPublisher.ActionType.UPDATED,
                     newDefaultStorage.getId());

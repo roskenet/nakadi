@@ -60,6 +60,13 @@ public class EventTypeStatistics {
         this.messagesPerMinute = 1;
     }
 
+    public EventTypeStatistics(final EventTypeStatistics other) {
+        this.readParallelism = other.readParallelism;
+        this.writeParallelism = other.writeParallelism;
+        this.messageSize = other.messageSize;
+        this.messagesPerMinute = other.messagesPerMinute;
+    }
+
     @Override
     public boolean equals(final Object o) {
         if (this == o) {
