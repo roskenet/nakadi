@@ -35,7 +35,6 @@ import org.zalando.nakadi.exceptions.runtime.NoSuchEventTypeException;
 import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableException;
 import org.zalando.nakadi.exceptions.runtime.UnparseableCursorException;
 import org.zalando.nakadi.metrics.MetricUtils;
-import org.zalando.nakadi.service.timeline.HighLevelConsumer;
 import org.zalando.nakadi.repository.TopicRepository;
 import org.zalando.nakadi.security.Client;
 import org.zalando.nakadi.service.AuthorizationValidator;
@@ -45,6 +44,7 @@ import org.zalando.nakadi.service.EventStreamChecks;
 import org.zalando.nakadi.service.EventStreamConfig;
 import org.zalando.nakadi.service.EventStreamFactory;
 import org.zalando.nakadi.service.EventTypeChangeListener;
+import org.zalando.nakadi.service.timeline.HighLevelConsumer;
 import org.zalando.nakadi.service.timeline.TimelineService;
 import org.zalando.nakadi.util.MDCUtils;
 import org.zalando.nakadi.view.Cursor;
@@ -65,6 +65,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static org.zalando.nakadi.metrics.MetricUtils.metricNameFor;
+import static org.zalando.nakadi.metrics.MetricUtils.metricNameForLoLAStream;
 import static org.zalando.problem.Status.BAD_REQUEST;
 import static org.zalando.problem.Status.FORBIDDEN;
 import static org.zalando.problem.Status.INTERNAL_SERVER_ERROR;
@@ -202,6 +203,7 @@ public class EventStreamController {
                 }
 
                 Counter consumerCounter = null;
+                Counter appConnectionsCounter = null;
                 EventStream eventStream = null;
                 final AtomicBoolean needCheckAuthorization = new AtomicBoolean(false);
 
@@ -230,6 +232,8 @@ public class EventStreamController {
 
                     consumerCounter = metricRegistry.counter(metricNameFor(eventTypeName, CONSUMERS_COUNT_METRIC_NAME));
                     consumerCounter.inc();
+                    appConnectionsCounter = metricRegistry.counter(metricNameForLoLAStream(client.getClientId()));
+                    appConnectionsCounter.inc();
 
                     final String kafkaQuotaClientId = getKafkaQuotaClientId(eventTypeName, client);
 
@@ -284,6 +288,9 @@ public class EventStreamController {
                 } finally {
                     if (consumerCounter != null) {
                         consumerCounter.dec();
+                    }
+                    if (appConnectionsCounter != null) {
+                        appConnectionsCounter.dec();
                     }
                     if (eventStream != null) {
                         eventStream.close();

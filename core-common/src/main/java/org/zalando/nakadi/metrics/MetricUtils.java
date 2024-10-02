@@ -27,6 +27,13 @@ public class MetricUtils {
                 BYTES_FLUSHED);
     }
 
+    public static String metricNameForLoLAStream(final String applicationId) {
+        return MetricRegistry.name(
+                LOW_LEVEL_STREAM,
+                applicationId.replace(".", "#"),
+                "open_connections");
+    }
+
     public static String metricNameForHiLAStream(final String applicationId, final String subscriptionId) {
         return MetricRegistry.name(
                 HIGH_LEVEL_STREAM,
