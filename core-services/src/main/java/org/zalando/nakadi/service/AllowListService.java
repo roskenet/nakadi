@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.zalando.nakadi.repository.zookeeper.ZooKeeperHolder;
+import org.zalando.nakadi.security.Client;
 import org.zalando.nakadi.service.publishing.NakadiAuditLogPublisher;
 
 import javax.annotation.PostConstruct;
@@ -51,9 +52,13 @@ public class AllowListService {
         this.allowListCache.close();
     }
 
-    public boolean isAllowed(final String application) {
+    public boolean isAllowed(final Client client) {
+        if ("/employees".equals(client.getRealm())) {
+            return true;
+        }
+
         try {
-            final ChildData currentData = allowListCache.getCurrentData(application);
+            final ChildData currentData = allowListCache.getCurrentData(client.getClientId());
             if (currentData != null) {
                 final AllowListData allowListData = objectMapper
                         .readValue(currentData.getData(), AllowListData.class);

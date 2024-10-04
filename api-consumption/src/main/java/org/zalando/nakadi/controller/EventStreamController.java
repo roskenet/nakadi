@@ -195,7 +195,7 @@ public class EventStreamController {
 
         return outputStream -> {
             try (MDCUtils.CloseableNoEx ignore1 = MDCUtils.withContext(requestContext)) {
-                if (eventStreamChecks.isAllowedToConnect(client.getClientId())) {
+                if (eventStreamChecks.isAllowedToConnect(client)) {
                     writeProblemResponse(response, outputStream,
                             Problem.valueOf(FORBIDDEN, "Application or event type " +
                                     "is not allowed to connect Low Level API"));

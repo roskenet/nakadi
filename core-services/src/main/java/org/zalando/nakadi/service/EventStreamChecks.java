@@ -8,6 +8,7 @@ import org.zalando.nakadi.domain.ConsumedEvent;
 import org.zalando.nakadi.exceptions.runtime.NoSuchSubscriptionException;
 import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableException;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
+import org.zalando.nakadi.security.Client;
 
 import java.util.Collection;
 
@@ -50,8 +51,8 @@ public class EventStreamChecks {
         return false;
     }
 
-    public boolean isAllowedToConnect(final String application) {
-        return allowListService.isAllowed(application);
+    public boolean isAllowedToConnect(final Client client) {
+        return allowListService.isAllowed(client);
     }
 
 }
