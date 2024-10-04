@@ -10,6 +10,7 @@ public class MetricUtils {
     private static final String LOW_LEVEL_STREAM = "lola";
     private static final String HIGH_LEVEL_STREAM = "hila";
     private static final String BYTES_FLUSHED = "bytes-flushed";
+    private static final String OPEN_CONNECTIONS = "open-connections";
 
     public static String metricNameFor(final String eventTypeName, final String metricName) {
         return MetricRegistry.name(EVENTTYPES_PREFIX, eventTypeName.replace('.', '#'), metricName);
