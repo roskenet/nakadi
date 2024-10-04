@@ -31,7 +31,7 @@ public class MetricUtils {
         return MetricRegistry.name(
                 LOW_LEVEL_STREAM,
                 applicationId.replace(".", "#"),
-                "open_connections");
+                OPEN_CONNECTIONS);
     }
 
     public static String metricNameForHiLAStream(final String applicationId, final String subscriptionId) {
