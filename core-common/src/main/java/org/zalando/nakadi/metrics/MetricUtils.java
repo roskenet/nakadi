@@ -10,6 +10,7 @@ public class MetricUtils {
     private static final String LOW_LEVEL_STREAM = "lola";
     private static final String HIGH_LEVEL_STREAM = "hila";
     private static final String BYTES_FLUSHED = "bytes-flushed";
+    private static final String OPEN_CONNECTIONS = "open-connections";
 
     public static String metricNameFor(final String eventTypeName, final String metricName) {
         return MetricRegistry.name(EVENTTYPES_PREFIX, eventTypeName.replace('.', '#'), metricName);
@@ -25,6 +26,13 @@ public class MetricUtils {
                 applicationId.replace(".", "#"),
                 eventTypeName.replace(".", "#"),
                 BYTES_FLUSHED);
+    }
+
+    public static String metricNameForLoLAOpenConnections(final String applicationId) {
+        return MetricRegistry.name(
+                LOW_LEVEL_STREAM,
+                applicationId.replace(".", "#"),
+                OPEN_CONNECTIONS);
     }
 
     public static String metricNameForHiLAStream(final String applicationId, final String subscriptionId) {
