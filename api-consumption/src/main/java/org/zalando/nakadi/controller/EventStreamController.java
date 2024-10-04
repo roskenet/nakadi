@@ -232,7 +232,8 @@ public class EventStreamController {
 
                     consumerCounter = metricRegistry.counter(metricNameFor(eventTypeName, CONSUMERS_COUNT_METRIC_NAME));
                     consumerCounter.inc();
-                    appConnectionsCounter = metricRegistry.counter(metricNameForLoLAOpenConnections(client.getClientId()));
+                    appConnectionsCounter = metricRegistry.counter(
+                            metricNameForLoLAOpenConnections(client.getClientId()));
                     appConnectionsCounter.inc();
 
                     final String kafkaQuotaClientId = getKafkaQuotaClientId(eventTypeName, client);
