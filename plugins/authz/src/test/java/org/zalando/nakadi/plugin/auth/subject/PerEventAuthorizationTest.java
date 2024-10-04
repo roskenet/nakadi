@@ -50,25 +50,29 @@ public class PerEventAuthorizationTest {
                 EVENT_RESOURCE,
                 AuthorizationService.Operation.READ,
                 Optional.of(Collections.singletonList(
-                        new SimpleAuthorizationAttribute("retailer_id", "data_r1")))));
+                        new SimpleAuthorizationAttribute("retailer_id", "data_r1"))),
+                Collections.emptyList()));
 
         Assert.assertTrue(principal.isAuthorized(
                 EVENT_RESOURCE,
                 AuthorizationService.Operation.READ,
                 Optional.of(Collections.singletonList(
-                        new SimpleAuthorizationAttribute("retailer_id", "data_r2")))));
+                        new SimpleAuthorizationAttribute("retailer_id", "data_r2"))),
+                Collections.emptyList()));
 
         Assert.assertFalse(principal.isAuthorized(
                 EVENT_RESOURCE,
                 AuthorizationService.Operation.READ,
                 Optional.of(Collections.singletonList(
-                        new SimpleAuthorizationAttribute("retailer_id", "data_r3")))));
+                        new SimpleAuthorizationAttribute("retailer_id", "data_r3"))),
+                Collections.emptyList()));
 
         Assert.assertFalse(principal.isAuthorized(
                 EVENT_RESOURCE,
                 AuthorizationService.Operation.READ,
                 Optional.of(Collections.singletonList(
-                        new SimpleAuthorizationAttribute("retailer_id", "data_w1")))));
+                        new SimpleAuthorizationAttribute("retailer_id", "data_w1"))),
+                Collections.emptyList()));
     }
 
     @Test
@@ -77,19 +81,22 @@ public class PerEventAuthorizationTest {
                 EVENT_RESOURCE,
                 AuthorizationService.Operation.WRITE,
                 Optional.of(Collections.singletonList(
-                        new SimpleAuthorizationAttribute("retailer_id", "data_w1")))));
+                        new SimpleAuthorizationAttribute("retailer_id", "data_w1"))),
+                Collections.emptyList()));
 
         Assert.assertTrue(principal.isAuthorized(
                 EVENT_RESOURCE,
                 AuthorizationService.Operation.WRITE,
                 Optional.of(Collections.singletonList(
-                        new SimpleAuthorizationAttribute("retailer_id", "data_w2")))));
+                        new SimpleAuthorizationAttribute("retailer_id", "data_w2"))),
+                Collections.emptyList()));
 
         Assert.assertTrue(principal.isAuthorized(
                 EVENT_RESOURCE,
                 AuthorizationService.Operation.WRITE,
                 Optional.of(Collections.singletonList(
-                        new SimpleAuthorizationAttribute("retailer_id", "data_r1")))));
+                        new SimpleAuthorizationAttribute("retailer_id", "data_r1"))),
+                Collections.emptyList()));
 
     }
 }

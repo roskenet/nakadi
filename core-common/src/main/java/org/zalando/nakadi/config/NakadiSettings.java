@@ -16,7 +16,7 @@ public class NakadiSettings {
     private final long defaultTopicRotationMs;
     private final long maxCommitTimeout;
     private final int kafkaActiveProducersCount;
-    private final int kafkaTimeLagCheckerConsumerPoolSize;
+    private final int kafkaConsumerPoolSize;
     private final long kafkaPollTimeoutMs;
     private final long kafkaSendTimeoutMs;
     private final long timelineWaitTimeoutMs;
@@ -38,8 +38,7 @@ public class NakadiSettings {
                           @Value("${nakadi.topic.default.rotationMs}") final long defaultTopicRotationMs,
                           @Value("${nakadi.stream.max.commitTimeout}") final long maxCommitTimeout,
                           @Value("${nakadi.kafka.producers.count}") final int kafkaActiveProducersCount,
-                          @Value("${nakadi.kafka.time-lag-checker.consumer-pool.size}")
-                              final int kafkaTimeLagCheckerConsumerPoolSize,
+                          @Value("${nakadi.kafka.consumer-pool.size}") final int kafkaConsumerPoolSize,
                           @Value("${nakadi.kafka.poll.timeoutMs}") final long kafkaPollTimeoutMs,
                           @Value("${nakadi.kafka.send.timeoutMs}") final long kafkaSendTimeoutMs,
                           @Value("${nakadi.timeline.wait.timeoutMs}") final long timelineWaitTimeoutMs,
@@ -64,7 +63,7 @@ public class NakadiSettings {
         this.defaultTopicRotationMs = defaultTopicRotationMs;
         this.maxCommitTimeout = maxCommitTimeout;
         this.kafkaActiveProducersCount = kafkaActiveProducersCount;
-        this.kafkaTimeLagCheckerConsumerPoolSize = kafkaTimeLagCheckerConsumerPoolSize;
+        this.kafkaConsumerPoolSize = kafkaConsumerPoolSize;
         this.kafkaPollTimeoutMs = kafkaPollTimeoutMs;
         this.kafkaSendTimeoutMs = kafkaSendTimeoutMs;
         this.eventMaxBytes = eventMaxBytes;
@@ -107,8 +106,8 @@ public class NakadiSettings {
         return kafkaActiveProducersCount;
     }
 
-    public int getKafkaTimeLagCheckerConsumerPoolSize() {
-        return kafkaTimeLagCheckerConsumerPoolSize;
+    public int getKafkaConsumerPoolSize() {
+        return kafkaConsumerPoolSize;
     }
 
     public long getKafkaPollTimeoutMs() {

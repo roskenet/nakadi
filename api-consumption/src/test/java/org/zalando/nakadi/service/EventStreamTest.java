@@ -283,7 +283,7 @@ public class EventStreamTest {
                 .boxed()
                 .map(index -> new ConsumedEvent(
                         ("event" + index).getBytes(UTF_8), NakadiCursor.of(TIMELINE, "0",
-                        KafkaCursor.toNakadiOffset(index)), 0, null, Collections.emptyMap()))
+                        KafkaCursor.toNakadiOffset(index)), 0, null, Collections.emptyMap(), Optional.empty()))
                 .collect(Collectors.toList()));
 
         final EventStream eventStream =
@@ -324,12 +324,18 @@ public class EventStreamTest {
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         final var noTag = Collections.<HeaderTag, String>emptyMap();
         final LinkedList<ConsumedEvent> events = new LinkedList<>();
-        events.add(new ConsumedEvent(DUMMY, NakadiCursor.of(TIMELINE, "0", "000000000000000000"), 0, null, noTag));
-        events.add(new ConsumedEvent(DUMMY, NakadiCursor.of(TIMELINE, "1", "000000000000000000"), 0, null, noTag));
-        events.add(new ConsumedEvent(DUMMY, NakadiCursor.of(TIMELINE, "2", "000000000000000000"), 0, null, noTag));
-        events.add(new ConsumedEvent(DUMMY, NakadiCursor.of(TIMELINE, "0", "000000000000000000"), 0, null, noTag));
-        events.add(new ConsumedEvent(DUMMY, NakadiCursor.of(TIMELINE, "1", "000000000000000000"), 0, null, noTag));
-        events.add(new ConsumedEvent(DUMMY, NakadiCursor.of(TIMELINE, "2", "000000000000000000"), 0, null, noTag));
+        events.add(new ConsumedEvent(DUMMY, NakadiCursor.of(TIMELINE, "0", "000000000000000000"), 0,
+                null, noTag, Optional.empty()));
+        events.add(new ConsumedEvent(DUMMY, NakadiCursor.of(TIMELINE, "1", "000000000000000000"), 0,
+                null, noTag, Optional.empty()));
+        events.add(new ConsumedEvent(DUMMY, NakadiCursor.of(TIMELINE, "2", "000000000000000000"), 0,
+                null, noTag, Optional.empty()));
+        events.add(new ConsumedEvent(DUMMY, NakadiCursor.of(TIMELINE, "0", "000000000000000000"), 0,
+                null, noTag, Optional.empty()));
+        events.add(new ConsumedEvent(DUMMY, NakadiCursor.of(TIMELINE, "1", "000000000000000000"), 0,
+                null, noTag, Optional.empty()));
+        events.add(new ConsumedEvent(DUMMY, NakadiCursor.of(TIMELINE, "2", "000000000000000000"), 0,
+                null, noTag, Optional.empty()));
 
         final EventStream eventStream =
                 new EventStream(predefinedConsumer(events), out, config, mock(EventStreamChecks.class), cursorConverter,
@@ -359,7 +365,7 @@ public class EventStreamTest {
         when(nakadiKafkaConsumer.readEvents())
                 .thenReturn(Collections.singletonList(
                         new ConsumedEvent(DUMMY, NakadiCursor.of(TIMELINE, partition, "0"), 0, null,
-                                Collections.emptyMap())));
+                                Collections.emptyMap(), Optional.empty())));
         return nakadiKafkaConsumer;
     }
 
@@ -373,7 +379,7 @@ public class EventStreamTest {
                 return Collections.singletonList(
                         new ConsumedEvent(DUMMY,
                                 NakadiCursor.of(TIMELINE, partition, "000000000000000000"), 0, null,
-                                Collections.emptyMap()));
+                                Collections.emptyMap(), Optional.empty()));
             } else {
                 return Collections.emptyList();
             }
@@ -490,7 +496,8 @@ public class EventStreamTest {
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         final SubscriptionCursor cursor = new SubscriptionCursor("11", "000000000000000012", "event-type", "token-id");
         final ArrayList<ConsumedEvent> events = Lists.newArrayList(
-                new ConsumedEvent("{\"a\":\"b\"}".getBytes(), mock(NakadiCursor.class), 0, null, null));
+                new ConsumedEvent("{\"a\":\"b\"}".getBytes(), mock(NakadiCursor.class), 0, null,
+                        null, Optional.empty()));
 
         try {
             eventStreamWriter.writeSubscriptionBatch(baos, cursor, events, Optional.of("something"));

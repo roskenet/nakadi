@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "properties" : {
+    "employee_name": {
+      "type": "string"
+    },
+    "department": {
+      "type" : "number",
+      "x-extensible-enum" : [
+       "HR", "ENG", "MARKETING"
+      ]
+    }
+  },
+  "required" : ["employee_name"]
+}

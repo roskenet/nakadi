@@ -2,6 +2,7 @@ package org.zalando.nakadi.service.subscription;
 
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
+import org.zalando.nakadi.domain.TestDataFilter;
 import org.zalando.nakadi.exceptions.runtime.InvalidStreamParametersException;
 import org.zalando.nakadi.security.Client;
 import org.zalando.nakadi.service.EventStreamConfig;
@@ -107,7 +108,7 @@ public class StreamParametersTest {
                                                           final Client client) throws InvalidStreamParametersException {
         final UserStreamParameters userParams = new UserStreamParameters(batchLimitEvents, streamLimitEvents,
                 batchTimespan, batchTimeoutSeconds, streamTimeoutSeconds, batchKeepAliveIterations,
-                maxUncommittedMessages, ImmutableList.of(), commitTimeoutSeconds);
+                maxUncommittedMessages, ImmutableList.of(), commitTimeoutSeconds, TestDataFilter.LIVE);
         return StreamParameters.of(userParams, commitTimeoutSeconds, client);
     }
 }

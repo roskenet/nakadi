@@ -15,6 +15,7 @@ import org.zalando.nakadi.service.timeline.TimelineService;
 
 import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -51,7 +52,8 @@ public class SubscriptionTimeLagServiceTest {
                 .thenAnswer(invocation ->
                         ImmutableList.of(
                                 new ConsumedEvent(
-                                        null, NakadiCursor.of(timeline, "", ""), FAKE_EVENT_TIMESTAMP, null, null)));
+                                        null, NakadiCursor.of(timeline, "", ""),
+                                        FAKE_EVENT_TIMESTAMP, null, null, Optional.empty())));
 
         when(timelineService.createEventConsumer(any(), any())).thenReturn(eventConsumer);
 

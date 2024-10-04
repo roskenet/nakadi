@@ -40,6 +40,13 @@ public class Storage {
         this.isDefault = isDefault;
     }
 
+    public Storage(final Storage other) {
+        this.id = other.id;
+        this.type = other.type;
+        this.configuration = other.configuration;
+        this.isDefault = other.isDefault;
+    }
+
     public String getId() {
         return id;
     }

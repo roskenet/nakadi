@@ -19,18 +19,20 @@ import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.zalando.nakadi.config.NakadiSettings;
 import org.zalando.nakadi.domain.BatchItem;
-import org.zalando.nakadi.domain.HeaderTag;
 import org.zalando.nakadi.domain.CursorError;
-import org.zalando.nakadi.domain.EventOwnerHeader;
 import org.zalando.nakadi.domain.EventPublishingStatus;
-import org.zalando.nakadi.domain.NakadiCursor;
+import org.zalando.nakadi.domain.TopicPartition;
 import org.zalando.nakadi.domain.NakadiMetadata;
+import org.zalando.nakadi.domain.HeaderTag;
+import org.zalando.nakadi.domain.EventOwnerHeader;
+import org.zalando.nakadi.domain.TestProjectIdHeader;
+import org.zalando.nakadi.domain.NakadiCursor;
 import org.zalando.nakadi.domain.NakadiRecord;
 import org.zalando.nakadi.domain.NakadiRecordResult;
 import org.zalando.nakadi.domain.PartitionEndStatistics;
 import org.zalando.nakadi.domain.PartitionStatistics;
 import org.zalando.nakadi.domain.Timeline;
-import org.zalando.nakadi.domain.TopicPartition;
+
 import org.zalando.nakadi.exceptions.runtime.EventPublishingException;
 import org.zalando.nakadi.exceptions.runtime.InvalidCursorException;
 import org.zalando.nakadi.mapper.NakadiRecordMapper;
@@ -49,7 +51,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Future;
+import java.util.function.IntFunction;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static com.google.common.collect.Sets.newHashSet;
 import static java.util.Arrays.asList;
@@ -58,6 +62,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -69,6 +74,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.zalando.nakadi.utils.TestUtils.buildTimelineWithTopic;
+import com.google.common.base.Charsets;
 
 public class KafkaTopicRepositoryTest {
 
@@ -163,6 +169,73 @@ public class KafkaTopicRepositoryTest {
             final Header valueHeader = recordSent.headers().headers(EventOwnerHeader.AUTH_PARAM_VALUE)
                     .iterator().next();
             Assert.assertEquals(new String(valueHeader.value()), "nakadi");
+        }
+    }
+
+    @Test
+    public void testIfKafkaRecordHeaderIsAbsentWhenNonTestEventPublished() {
+        final String myTopic = "event-owner-selector-events";
+        final BatchItem item = new BatchItem("{}", null,
+                null,
+                Collections.emptyList());
+        item.setPartition("1");
+        final List<BatchItem> batch = ImmutableList.of(item);
+
+        when(kafkaProducer.partitionsFor(myTopic)).thenReturn(ImmutableList.of(
+                new PartitionInfo(myTopic, 1, NODE, null, null)));
+
+        try {
+            kafkaTopicRepository.syncPostBatch(myTopic, batch, "random", null, false);
+            fail();
+        } catch (final EventPublishingException e) {
+            final ProducerRecord<byte[], byte[]> recordSent = captureProducerRecordSent();
+            Assert.assertNull(recordSent.headers().lastHeader(TestProjectIdHeader.HEADER_NAME));
+        }
+    }
+
+    @Test
+    public void testKafkaRecordHeaderWhenTestEventPublished() {
+        final String myTopic = "event-owner-selector-events";
+        final String testProjectId = "plus-early-access";
+        final BatchItem item = new BatchItem("{\"metadata\":{\"test_project_id\":\"" + testProjectId + "\"}}", null,
+                null,
+                Collections.emptyList());
+        item.setPartition("1");
+        final List<BatchItem> batch = ImmutableList.of(item);
+
+        when(kafkaProducer.partitionsFor(myTopic)).thenReturn(ImmutableList.of(
+                new PartitionInfo(myTopic, 1, NODE, null, null)));
+
+        try {
+            kafkaTopicRepository.syncPostBatch(myTopic, batch, "random", null, false);
+            fail();
+        } catch (final EventPublishingException e) {
+            final ProducerRecord<byte[], byte[]> recordSent = captureProducerRecordSent();
+            final Header kafkaHeader = recordSent.headers().lastHeader(TestProjectIdHeader.HEADER_NAME);
+            Assert.assertNotNull(kafkaHeader);
+            Assert.assertEquals(testProjectId, new String(kafkaHeader.value(), Charsets.UTF_8));
+        }
+    }
+
+    @Test
+    public void testIfKafkaRecordHeaderIsAbsentForNonTestEvent() {
+        final String myTopic = "event-owner-selector-events";
+        final BatchItem item = new BatchItem("{}", null,
+                null,
+                Collections.emptyList());
+        item.setPartition("1");
+        final List<BatchItem> batch = ImmutableList.of(item);
+
+        when(kafkaProducer.partitionsFor(myTopic)).thenReturn(ImmutableList.of(
+                new PartitionInfo(myTopic, 1, NODE, null, null)));
+
+        try {
+            kafkaTopicRepository.syncPostBatch(myTopic, batch, "random", null, false);
+            fail();
+        } catch (final EventPublishingException e) {
+            final ProducerRecord<byte[], byte[]> recordSent = captureProducerRecordSent();
+            final Header kafkaHeader = recordSent.headers().lastHeader(TestProjectIdHeader.HEADER_NAME);
+            Assert.assertNull(kafkaHeader);
         }
     }
 
@@ -365,17 +438,18 @@ public class KafkaTopicRepositoryTest {
 
     @Test
     public void whenKafkaPublishCallbackWithExceptionThenEventPublishingException() {
+        final IntFunction<BatchItem> itemGenerator = (partitionNum) -> {
+            final var item = new BatchItem("{}", BatchItem.EmptyInjectionConfiguration.build(1, true),
+                    new BatchItem.InjectionConfiguration[BatchItem.Injection.values().length],
+                    Collections.emptyList());
+            item.setPartition(String.valueOf(partitionNum));
+            return item;
+        };
 
-        final BatchItem firstItem = new BatchItem("{}", BatchItem.EmptyInjectionConfiguration.build(1, true),
-                new BatchItem.InjectionConfiguration[BatchItem.Injection.values().length],
-                Collections.emptyList());
-        firstItem.setPartition("1");
-        final BatchItem secondItem = new BatchItem("{}", BatchItem.EmptyInjectionConfiguration.build(1, true),
-                new BatchItem.InjectionConfiguration[BatchItem.Injection.values().length],
-                Collections.emptyList());
-        secondItem.setPartition("2");
-        final List<BatchItem> batch = ImmutableList.of(firstItem, secondItem);
+        final List<BatchItem> batch = IntStream.rangeClosed(1, 4).mapToObj(itemGenerator)
+                .collect(Collectors.toUnmodifiableList());
 
+        when(nakadiSettings.getKafkaSendTimeoutMs()).thenReturn((long) 300);
         when(kafkaProducer.partitionsFor(EXPECTED_PRODUCER_RECORD.topic())).thenReturn(ImmutableList.of(
                 new PartitionInfo(EXPECTED_PRODUCER_RECORD.topic(), 1, NODE, null, null),
                 new PartitionInfo(EXPECTED_PRODUCER_RECORD.topic(), 2, NODE, null, null)));
@@ -383,8 +457,8 @@ public class KafkaTopicRepositoryTest {
         when(kafkaProducer.send(any(), any())).thenAnswer(invocation -> {
             final ProducerRecord record = (ProducerRecord) invocation.getArguments()[0];
             final Callback callback = (Callback) invocation.getArguments()[1];
-            if (record.partition() == 2) {
-                callback.onCompletion(null, new Exception()); // return exception only for second event
+            if (record.partition() < 3) {
+                callback.onCompletion(null, new Exception()); // return exception for all except last 2
             } else {
                 callback.onCompletion(null, null);
             }
@@ -395,10 +469,15 @@ public class KafkaTopicRepositoryTest {
             kafkaTopicRepository.syncPostBatch(EXPECTED_PRODUCER_RECORD.topic(), batch, "random", null, false);
             fail();
         } catch (final EventPublishingException e) {
-            assertThat(firstItem.getResponse().getPublishingStatus(), equalTo(EventPublishingStatus.SUBMITTED));
-            assertThat(firstItem.getResponse().getDetail(), equalTo(""));
-            assertThat(secondItem.getResponse().getPublishingStatus(), equalTo(EventPublishingStatus.FAILED));
-            assertThat(secondItem.getResponse().getDetail(), equalTo("internal error"));
+            assertThat(e.getCause(), notNullValue());
+            assertThat(batch.get(0).getResponse().getPublishingStatus(), equalTo(EventPublishingStatus.FAILED));
+            assertThat(batch.get(0).getResponse().getDetail(), equalTo("internal error"));
+            assertThat(batch.get(1).getResponse().getPublishingStatus(), equalTo(EventPublishingStatus.FAILED));
+            assertThat(batch.get(1).getResponse().getDetail(), equalTo("internal error"));
+            assertThat(batch.get(2).getResponse().getPublishingStatus(), equalTo(EventPublishingStatus.SUBMITTED));
+            assertThat(batch.get(2).getResponse().getDetail(), equalTo(""));
+            assertThat(batch.get(3).getResponse().getPublishingStatus(), equalTo(EventPublishingStatus.SUBMITTED));
+            assertThat(batch.get(3).getResponse().getDetail(), equalTo(""));
         }
     }
 

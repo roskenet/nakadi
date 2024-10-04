@@ -1,6 +1,8 @@
 package org.zalando.nakadi.service;
 
 import com.google.common.collect.ImmutableSet;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +22,7 @@ import org.zalando.nakadi.exceptions.runtime.NakadiBaseException;
 import org.zalando.nakadi.exceptions.runtime.NakadiRuntimeException;
 import org.zalando.nakadi.repository.db.EventTypeRepository;
 import org.zalando.nakadi.repository.db.SubscriptionDbRepository;
+import org.zalando.nakadi.service.publishing.NakadiAuditLogPublisher;
 import org.zalando.nakadi.service.subscription.zk.SubscriptionClientFactory;
 import org.zalando.nakadi.service.subscription.zk.ZkSubscriptionClient;
 import org.zalando.nakadi.service.timeline.TimelineService;
@@ -50,6 +53,7 @@ public class RepartitioningService {
     private final CursorConverter cursorConverter;
     private final TimelineSync timelineSync;
     private final String dlqRedriveEventTypeName;
+    private final NakadiAuditLogPublisher auditLogPublisher;
 
     @Autowired
     public RepartitioningService(
@@ -61,7 +65,8 @@ public class RepartitioningService {
             final NakadiSettings nakadiSettings,
             final CursorConverter cursorConverter,
             final TimelineSync timelineSync,
-            @Value("${nakadi.dlq.redriveEventTypeName}") final String dlqRedriveEventTypeName) {
+            @Value("${nakadi.dlq.redriveEventTypeName}") final String dlqRedriveEventTypeName,
+            final NakadiAuditLogPublisher auditLogPublisher) {
         this.eventTypeRepository = eventTypeRepository;
         this.eventTypeCache = eventTypeCache;
         this.timelineService = timelineService;
@@ -71,6 +76,7 @@ public class RepartitioningService {
         this.cursorConverter = cursorConverter;
         this.timelineSync = timelineSync;
         this.dlqRedriveEventTypeName = dlqRedriveEventTypeName;
+        this.auditLogPublisher = auditLogPublisher;
     }
 
     public void repartition(final String eventTypeName, final int partitions)
@@ -88,9 +94,11 @@ public class RepartitioningService {
         }
         LOG.info("Start repartitioning for {} to {} partitions", eventTypeName, partitions);
         final EventType eventType = eventTypeRepository.findByName(eventTypeName);
-
         eventType.setDefaultStatistic(Optional.ofNullable(eventType.getDefaultStatistic())
                 .orElse(new EventTypeStatistics(1, 1)));
+
+        final EventType originalEvent = EventType.copy(eventType);
+        originalEvent.setDefaultStatistic(new EventTypeStatistics(eventType.getDefaultStatistic()));
         final int currentPartitionsNumber =
                 timelineService.getTopicRepository(eventType).listPartitionNames(
                         timelineService.getActiveTimeline(eventType).getTopic()).size();
@@ -101,7 +109,10 @@ public class RepartitioningService {
         }
         Closeable closeable = null;
         try {
-            closeable = timelineSync.workWithEventType(eventType.getName(), nakadiSettings.getTimelineWaitTimeoutMs());
+            closeable = timelineSync.workWithEventType(
+                    eventType.getName(),
+                    nakadiSettings.getTimelineWaitTimeoutMs()
+            );
             // Increase kafka partitions count, increase partitions in database
             timelineService.updateTimeLineForRepartition(eventType, partitions);
 
@@ -116,10 +127,21 @@ public class RepartitioningService {
             // type, but it is skipped, because it is quite rare operation to change event type and repartition at the
             // same time
             try {
-                eventType.getDefaultStatistic().setReadParallelism(partitions);
-                eventType.getDefaultStatistic().setWriteParallelism(partitions);
+                final var defaultStatistics = new EventTypeStatistics(eventType.getDefaultStatistic());
+                defaultStatistics.setReadParallelism(partitions);
+                defaultStatistics.setWriteParallelism(partitions);
+                eventType.setDefaultStatistic(defaultStatistics);
+                eventType.setUpdatedAt(new DateTime(DateTimeZone.UTC));
                 eventTypeRepository.update(eventType);
                 eventTypeCache.invalidate(eventTypeName);
+
+                auditLogPublisher.publish(
+                        Optional.of(originalEvent),
+                        Optional.of(eventType),
+                        NakadiAuditLogPublisher.ResourceType.EVENT_TYPE,
+                        NakadiAuditLogPublisher.ActionType.UPDATED,
+                        eventTypeName
+                );
             } catch (Exception e) {
                 throw new NakadiBaseException(e.getMessage(), e);
             }

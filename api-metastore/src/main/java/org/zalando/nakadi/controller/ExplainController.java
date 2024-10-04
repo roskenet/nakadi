@@ -51,8 +51,8 @@ public class ExplainController {
         final Resource eventTypeResource = AuthorizationResourceMapping.mapToResource(authResource);
         authorizationValidator.validateAuthorization(eventTypeResource);
 
-        final var readersResult = authorizationValidator.explainReadAuthorization(eventTypeResource);
-        return ResponseEntity.ok(new EventTypeAuthExplainResult(readersResult));
+        final var result = authorizationValidator.explainAuthorization(eventTypeResource);
+        return ResponseEntity.ok(new EventTypeAuthExplainResult(result));
     }
 }
 

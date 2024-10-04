@@ -17,6 +17,8 @@ apply plugin: 'org.owasp.dependencycheck'
 group 'org.zalando'
 
 configurations {
+    jolokia
+
     all*.exclude module: 'spring-boot-starter-logging'
     all*.exclude group: "com.vaadin.external.google", module: "android-json"
 }
@@ -124,9 +126,13 @@ dependencies {
     compile "io.opentracing:opentracing-api:$opentracingVersion"
     compile "io.opentracing:opentracing-util:$opentracingVersion"
 
+    jolokia ("org.jolokia:jolokia-jvm:1.6.2:agent") {
+        transitive false
+    }
+
     // tests
     testCompile 'org.hamcrest:hamcrest-all:1.3'
-    testCompile('org.junit.jupiter:junit-jupiter-api:5.5.2') {
+    testCompile("org.junit.jupiter:junit-jupiter-api:$junit5Version") {
         exclude module: "hamcrest-core"
     }
     testCompile "org.springframework:spring-test"
@@ -142,4 +148,10 @@ bootJar {
         attributes 'Main-Class': 'org.springframework.boot.loader.PropertiesLauncher'
     }
     mainClassName = 'org.zalando.nakadi.Application'
+}
+
+tasks.register('copyJolokiaAgent', Copy.class) {
+    from(configurations.jolokia)
+    into "build/libs"
+    rename { fileName -> "jolokia-jvm-agent.jar" }
 }

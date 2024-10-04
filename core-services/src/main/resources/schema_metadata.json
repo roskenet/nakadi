@@ -41,6 +41,10 @@
       },
       "flow_id": {
         "type": "string"
+      },
+      "test_project_id": {
+        "type": "string",
+        "minLength": 1
       }
     },
     "required": [
@@ -94,6 +98,10 @@
       "retailer_id": {
         "minLength": 1,
         "type": "string"
+      },
+      "test_project_id": {
+        "type": "string",
+        "minLength": 1
       }
     },
     "required": [
@@ -148,6 +156,10 @@
       "retailer_id": {
         "minLength": 1,
         "type": "string"
+      },
+      "test_project_id": {
+        "type": "string",
+        "minLength": 1
       }
     },
     "required": [

@@ -13,6 +13,7 @@ import org.zalando.nakadi.domain.Feature;
 import org.zalando.nakadi.domain.HeaderTag;
 import org.zalando.nakadi.domain.NakadiCursor;
 import org.zalando.nakadi.domain.Subscription;
+import org.zalando.nakadi.domain.TestDataFilter;
 import org.zalando.nakadi.domain.UnprocessableEventPolicy;
 import org.zalando.nakadi.exceptions.runtime.AccessDeniedException;
 import org.zalando.nakadi.exceptions.runtime.NakadiRuntimeException;
@@ -149,6 +150,10 @@ public class StreamingContext implements SubscriptionStreamer {
         return zkClient;
     }
 
+    public Session getSession() {
+        return session;
+    }
+
     public String getSessionId() {
         return session.getId();
     }
@@ -266,6 +271,9 @@ public class StreamingContext implements SubscriptionStreamer {
 
     public void subscribeToSessionListChangeAndRebalance() throws NakadiRuntimeException {
         // Install re-balance hook on client list change.
+        if (null != sessionListSubscription) {
+            sessionListSubscription.close();
+        }
         sessionListSubscription = zkClient.subscribeForSessionListChanges(() -> addTask(this::rebalance));
         // Trigger re-balance explicitly as session list might have changed before scheduling hook
         rebalance();
@@ -311,6 +319,16 @@ public class StreamingContext implements SubscriptionStreamer {
                 return true;
             }
         }
+
+        // For the "testing in production" feature.
+        // If the user requested only LIVE events we need to discard any test events.
+        // If the user requested only TEST events we need to discard any non-test events.
+        final boolean isTestEvent = event.getTestProjectIdHeader().isPresent();
+        if ((parameters.getTestDataFilter() == TestDataFilter.LIVE && isTestEvent) ||
+                (parameters.getTestDataFilter() == TestDataFilter.TEST && !isTestEvent)) {
+            return true;
+        }
+
         return !isConsumptionAllowedFromConsumerTags(event)
                 || eventStreamChecks.isConsumptionBlocked(event);
     }

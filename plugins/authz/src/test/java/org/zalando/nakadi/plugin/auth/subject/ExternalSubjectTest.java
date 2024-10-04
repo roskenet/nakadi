@@ -19,13 +19,15 @@ public class ExternalSubjectTest {
 
         assertTrue(p.isAuthorized("event-type", AuthorizationService.Operation.READ, Optional.of(
                 Collections.singletonList(
-                        new SimpleAuthorizationAttribute("business_partner", "ahzhd657-dhsdjs-dshd83-dhsdjs"))
-        )));
+                        new SimpleAuthorizationAttribute("business_partner", "ahzhd657-dhsdjs-dshd83-dhsdjs"))),
+                Collections.emptyList()
+        ));
 
         assertFalse(p.isAuthorized("event-type", AuthorizationService.Operation.READ, Optional.of(
                 Collections.singletonList(
-                        new SimpleAuthorizationAttribute("business_partner", "ahzhd657-dhsdjs-dshd83-dhaaajw"))
-        )));
+                        new SimpleAuthorizationAttribute("business_partner", "ahzhd657-dhsdjs-dshd83-dhaaajw"))),
+                Collections.emptyList()
+        ));
     }
 
     @Test
@@ -33,9 +35,11 @@ public class ExternalSubjectTest {
         final Principal p = new ExternalSubject(
                 "merchant-api", Collections::emptySet, Collections.singleton("ahzhd657-dhsdjs-dshd83-dhsdjs"));
         assertFalse(p.isAuthorized(
-                "test", AuthorizationService.Operation.VIEW, Optional.empty()));
+                "test", AuthorizationService.Operation.VIEW,
+                Optional.empty(), Collections.emptyList()));
         assertFalse(p.isAuthorized(
-                "test", AuthorizationService.Operation.VIEW, Optional.of(Collections.emptyList())));
+                "test", AuthorizationService.Operation.VIEW,
+                Optional.of(Collections.emptyList()), Collections.emptyList()));
     }
 
 }

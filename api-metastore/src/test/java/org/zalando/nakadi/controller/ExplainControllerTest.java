@@ -36,7 +36,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
-import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessLevel.FULL_ACCESS;
+import static org.zalando.nakadi.plugin.api.authz.AccessLevel.FULL_ACCESS;
 import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessRestrictionType.MATCHING_EVENT_DISCRIMINATORS;
 
 public class ExplainControllerTest {
@@ -111,7 +111,7 @@ public class ExplainControllerTest {
                 "some reason", discriminator);
         final ExplainResourceResult result = new ExplainResourceResult(null, userAttrs.get(0), attrResult);
 
-        when(authorizationValidator.explainReadAuthorization(any())).
+        when(authorizationValidator.explainAuthorization(any())).
                 thenReturn(List.of(result));
 
         postEvenTypeAuthExplain(request).andExpect(status().is2xxSuccessful()).

@@ -148,6 +148,55 @@ public class JSONSchemaValidationTest {
     }
 
     @Test
+    public void acceptsMetadataTestProjectIdForBusinessEvent() {
+        final String testProjectId = "sampleTestProjectId";
+        final JSONObject schema = basicSchema();
+        final EventType et = EventTypeTestBuilder.builder().name("some-event-type").schema(schema).build();
+        et.setCategory(EventCategory.BUSINESS);
+
+        final JSONObject event = businessEvent();
+        event.getJSONObject("metadata").put("test_project_id", testProjectId);
+
+        final Optional<ValidationError> error = eventValidatorBuilder.build(et).validate(event);
+
+        Assert.assertThat(error, IsOptional.isAbsent());
+    }
+
+    @Test
+    public void validationOfBusinessEventShouldRequireMetadataTestProjectIdAsString() {
+        final int testProjectId = 123;
+        final JSONObject schema = basicSchema();
+        final EventType et = EventTypeTestBuilder.builder().name("some-event-type").schema(schema).build();
+        et.setCategory(EventCategory.BUSINESS);
+
+        final JSONObject event = businessEvent();
+        event.getJSONObject("metadata").put("test_project_id", testProjectId);
+
+        final Optional<ValidationError> error = eventValidatorBuilder.build(et).validate(event);
+
+        Assert.assertThat(
+                error.get().getMessage(),
+                Matchers.equalTo("#/metadata/test_project_id: expected type: String, found: Integer"));
+    }
+
+    @Test
+    public void validationOfBusinessEventShouldRequireMetadataTestProjectIdNonEmptyString() {
+        final String testProjectId = "";
+        final JSONObject schema = basicSchema();
+        final EventType et = EventTypeTestBuilder.builder().name("some-event-type").schema(schema).build();
+        et.setCategory(EventCategory.BUSINESS);
+
+        final JSONObject event = businessEvent();
+        event.getJSONObject("metadata").put("test_project_id", testProjectId);
+
+        final Optional<ValidationError> error = eventValidatorBuilder.build(et).validate(event);
+
+        Assert.assertThat(
+                error.get().getMessage(),
+                Matchers.equalTo("#/metadata/test_project_id: expected minLength: 1, actual: 0"));
+    }
+
+    @Test
     public void requireEidToBeFormattedAsUUID() {
         final JSONObject schema = basicSchema();
         final EventType et = EventTypeTestBuilder.builder().name("some-event-type").schema(schema).build();

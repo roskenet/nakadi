@@ -52,6 +52,11 @@ public class ChangeSet {
     }
 
     public Collection<Change> getChangesToRemove(final List<Change> newChanges, final long changeTTLms) {
+        return getChangesToRemove(newChanges, changeTTLms, System.currentTimeMillis());
+    }
+
+    Collection<Change> getChangesToRemove(
+            final List<Change> newChanges, final long changeTTLms, final long currentTimeMillis) {
         // There are 2 reasons to remove:
         // 1. Event type is present several times
         // 2. Change is too old.
@@ -63,7 +68,7 @@ public class ChangeSet {
             final List<Change> newChangesSorted = newEntry.getValue().stream()
                     .sorted(Comparator.comparing(this::getActualChangeDate).thenComparing(Change::getId).reversed())
                     .collect(Collectors.toList());
-            final long newestAge = System.currentTimeMillis() - getActualChangeDate(newChangesSorted.get(0)).getTime();
+            final long newestAge = currentTimeMillis - getActualChangeDate(newChangesSorted.get(0)).getTime();
             if (newestAge > changeTTLms) {
                 toDelete.addAll(newChangesSorted);
             } else if (newChangesSorted.size() > 1) {

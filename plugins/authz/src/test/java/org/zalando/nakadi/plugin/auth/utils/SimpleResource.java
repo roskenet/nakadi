@@ -1,6 +1,7 @@
 package org.zalando.nakadi.plugin.auth.utils;
 
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
+import org.zalando.nakadi.plugin.api.authz.AuthorizationProperty;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.Resource;
 
@@ -17,15 +18,18 @@ public class SimpleResource<T> implements Resource<T> {
     private final String type;
     private final Map<AuthorizationService.Operation, List<AuthorizationAttribute>> authorization;
     private final T resource;
+    private final List<AuthorizationProperty> properties;
 
     public SimpleResource(final String name, final String type,
                           @Nullable final Map<AuthorizationService.Operation, List<AuthorizationAttribute>> 
                                   authorization,
-                          final T resource) {
+                          final T resource,
+                          final List<AuthorizationProperty> properties) {
         this.name = name;
         this.type = type;
         this.authorization = authorization;
         this.resource = resource;
+        this.properties = properties;
     }
 
     @Override
@@ -56,5 +60,10 @@ public class SimpleResource<T> implements Resource<T> {
     @Override
     public T get() {
         return resource;
+    }
+
+    @Override
+    public List<AuthorizationProperty> getProperties() {
+        return properties;
     }
 }
