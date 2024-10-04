@@ -200,7 +200,7 @@ public class EventStreamController {
         return outputStream -> {
             try (MDCUtils.CloseableNoEx ignore1 = MDCUtils.withContext(requestContext)) {
 
-                if (allowListService.isAllowed(client)) {
+                if (!allowListService.isAllowed(client)) {
                     writeProblemResponse(response, outputStream,
                             Problem.valueOf(FORBIDDEN, "Application or event type " +
                                     "is not allowed to connect Low Level API"));
