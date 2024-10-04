@@ -159,7 +159,7 @@ public class EventStreamControllerTest {
         when(eventTypeChangeListener.registerListener(any(), any())).thenReturn(mock(Closeable.class));
         final AllowListService allowListServiceMock = mock(AllowListService.class);
         when(allowListServiceMock.isAllowed(any())).thenReturn(true);
-        when(allowListServiceMock.canConnect(any())).thenReturn(true);
+        when(allowListServiceMock.canAcceptConnection(any())).thenReturn(true);
         controller = new EventStreamController(
                 eventTypeCache, timelineService, OBJECT_MAPPER, eventStreamFactoryMock, metricRegistry,
                 streamMetrics, eventStreamChecks,

@@ -199,7 +199,6 @@ public class EventStreamController {
 
         return outputStream -> {
             try (MDCUtils.CloseableNoEx ignore1 = MDCUtils.withContext(requestContext)) {
-
                 if (!allowListService.isAllowed(client)) {
                     writeProblemResponse(response, outputStream,
                             Problem.valueOf(FORBIDDEN, "Application or event type " +
@@ -207,8 +206,8 @@ public class EventStreamController {
                     return;
                 }
 
-                allowListService.incConnectionsCount();
-                if (!allowListService.canConnect(client)) {
+                allowListService.trackConnectionsCount(client, 1);
+                if (!allowListService.canAcceptConnection(client)) {
                     writeProblemResponse(response, outputStream,
                             Problem.valueOf(TOO_MANY_REQUESTS, "Exceeded max allowed connections"));
                     return;
@@ -299,7 +298,7 @@ public class EventStreamController {
                     LOG.error("Error while trying to stream events. Respond with INTERNAL_SERVER_ERROR.", e);
                     writeProblemResponse(response, outputStream, INTERNAL_SERVER_ERROR, e.getMessage());
                 } finally {
-                    allowListService.decConnectionsCount();
+                    allowListService.trackConnectionsCount(client, -1);
                     if (consumerCounter != null) {
                         consumerCounter.dec();
                     }
