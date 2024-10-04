@@ -16,15 +16,18 @@ public class EventStreamChecks {
     private final BlacklistService blacklistService;
     private final AuthorizationService authorizationService;
     private final SubscriptionCache subscriptionCache;
+    private final AllowListService allowListService;
     private static final Logger LOG = LoggerFactory.getLogger(EventStreamChecks.class);
 
     public EventStreamChecks(
             final BlacklistService blacklistService,
             final AuthorizationService authorizationService,
-            final SubscriptionCache subscriptionCache) {
+            final SubscriptionCache subscriptionCache,
+            final AllowListService allowListService) {
         this.blacklistService = blacklistService;
         this.authorizationService = authorizationService;
         this.subscriptionCache = subscriptionCache;
+        this.allowListService = allowListService;
     }
 
     public boolean isConsumptionBlocked(final Collection<String> etNames, final String appId) {
@@ -45,6 +48,10 @@ public class EventStreamChecks {
             LOG.error(e.getMessage(), e);
         }
         return false;
+    }
+
+    public boolean isAllowedToConnect(final String application) {
+        return allowListService.isAllowed(application);
     }
 
 }
