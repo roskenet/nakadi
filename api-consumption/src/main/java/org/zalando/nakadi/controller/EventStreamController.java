@@ -199,6 +199,13 @@ public class EventStreamController {
 
         return outputStream -> {
             try (MDCUtils.CloseableNoEx ignore1 = MDCUtils.withContext(requestContext)) {
+                if (eventStreamChecks.isConsumptionBlocked(
+                        Collections.singleton(eventTypeName), client.getClientId())) {
+                    writeProblemResponse(response, outputStream,
+                            Problem.valueOf(FORBIDDEN, "Application or event type is blocked"));
+                    return;
+                }
+
                 if (!allowListService.isAllowed(client)) {
                     writeProblemResponse(response, outputStream,
                             Problem.valueOf(FORBIDDEN, "Application or event type " +
