@@ -33,9 +33,12 @@ import org.zalando.nakadi.view.SubscriptionCursorWithoutToken;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -216,29 +219,38 @@ public class CursorsService {
             // In case if subscription was never initialized - initialize it
             SubscriptionInitializer.initialize(
                     zkClient, subscription, timelineService, cursorConverter);
-            // add 1 second to commit timeout in order to give time to finish reset if there is uncommitted events
+
             if (!cursors.isEmpty()) {
+                // FIXME: honey, but we already have the client at home...
                 final List<SubscriptionCursorWithoutToken> oldCursors = getSubscriptionCursorsForUpdate(subscriptionId);
 
-                final long timeout = TimeUnit.SECONDS.toMillis(nakadiSettings.getMaxCommitTimeout()) +
-                        TimeUnit.SECONDS.toMillis(1);
                 final List<SubscriptionCursorWithoutToken> newCursors = cursors.stream()
                         .map(cursorConverter::convertToNoToken)
                         .collect(Collectors.toList());
-                final Predicate<Partition> isUpdatedPartition =
-                        p -> cursors.stream().anyMatch(c -> p.getKey().equals(c.getEventTypePartition()));
 
-                zkClient.closeSubscriptionStreams(() -> {
+                final Runnable doResetCursors = () -> {
+                    final Predicate<Partition> isUpdatedPartition =
+                            p -> cursors.stream().anyMatch(c -> p.getKey().equals(c.getEventTypePartition()));
+
                     zkClient.forceCommitOffsets(newCursors);
                     // reset the DLQ state of any partition that got updated
                     zkClient.updateTopology(topology ->
-                        Arrays
-                            .stream(topology.getPartitions())
+                            Arrays.stream(topology.getPartitions())
                             .filter(isUpdatedPartition)
                             .map(p -> p.toCleanDeadLetterState())
-                            .toArray(Partition[]::new)
-                    );
-                }, timeout);
+                            .toArray(Partition[]::new));
+                };
+
+                if (cursorsResetAffectsAssignedPartitions(zkClient.getTopology().getPartitions(), newCursors)) {
+                    // we add one second to the commit timeout in order to give time to finish reset if there are some
+                    // uncommitted events
+                    zkClient.closeSubscriptionStreams(
+                            doResetCursors,
+                            TimeUnit.SECONDS.toMillis(nakadiSettings.getMaxCommitTimeout() + 1));
+                } else {
+                    // no need to close streams and wait if all affected partitions are currently unassigned: just do it
+                    doResetCursors.run();
+                }
 
                 auditLogPublisher.publish(
                         Optional.of(new ItemsWrapper<>(oldCursors)),
@@ -254,6 +266,19 @@ public class CursorsService {
                 throw new ServiceTemporarilyUnavailableException(io.getMessage(), io);
             }
         }
+    }
+
+    static boolean cursorsResetAffectsAssignedPartitions(
+            final Partition[] partitions, final Collection<SubscriptionCursorWithoutToken> cursors) {
+
+        final Set<EventTypePartition> assignedPartitions = Stream.of(partitions)
+                .filter(p -> p.getState() != Partition.State.UNASSIGNED)
+                .map(Partition::getKey)
+                .collect(Collectors.toCollection(HashSet::new));
+
+        return cursors.stream()
+                .map(SubscriptionCursorWithoutToken::getEventTypePartition)
+                .anyMatch(assignedPartitions::contains);
     }
 
     private void checkCursorsStorageAvailability(final List<NakadiCursor> cursors)

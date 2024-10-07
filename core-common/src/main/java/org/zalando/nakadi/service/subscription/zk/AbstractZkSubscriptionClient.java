@@ -298,10 +298,10 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
     public final void closeSubscriptionStreams(final Runnable action, final long timeout)
             throws OperationTimeoutException, ZookeeperException, OperationInterruptedException,
             RequestInProgressException {
+
         ZkSubscription<List<String>> sessionsListener = null;
-        boolean resetWasAlreadyInitiated = false;
+        boolean closeWasAlreadyInitiated = false;
         try {
-            // close subscription connections
             getCurator().create().withMode(CreateMode.EPHEMERAL).forPath(closeSubscriptionStream);
 
             final AtomicBoolean sessionsChanged = new AtomicBoolean(true);
@@ -326,22 +326,21 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
             }
         } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new OperationInterruptedException("Resetting cursors is interrupted", e);
+            throw new OperationInterruptedException("Closing subscription streams is interrupted", e);
         } catch (final KeeperException.NodeExistsException e) {
-            resetWasAlreadyInitiated = true;
-            throw new RequestInProgressException("Cursors reset is already in progress for provided subscription", e);
+            closeWasAlreadyInitiated = true;
+            throw new RequestInProgressException("Streams closing is already in progress for the subscription", e);
         } catch (final KeeperException.NoNodeException e) {
-            throw new UnableProcessException("Impossible to reset cursors for subscription", e);
+            throw new UnableProcessException("Impossible to close streams for subscription", e);
         } catch (final Exception e) {
             LOG.error(e.getMessage(), e);
-            throw new ZookeeperException("Unexpected problem occurred when resetting cursors", e);
+            throw new ZookeeperException("Unexpected problem occurred when closing subscription streams", e);
         } finally {
             if (sessionsListener != null) {
                 sessionsListener.close();
             }
-
             try {
-                if (!resetWasAlreadyInitiated) {
+                if (!closeWasAlreadyInitiated) {
                     getCurator().delete().forPath(closeSubscriptionStream);
                 }
             } catch (final Exception e) {
@@ -349,7 +348,7 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
             }
         }
 
-        throw new OperationTimeoutException("Timeout resetting cursors");
+        throw new OperationTimeoutException("Timeout when closing subscription streams");
     }
 
     @Override
