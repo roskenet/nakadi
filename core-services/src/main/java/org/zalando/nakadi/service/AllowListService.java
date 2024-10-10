@@ -27,9 +27,13 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * The class holds two responsibilities
  *
- * - allow list for lola consumers: list of allowed application is stored in zookeeper
- * - connection limit for lola consumers: we use approximation to calculate number of simultaneous connections
- * by multiplying current connections to the number of lola pods, the pods are registered in zookeeper as ephemeral nodes
+ * - allow list for lola consumers:
+ * list of allowed application is stored in zookeeper
+ * 
+ * - connection limit for lola consumers: we use approximation
+ * to calculate number of simultaneous connections
+ * by multiplying current connections to the number of lola pods,
+ * the pods are registered in zookeeper as ephemeral nodes
  *
  */
 @Service
