@@ -8,8 +8,8 @@ import org.apache.zookeeper.CreateMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.zalando.nakadi.config.NakadiSettings;
 import org.zalando.nakadi.domain.Feature;
 import org.zalando.nakadi.exceptions.runtime.NakadiRuntimeException;
 import org.zalando.nakadi.repository.zookeeper.ZooKeeperHolder;
@@ -18,12 +18,20 @@ import org.zalando.nakadi.service.publishing.NakadiAuditLogPublisher;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * The class holds two responsibilities
+ *
+ * - allow list for lola consumers: list of allowed application is stored in zookeeper
+ * - connection limit for lola consumers: we use approximation to calculate number of simultaneous connections
+ * by multiplying current connections to the number of lola pods, the pods are registered in zookeeper as ephemeral nodes
+ *
+ */
 @Service
 public class AllowListService {
 
@@ -36,20 +44,23 @@ public class AllowListService {
     private TreeCache allowListCache;
     private final ObjectMapper objectMapper;
     private final String nodeId;
-    private final Map<String, Integer> applicationConnections;
+    private final Map<String, Integer> clientConnections;
     private final FeatureToggleService featureToggleService;
+    private final NakadiSettings nakadiSettings;
 
     @Autowired
     public AllowListService(final ZooKeeperHolder zooKeeperHolder,
                             final NakadiAuditLogPublisher auditLogPublisher,
                             final ObjectMapper objectMapper,
-                            final FeatureToggleService featureToggleService) {
+                            final FeatureToggleService featureToggleService,
+                            final NakadiSettings nakadiSettings) {
         this.zooKeeperHolder = zooKeeperHolder;
         this.auditLogPublisher = auditLogPublisher;
         this.objectMapper = objectMapper;
         this.nodeId = UUID.randomUUID().toString();
-        this.applicationConnections = new ConcurrentHashMap<>();
+        this.clientConnections = new ConcurrentHashMap<>();
         this.featureToggleService = featureToggleService;
+        this.nakadiSettings = nakadiSettings;
     }
 
     @PostConstruct
@@ -59,9 +70,10 @@ public class AllowListService {
                     zooKeeperHolder.get(), PATH_ALLOWLIST).setCacheData(false).build();
             this.allowListCache.start();
 
-            zooKeeperHolder.get().create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL)
-                    .forPath(PATH_CONNECTIONS + "/" + nodeId);
-
+            if (nakadiSettings.isLimitLoLaConnections()) {
+                zooKeeperHolder.get().create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL)
+                        .forPath(PATH_CONNECTIONS + "/" + nodeId);
+            }
         } catch (final Exception e) {
             LOG.error(e.getMessage(), e);
         }
@@ -87,7 +99,6 @@ public class AllowListService {
                 return false;
             }
         } catch (final Exception e) {
-            LOG.error(e.getMessage(), e);
             throw new NakadiRuntimeException(e);
         }
 
@@ -100,41 +111,25 @@ public class AllowListService {
         }
 
         try {
-            final Map<String, Integer> tmp = new HashMap<>(applicationConnections);
             final CuratorFramework curator = zooKeeperHolder.get();
-            for (final String node : curator.getChildren().forPath(PATH_CONNECTIONS)) {
-                final byte[] bytes = curator.getData().forPath(PATH_CONNECTIONS + "/" + node);
-                final Map<String, Integer> appConns = objectMapper.readValue(bytes, HashMap.class);
-                appConns.forEach((app1, conn1) ->
-                        tmp.compute(app1, (app2, conn2) -> conn2 == null ? conn1 : conn1 + conn2));
-            }
-
-            final Integer currentConns = tmp.getOrDefault(client.getClientId(), 0);
-
-            if (currentConns > CONNS_PER_APPLICATION) {
+            final List<String> nodes = curator.getChildren().forPath(PATH_CONNECTIONS);
+            final Integer currentConns = clientConnections.getOrDefault(client.getClientId(), 0);
+            final Integer currentApproxConnects = nodes.size() * currentConns;
+            if (currentApproxConnects > CONNS_PER_APPLICATION) {
+                LOG.debug("Can not accept connection for client `{}`, connections: {}, nodes: {}, limit: {}",
+                        client.getClientId(), currentConns, nodes, CONNS_PER_APPLICATION);
                 return false;
             }
 
             return true;
         } catch (final Exception e) {
-            LOG.error(e.getMessage(), e);
             throw new NakadiRuntimeException(e);
         }
     }
 
     public void trackConnectionsCount(final Client client, final Integer increment) {
-        applicationConnections.compute(client.getClientId(), (app, conns) -> conns == null ? 1 : 1 + increment);
-    }
-
-    @Scheduled(fixedRate = 5000)
-    private void uploadApplicationConnections() {
-        try {
-            final CuratorFramework curator = zooKeeperHolder.get();
-            curator.setData().forPath(PATH_CONNECTIONS + "/" + nodeId,
-                    objectMapper.writeValueAsBytes(applicationConnections));
-        } catch (final Exception e) {
-            LOG.error(e.getMessage(), e);
-        }
+        clientConnections.compute(client.getClientId(),
+                (app, conns) -> Math.max(0, (conns == null ? 0 : conns) + increment));
     }
 
     public void add(final String application) throws RuntimeException {

@@ -199,6 +199,7 @@ public class EventStreamController {
 
         return outputStream -> {
             try (MDCUtils.CloseableNoEx ignore1 = MDCUtils.withContext(requestContext)) {
+                allowListService.trackConnectionsCount(client, 1);
                 if (eventStreamChecks.isConsumptionBlocked(
                         Collections.singleton(eventTypeName), client.getClientId())) {
                     writeProblemResponse(response, outputStream,
@@ -213,7 +214,6 @@ public class EventStreamController {
                     return;
                 }
 
-                allowListService.trackConnectionsCount(client, 1);
                 if (!allowListService.canAcceptConnection(client)) {
                     writeProblemResponse(response, outputStream,
                             Problem.valueOf(TOO_MANY_REQUESTS, "Exceeded max allowed connections"));
