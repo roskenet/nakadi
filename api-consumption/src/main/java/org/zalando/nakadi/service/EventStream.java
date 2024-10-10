@@ -85,8 +85,7 @@ public class EventStream {
                 if (consumedEvents.isEmpty()) {
                     final List<ConsumedEvent> eventsFromKafka = eventConsumer.readEvents();
                     for (final ConsumedEvent evt : eventsFromKafka) {
-                        if (evt.getConsumerTags().containsKey(HeaderTag.CONSUMER_SUBSCRIPTION_ID)
-                                || eventStreamChecks.isConsumptionBlocked(evt)) {
+                        if (shouldEventBeDiscarded(evt)) {
                             continue;
                         }
                         consumedEvents.add(evt);
@@ -183,6 +182,12 @@ public class EventStream {
         } finally {
             kpiCollector.sendKpi();
         }
+    }
+
+    private boolean shouldEventBeDiscarded(ConsumedEvent evt) {
+        return evt.getConsumerTags().containsKey(HeaderTag.CONSUMER_SUBSCRIPTION_ID)
+                || eventStreamChecks.isConsumptionBlocked(evt)
+                || evt.getTestProjectIdHeader().isPresent();
     }
 
     private boolean isMemoryLimitReached(final long memoryUsed) {
