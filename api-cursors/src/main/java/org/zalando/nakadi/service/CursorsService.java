@@ -27,6 +27,7 @@ import org.zalando.nakadi.service.subscription.model.Partition;
 import org.zalando.nakadi.service.subscription.zk.SubscriptionClientFactory;
 import org.zalando.nakadi.service.subscription.zk.SubscriptionNotInitializedException;
 import org.zalando.nakadi.service.subscription.zk.ZkSubscriptionClient;
+import org.zalando.nakadi.service.subscription.zk.ZkSubscriptionNode;
 import org.zalando.nakadi.service.timeline.TimelineService;
 import org.zalando.nakadi.util.UUIDGenerator;
 import org.zalando.nakadi.view.SubscriptionCursorWithoutToken;
@@ -34,11 +35,9 @@ import org.zalando.nakadi.view.SubscriptionCursorWithoutToken;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -241,7 +240,10 @@ public class CursorsService {
                             .toArray(Partition[]::new));
                 };
 
-                if (cursorsResetAffectsAssignedPartitions(zkClient.getTopology().getPartitions(), newCursors)) {
+                // node must be present, as we have initialized it above
+                final ZkSubscriptionNode node = zkClient.getZkSubscriptionNode().get();
+
+                if (cursorsResetAffectsActiveSessions(node, newCursors)) {
                     // we add one second to the commit timeout in order to give time to finish reset if there are some
                     // uncommitted events
                     zkClient.closeSubscriptionStreams(
@@ -268,17 +270,12 @@ public class CursorsService {
         }
     }
 
-    static boolean cursorsResetAffectsAssignedPartitions(
-            final Partition[] partitions, final Collection<SubscriptionCursorWithoutToken> cursors) {
-
-        final Set<EventTypePartition> assignedPartitions = Stream.of(partitions)
-                .filter(p -> p.getState() != Partition.State.UNASSIGNED)
-                .map(Partition::getKey)
-                .collect(Collectors.toCollection(HashSet::new));
+    static boolean cursorsResetAffectsActiveSessions(
+            final ZkSubscriptionNode node, final Collection<SubscriptionCursorWithoutToken> cursors) {
 
         return cursors.stream()
-                .map(SubscriptionCursorWithoutToken::getEventTypePartition)
-                .anyMatch(assignedPartitions::contains);
+                .map(c -> node.getPartitionWithActiveSession(c.getEventType(), c.getPartition()))
+                .anyMatch(Optional::isPresent);
     }
 
     private void checkCursorsStorageAvailability(final List<NakadiCursor> cursors)

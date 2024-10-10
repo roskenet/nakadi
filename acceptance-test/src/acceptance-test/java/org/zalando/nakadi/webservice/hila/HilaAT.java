@@ -590,6 +590,11 @@ public class HilaAT extends BaseAT {
         publishBusinessEventWithUserDefinedPartition(
                 eventType.getName(), 50, i -> "{\"foo\":\"bar\"}", i -> String.valueOf(i % 2));
 
+        // make sure that the topology is initialized, to test behavior after "unclean" state
+        final TestStreamingClient client = new TestStreamingClient(URL, subscription.getId(), "commit_timeout=1");
+        client.start();
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+
         final TestStreamingClient client1 = new TestStreamingClient(
                 URL, subscription.getId(), "stream_timeout=5",
                 Optional.empty(),
