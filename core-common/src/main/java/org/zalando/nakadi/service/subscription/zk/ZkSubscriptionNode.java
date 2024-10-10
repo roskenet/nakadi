@@ -31,7 +31,7 @@ public final class ZkSubscriptionNode {
                 .orElse(Partition.State.UNASSIGNED);
     }
 
-    private Optional<Partition> getPartitionWithActiveSession(final String eventType, final String partition) {
+    public Optional<Partition> getPartitionWithActiveSession(final String eventType, final String partition) {
         return partitions.stream()
                 .filter(p -> p.getPartition().equals(partition) && p.getEventType().equals(eventType))
                 .filter(p -> sessions.stream().anyMatch(s -> s.getId().equalsIgnoreCase(p.getSession())))

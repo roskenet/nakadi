@@ -44,9 +44,10 @@ import static com.google.common.base.Charsets.UTF_8;
  * +- subscriptions
  *   +- {subscription_id}
  *     |- state                             // Node for initialization finish tracking.
- *     |- cursor_reset                      // Optional node, presence of which says that cursor reset is in progress
- *     |                                    // During cursor reset process no new streams can be created. At the same
- *     |                                    // time all existing streaming sessions are being terminated.
+ *     |- close_subscription_stream         // Optional node, presence of which indicates that an exclusive operation
+ *     |                                    // (such as cursor reset or repartitioning) is in progress.
+ *     |                                    // During this time no new streams can be created, and all existing
+ *     |                                    // streaming sessions are being terminated.
  *     |- sessions                          // Node contains list of active sessions
  *     | |- {session_1}                     // Ephemeral node of session_1
  *     | |- ....

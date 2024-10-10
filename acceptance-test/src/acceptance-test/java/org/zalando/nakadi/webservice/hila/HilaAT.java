@@ -537,6 +537,95 @@ public class HilaAT extends BaseAT {
     }
 
     @Test(timeout = 15000)
+    public void whenResetCursorsOfAssignedPartitionsThenAllStreamsClosed() throws Exception {
+        final EventType eventType = NakadiTestUtils.createBusinessEventTypeWithPartitions(2);
+        final Subscription subscription = createSubscription(
+                RandomSubscriptionBuilder.builder()
+                        .withEventType(eventType.getName())
+                        .withStartFrom(BEGIN)
+                        .buildSubscriptionBase());
+
+        publishBusinessEventWithUserDefinedPartition(
+                eventType.getName(), 50, i -> "{\"foo\":\"bar\"}", i -> String.valueOf(i % 2));
+
+        final TestStreamingClient client0 = new TestStreamingClient(URL, subscription.getId(), "",
+                Optional.empty(),
+                Optional.of("{\"partitions\":[{\"event_type\":\"" + eventType.getName() + "\",\"partition\":\"0\"}]}"));
+        client0.start();
+
+        final TestStreamingClient client1 = new TestStreamingClient(URL, subscription.getId(), "",
+                Optional.empty(),
+                Optional.of("{\"partitions\":[{\"event_type\":\"" + eventType.getName() + "\",\"partition\":\"1\"}]}"));
+        client1.start();
+
+        waitFor(() -> assertThat(client0.getJsonBatches(), hasSize(10)));
+        waitFor(() -> assertThat(client1.getJsonBatches(), hasSize(10)));
+
+        final List<SubscriptionCursor> cursorsToReset =
+                Collections.singletonList(client1.getJsonBatches().get(4).getCursor());
+        resetCursorsWithToken(subscription.getId(), cursorsToReset);
+
+        waitFor(() -> Assert.assertFalse(client1.isRunning()));
+        Assert.assertTrue(
+                client1.getJsonBatches().stream()
+                .anyMatch(streamBatch -> streamBatch.getMetadata() != null
+                        && streamBatch.getMetadata().getDebug().equals("Resetting subscription cursors")));
+
+        waitFor(() -> Assert.assertFalse(client0.isRunning()));
+        Assert.assertTrue(
+                client0.getJsonBatches().stream()
+                .anyMatch(streamBatch -> streamBatch.getMetadata() != null
+                        && streamBatch.getMetadata().getDebug().equals("Resetting subscription cursors")));
+    }
+
+    @Test(timeout = 15000)
+    public void whenResetCursorsOfUnassignedPartitionsThenNoStreamsClosed() throws Exception {
+        final EventType eventType = NakadiTestUtils.createBusinessEventTypeWithPartitions(2);
+        final Subscription subscription = createSubscription(
+                RandomSubscriptionBuilder.builder()
+                        .withEventType(eventType.getName())
+                        .withStartFrom(BEGIN)
+                        .buildSubscriptionBase());
+
+        publishBusinessEventWithUserDefinedPartition(
+                eventType.getName(), 50, i -> "{\"foo\":\"bar\"}", i -> String.valueOf(i % 2));
+
+        // make sure that the topology is initialized, to test behavior after "unclean" state
+        final TestStreamingClient client = new TestStreamingClient(URL, subscription.getId(), "commit_timeout=1");
+        client.start();
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+
+        final TestStreamingClient client1 = new TestStreamingClient(
+                URL, subscription.getId(), "stream_timeout=5",
+                Optional.empty(),
+                Optional.of("{\"partitions\":[{\"event_type\":\"" + eventType.getName() + "\",\"partition\":\"1\"}]}"));
+        client1.start();
+
+        waitFor(() -> assertThat(client1.getJsonBatches(), hasSize(10)));
+
+        final List<EventTypePartitionView> etStats = MAPPER.readValue(
+                given().get("/event-types/{et}/partitions", eventType.getName()).getBody().asString(),
+                new TypeReference<List<EventTypePartitionView>>() {
+                }
+        );
+        final EventTypePartitionView begin = etStats.stream()
+                .filter(p -> "0".equals(p.getPartitionId()))
+                .findFirst()
+                .get();
+        resetCursors(
+                subscription.getId(),
+                Collections.singletonList(
+                        new SubscriptionCursorWithoutToken(
+                                eventType.getName(), begin.getPartitionId(), begin.getOldestAvailableOffset())));
+
+        waitFor(() -> Assert.assertFalse(client1.isRunning()));
+        Assert.assertTrue(
+                client1.getJsonBatches().stream()
+                .noneMatch(streamBatch -> streamBatch.getMetadata() != null
+                        && streamBatch.getMetadata().getDebug().equals("Resetting subscription cursors")));
+    }
+
+    @Test(timeout = 15000)
     public void whenPatchThenCursorsAreInitializedToDefault() throws Exception {
         final EventType et = createEventType();
         publishEvents(et.getName(), 10, i -> "{\"foo\": \"bar\"}");
