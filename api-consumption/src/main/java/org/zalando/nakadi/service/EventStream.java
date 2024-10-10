@@ -187,6 +187,8 @@ public class EventStream {
     private boolean shouldEventBeDiscarded(ConsumedEvent evt) {
         return evt.getConsumerTags().containsKey(HeaderTag.CONSUMER_SUBSCRIPTION_ID)
                 || eventStreamChecks.isConsumptionBlocked(evt)
+                // the default behavior in HILA is to discard test events,
+                // despite not allowing you to opt-in
                 || evt.getTestProjectIdHeader().isPresent();
     }
 
