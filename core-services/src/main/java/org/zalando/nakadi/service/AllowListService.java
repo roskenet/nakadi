@@ -102,7 +102,7 @@ public class AllowListService {
         }
 
         try {
-            final ChildData currentData = allowListCache.getCurrentData(client.getClientId());
+            final ChildData currentData = allowListCache.getCurrentData("/" + client.getClientId());
             if (currentData == null) {
                 return false;
             }
