@@ -41,7 +41,7 @@ public class AllowListService {
 
     private static final Logger LOG = LoggerFactory.getLogger(AllowListService.class);
     private static final String PATH_ALLOWLIST = "/nakadi/lola/allowlist/applications";
-    private static final String PATH_CONNECTIONS = "/nakadi/lola/connections";
+    private static final String PATH_NODES = "/nakadi/lola/nodes";
     private static final int CONNS_PER_APPLICATION = 100;
     private final ZooKeeperHolder zooKeeperHolder;
     private final NakadiAuditLogPublisher auditLogPublisher;
