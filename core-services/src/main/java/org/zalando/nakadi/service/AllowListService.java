@@ -18,7 +18,6 @@ import org.zalando.nakadi.service.publishing.NakadiAuditLogPublisher;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,15 +25,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The class holds two responsibilities
- *
+ * <p>
  * - allow list for lola consumers:
  * list of allowed application is stored in zookeeper
- * 
+ * <p>
  * - connection limit for lola consumers: we use approximation
  * to calculate number of simultaneous connections
  * by multiplying current connections to the number of lola pods,
  * the pods are registered in zookeeper as ephemeral nodes
- *
  */
 @Service
 public class AllowListService {
@@ -46,7 +44,7 @@ public class AllowListService {
     private final ZooKeeperHolder zooKeeperHolder;
     private final NakadiAuditLogPublisher auditLogPublisher;
     private TreeCache allowListCache;
-    private final ObjectMapper objectMapper;
+    private TreeCache nodesCache;
     private final String nodeId;
     private final Map<String, Integer> clientConnections;
     private final FeatureToggleService featureToggleService;
@@ -60,7 +58,6 @@ public class AllowListService {
                             final NakadiSettings nakadiSettings) {
         this.zooKeeperHolder = zooKeeperHolder;
         this.auditLogPublisher = auditLogPublisher;
-        this.objectMapper = objectMapper;
         this.nodeId = UUID.randomUUID().toString();
         this.clientConnections = new ConcurrentHashMap<>();
         this.featureToggleService = featureToggleService;
@@ -75,8 +72,12 @@ public class AllowListService {
             this.allowListCache.start();
 
             if (nakadiSettings.isLimitLoLaConnections()) {
-                zooKeeperHolder.get().create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL)
-                        .forPath(PATH_CONNECTIONS + "/" + nodeId);
+                this.nodesCache = TreeCache.newBuilder(
+                        zooKeeperHolder.get(), PATH_NODES).setCacheData(false).build();
+                this.nodesCache.start();
+
+                this.zooKeeperHolder.get().create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL)
+                        .forPath(PATH_NODES + "/" + nodeId);
             }
         } catch (final Exception e) {
             throw new NakadiRuntimeException(e);
@@ -86,6 +87,9 @@ public class AllowListService {
     @PreDestroy
     public void cleanUp() {
         this.allowListCache.close();
+        if (nodesCache != null) {
+            this.nodesCache.close();
+        }
     }
 
     public boolean isAllowed(final Client client) {
@@ -110,15 +114,14 @@ public class AllowListService {
     }
 
     public boolean canAcceptConnection(final Client client) {
-        if (!featureToggleService.isFeatureEnabled(Feature.RATE_LIMIT_LOLA_CONNECTIONS)) {
+        if (!featureToggleService.isFeatureEnabled(Feature.LIMIT_LOLA_CONNECTIONS)) {
             return true;
         }
 
         try {
-            final CuratorFramework curator = zooKeeperHolder.get();
-            final List<String> nodes = curator.getChildren().forPath(PATH_CONNECTIONS);
+            final Integer nodes = nodesCache.size();
             final Integer currentConns = clientConnections.getOrDefault(client.getClientId(), 0);
-            final Integer currentApproxConnects = nodes.size() * currentConns;
+            final Integer currentApproxConnects = nodes * currentConns;
             if (currentApproxConnects > CONNS_PER_APPLICATION) {
                 LOG.debug("Can not accept connection for client `{}`, connections: {}, nodes: {}, limit: {}",
                         client.getClientId(), currentConns, nodes, CONNS_PER_APPLICATION);
