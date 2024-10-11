@@ -40,6 +40,7 @@ import org.zalando.nakadi.repository.db.SubscriptionDbRepository;
 import org.zalando.nakadi.repository.kafka.KafkaLocationManager;
 import org.zalando.nakadi.repository.kafka.PartitionsCalculator;
 import org.zalando.nakadi.repository.zookeeper.ZooKeeperHolder;
+import org.zalando.nakadi.service.AllowListService;
 import org.zalando.nakadi.service.CursorsService;
 import org.zalando.nakadi.service.EventStreamFactory;
 import org.zalando.nakadi.service.EventTypeService;
@@ -193,6 +194,12 @@ public abstract class AuthenticationTest {
             final FeatureToggleService featureToggleService = mock(FeatureToggleService.class);
             when(featureToggleService.isFeatureEnabled(any())).thenReturn(true);
             return featureToggleService;
+        }
+
+        @Bean
+        @Primary
+        public AllowListService mockAllowListService() {
+            return mock(AllowListService.class);
         }
 
         @Bean

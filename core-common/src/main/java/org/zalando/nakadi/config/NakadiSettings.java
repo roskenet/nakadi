@@ -29,6 +29,7 @@ public class NakadiSettings {
     private final String deletableSubscriptionConsumerGroup;
     private final long curatorMaxLifetimeMs;
     private final long curatorRotationCheckMs;
+    private final boolean limitLoLaConnections;
 
     @Autowired
     public NakadiSettings(@Value("${nakadi.topic.max.partitionNum}") final int maxTopicPartitionCount,
@@ -55,7 +56,9 @@ public class NakadiSettings {
                           @Value("${nakadi.rotating.curator.max.lifetime.ms:300000}")
                               final long curatorMaxLifetimeMs,
                           @Value("${nakadi.rotating.curator.rotation.check.ms:10000}")
-                              final long curatorRotationCheckMs) {
+                              final long curatorRotationCheckMs,
+                          @Value("${nakadi.lola.limit.connections:false}")
+                          final boolean limitLoLaConnections) {
         this.maxTopicPartitionCount = maxTopicPartitionCount;
         this.defaultTopicPartitionCount = defaultTopicPartitionCount;
         this.defaultTopicReplicaFactor = defaultTopicReplicaFactor;
@@ -69,6 +72,7 @@ public class NakadiSettings {
         this.eventMaxBytes = eventMaxBytes;
         this.timelineWaitTimeoutMs = timelineWaitTimeoutMs;
         this.maxSubscriptionPartitions = maxSubscriptionPartitions;
+        this.limitLoLaConnections = limitLoLaConnections;
         this.defaultAdmin = new ResourceAuthorizationAttribute(defaultAdminDataType, defaultAdminValue);
         this.warnAllDataAccessMessage = warnAllDataAccessMessage;
         this.logCompactionWarnMessage = logCompactionWarnMessage;
@@ -156,5 +160,9 @@ public class NakadiSettings {
 
     public long getCuratorRotationCheckMs() {
         return curatorRotationCheckMs;
+    }
+
+    public boolean isLimitLoLaConnections() {
+        return limitLoLaConnections;
     }
 }

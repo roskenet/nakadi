@@ -16,6 +16,7 @@ import org.zalando.nakadi.exceptions.runtime.ForbiddenOperationException;
 import org.zalando.nakadi.exceptions.runtime.ValidationException;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.service.AdminService;
+import org.zalando.nakadi.service.AllowListService;
 import org.zalando.nakadi.service.BlacklistService;
 import org.zalando.nakadi.service.FeatureToggleService;
 import org.zalando.nakadi.service.publishing.NakadiAuditLogPublisher;
@@ -33,16 +34,19 @@ public class SettingsController {
     private final FeatureToggleService featureToggleService;
     private final AdminService adminService;
     private final NakadiAuditLogPublisher auditLogPublisher;
+    private final AllowListService allowListService;
 
     @Autowired
     public SettingsController(final BlacklistService blacklistService,
                               final FeatureToggleService featureToggleService,
                               final AdminService adminService,
-                              final NakadiAuditLogPublisher auditLogPublisher) {
+                              final NakadiAuditLogPublisher auditLogPublisher,
+                              final AllowListService allowListService) {
         this.blacklistService = blacklistService;
         this.featureToggleService = featureToggleService;
         this.adminService = adminService;
         this.auditLogPublisher = auditLogPublisher;
+        this.allowListService = allowListService;
     }
 
     @RequestMapping(path = "/blacklist", method = RequestMethod.GET)
@@ -75,6 +79,28 @@ public class SettingsController {
         }
         blacklistService.whitelist(name, blacklistType);
         return ResponseEntity.noContent().build();
+    }
+
+    @RequestMapping(value = "/allowlist/applications/{application}", method = RequestMethod.POST)
+    public ResponseEntity addToAllowlist(@PathVariable("application") final String application)
+            throws ForbiddenOperationException {
+        if (!adminService.isAdmin(AuthorizationService.Operation.WRITE)) {
+            throw new ForbiddenOperationException("Admin privileges are required to perform this operation");
+        }
+
+        allowListService.add(application);
+        return ResponseEntity.ok().build();
+    }
+
+    @RequestMapping(value = "/allowlist/applications/{application}", method = RequestMethod.DELETE)
+    public ResponseEntity removeFromAllowlist(@PathVariable("application") final String application)
+            throws ForbiddenOperationException {
+        if (!adminService.isAdmin(AuthorizationService.Operation.WRITE)) {
+            throw new ForbiddenOperationException("Admin privileges are required to perform this operation");
+        }
+
+        allowListService.remove(application);
+        return ResponseEntity.ok().build();
     }
 
     @RequestMapping(path = "/features", method = RequestMethod.GET)

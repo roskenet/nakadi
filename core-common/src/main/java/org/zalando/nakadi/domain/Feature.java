@@ -23,7 +23,9 @@ public enum Feature {
     SKIP_MISPLACED_EVENTS("skip_misplaced_events"),
     DLQ_REDRIVE_EVENT_TYPE_ATTACHMENT_JOB("dlq_redrive_event_type_attachment_job"),
     FORCE_DATA_LAKE_ANNOTATIONS,
-    FORCE_EVENT_TYPE_CREATE_SCHEMA_VALIDATION;
+    FORCE_EVENT_TYPE_CREATE_SCHEMA_VALIDATION,
+    LOLA_CONNECTIONS_ALLOWLIST,
+    LIMIT_LOLA_CONNECTIONS;
 
     private final String id;
 

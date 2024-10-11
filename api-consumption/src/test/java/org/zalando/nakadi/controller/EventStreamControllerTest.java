@@ -26,6 +26,7 @@ import org.zalando.nakadi.exceptions.runtime.InvalidCursorException;
 import org.zalando.nakadi.exceptions.runtime.NoSuchEventTypeException;
 import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableException;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
+import org.zalando.nakadi.service.AllowListService;
 import org.zalando.nakadi.service.timeline.HighLevelConsumer;
 import org.zalando.nakadi.repository.LowLevelConsumer;
 import org.zalando.nakadi.repository.TopicRepository;
@@ -156,11 +157,14 @@ public class EventStreamControllerTest {
         authorizationValidator = mock(AuthorizationValidator.class);
         eventTypeChangeListener = mock(EventTypeChangeListener.class);
         when(eventTypeChangeListener.registerListener(any(), any())).thenReturn(mock(Closeable.class));
+        final AllowListService allowListServiceMock = mock(AllowListService.class);
+        when(allowListServiceMock.isAllowed(any())).thenReturn(true);
+        when(allowListServiceMock.canAcceptConnection(any())).thenReturn(true);
         controller = new EventStreamController(
                 eventTypeCache, timelineService, OBJECT_MAPPER, eventStreamFactoryMock, metricRegistry,
                 streamMetrics, eventStreamChecks,
                 new CursorConverterImpl(eventTypeCache, timelineService), authorizationValidator,
-                eventTypeChangeListener, null);
+                eventTypeChangeListener, null, allowListServiceMock);
 
         settings = mock(SecuritySettings.class);
         when(settings.getAuthMode()).thenReturn(OFF);

@@ -37,6 +37,7 @@ import org.zalando.nakadi.exceptions.runtime.UnparseableCursorException;
 import org.zalando.nakadi.metrics.MetricUtils;
 import org.zalando.nakadi.repository.TopicRepository;
 import org.zalando.nakadi.security.Client;
+import org.zalando.nakadi.service.AllowListService;
 import org.zalando.nakadi.service.AuthorizationValidator;
 import org.zalando.nakadi.service.CursorConverter;
 import org.zalando.nakadi.service.EventStream;
@@ -92,6 +93,7 @@ public class EventStreamController {
     private final EventTypeChangeListener eventTypeChangeListener;
     private final Long maxMemoryUsageBytes;
     private final EventTypeCache eventTypeCache;
+    private final AllowListService allowListService;
 
     @Autowired
     public EventStreamController(final EventTypeCache eventTypeCache,
@@ -104,7 +106,8 @@ public class EventStreamController {
                                  final CursorConverter cursorConverter,
                                  final AuthorizationValidator authorizationValidator,
                                  final EventTypeChangeListener eventTypeChangeListener,
-                                 @Value("${nakadi.stream.maxStreamMemoryBytes}") final Long maxMemoryUsageBytes) {
+                                 @Value("${nakadi.stream.maxStreamMemoryBytes}") final Long maxMemoryUsageBytes,
+                                 final AllowListService allowListService) {
         this.timelineService = timelineService;
         this.jsonMapper = jsonMapper;
         this.eventStreamFactory = eventStreamFactory;
@@ -116,6 +119,7 @@ public class EventStreamController {
         this.eventTypeChangeListener = eventTypeChangeListener;
         this.eventTypeCache = eventTypeCache;
         this.maxMemoryUsageBytes = maxMemoryUsageBytes;
+        this.allowListService = allowListService;
     }
 
     @VisibleForTesting
@@ -195,10 +199,24 @@ public class EventStreamController {
 
         return outputStream -> {
             try (MDCUtils.CloseableNoEx ignore1 = MDCUtils.withContext(requestContext)) {
+                allowListService.trackConnectionsCount(client, 1);
                 if (eventStreamChecks.isConsumptionBlocked(
                         Collections.singleton(eventTypeName), client.getClientId())) {
                     writeProblemResponse(response, outputStream,
                             Problem.valueOf(FORBIDDEN, "Application or event type is blocked"));
+                    return;
+                }
+
+                if (!allowListService.isAllowed(client)) {
+                    writeProblemResponse(response, outputStream,
+                            Problem.valueOf(FORBIDDEN, "Application or event type " +
+                                    "is not allowed to connect Low Level API"));
+                    return;
+                }
+
+                if (!allowListService.canAcceptConnection(client)) {
+                    writeProblemResponse(response, outputStream,
+                            Problem.valueOf(TOO_MANY_REQUESTS, "Exceeded max allowed connections"));
                     return;
                 }
 
@@ -287,6 +305,7 @@ public class EventStreamController {
                     LOG.error("Error while trying to stream events. Respond with INTERNAL_SERVER_ERROR.", e);
                     writeProblemResponse(response, outputStream, INTERNAL_SERVER_ERROR, e.getMessage());
                 } finally {
+                    allowListService.trackConnectionsCount(client, -1);
                     if (consumerCounter != null) {
                         consumerCounter.dec();
                     }

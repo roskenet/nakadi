@@ -78,6 +78,7 @@ public class KafkaRepositoryAT extends BaseAT {
     private static final long DEFAULT_CURATOR_MAX_LIFETIME_MS = 1000;
     private static final long DEFAULT_CURATOR_ROTATION_MS = 10000;
     private static final int TCP_SEND_BUFFER_SIZE = 128 * 1024;
+    private static final boolean LOLA_LIMIT_CONNECTIONS = false;
 
     private NakadiSettings nakadiSettings;
     private KafkaSettings kafkaSettings;
@@ -109,7 +110,8 @@ public class KafkaRepositoryAT extends BaseAT {
                 DEFAULT_EVENT_TYPE_DELETABLE_SUBSCRIPTION_OWNING_APPLICATION,
                 DEFAULT_EVENT_TYPE_DELETABLE_SUBSCRIPTION_CONSUMER_GROUP,
                 DEFAULT_CURATOR_MAX_LIFETIME_MS,
-                DEFAULT_CURATOR_ROTATION_MS);
+                DEFAULT_CURATOR_ROTATION_MS,
+                LOLA_LIMIT_CONNECTIONS);
 
         kafkaSettings = new KafkaSettings(KAFKA_RETRIES, KAFKA_IDEMPOTENCE, KAFKA_REQUEST_TIMEOUT,
                 KAFKA_BATCH_SIZE, KAFKA_BUFFER_MEMORY,

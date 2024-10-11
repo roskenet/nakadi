@@ -146,6 +146,7 @@ nakadi:
     owningApplication: "stups_nakadi"
     authDataType: "*"
     authValue: "*"
+  lola.limit.connections: false
 
 twintip:
   mapping: /api
