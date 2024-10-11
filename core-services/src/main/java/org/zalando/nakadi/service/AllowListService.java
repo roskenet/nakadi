@@ -1,6 +1,5 @@
 package org.zalando.nakadi.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.TreeCache;
@@ -8,6 +7,7 @@ import org.apache.zookeeper.CreateMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.zalando.nakadi.config.NakadiSettings;
 import org.zalando.nakadi.domain.Feature;
@@ -35,6 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * the pods are registered in zookeeper as ephemeral nodes
  */
 @Service
+@Profile("!test")
 public class AllowListService {
 
     private static final Logger LOG = LoggerFactory.getLogger(AllowListService.class);
@@ -53,7 +54,6 @@ public class AllowListService {
     @Autowired
     public AllowListService(final ZooKeeperHolder zooKeeperHolder,
                             final NakadiAuditLogPublisher auditLogPublisher,
-                            final ObjectMapper objectMapper,
                             final FeatureToggleService featureToggleService,
                             final NakadiSettings nakadiSettings) {
         this.zooKeeperHolder = zooKeeperHolder;
