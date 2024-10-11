@@ -79,7 +79,7 @@ public class AllowListService {
                         .forPath(PATH_CONNECTIONS + "/" + nodeId);
             }
         } catch (final Exception e) {
-            LOG.error(e.getMessage(), e);
+            throw new NakadiRuntimeException(e);
         }
     }
 
