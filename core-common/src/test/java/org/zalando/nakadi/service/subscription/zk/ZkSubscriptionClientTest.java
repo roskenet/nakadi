@@ -96,5 +96,11 @@ public class ZkSubscriptionClientTest {
     public void testAllExpectedStreamsClosedCheck() {
         Assert.assertTrue(
                 AbstractZkSubscriptionClient.isAllExpectedStreamsClosed(List.of(), Set.of("a", "b")));
+
+        Assert.assertFalse(
+                AbstractZkSubscriptionClient.isAllExpectedStreamsClosed(List.of("b"), Set.of("a", "b")));
+
+        Assert.assertFalse(
+                AbstractZkSubscriptionClient.isAllExpectedStreamsClosed(List.of("d", "c", "B"), Set.of("a", "b")));
     }
 }

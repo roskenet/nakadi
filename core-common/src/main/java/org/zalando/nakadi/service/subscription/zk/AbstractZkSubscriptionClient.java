@@ -307,7 +307,11 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
                 streamIdsToClose == null || streamIdsToClose.isEmpty(),
                 "must provide set of stream ids to close");
 
-        closeSubscriptionStreamsInternal(streamIdsToClose, action, timeout);
+        // TODO: toLowerCase in two separate places, could be brought closer together?..
+        closeSubscriptionStreamsInternal(
+                streamIdsToClose.stream().map(String::toLowerCase).collect(Collectors.toSet()),
+                action,
+                timeout);
     }
 
     @Override
@@ -389,8 +393,13 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
         throw new OperationTimeoutException("Timeout when closing subscription streams");
     }
 
-    static boolean isAllExpectedStreamsClosed(List<String> openStreamIds, Set<String> streamIdsToClose) {
-        return false;
+    /**
+     * Expects the stream ids to be all lower-case in the streamIdsToClose.
+     */
+    static boolean isAllExpectedStreamsClosed(final List<String> openStreamIds, final Set<String> streamIdsToClose) {
+        return openStreamIds.stream()
+                .map(String::toLowerCase)
+                .noneMatch(streamIdsToClose::contains);
     }
 
     @Override

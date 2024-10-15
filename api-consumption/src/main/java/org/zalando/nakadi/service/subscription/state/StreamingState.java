@@ -69,7 +69,8 @@ class StreamingState extends State {
     private Meter bytesSentMeterPerSubscription;
     // Uncommitted offsets are calculated right on exiting from Streaming state.
     private Map<EventTypePartition, NakadiCursor> uncommittedOffsets;
-    private Closeable cursorResetSubscription;
+
+    private ZkSubscription<CloseStreamData> streamCloseSubscription;
     private IdleStreamWatcher idleStreamWatcher;
     private boolean commitTimeoutReached = false;
 
@@ -126,8 +127,8 @@ class StreamingState extends State {
         this.lastCommitMillis = System.currentTimeMillis();
         scheduleTask(this::checkCommitTimeout, getParameters().commitTimeoutMillis, TimeUnit.MILLISECONDS);
 
-        cursorResetSubscription = getZk().subscribeForStreamClose(
-                () -> addTask(this::resetSubscriptionCursorsCallback));
+        streamCloseSubscription = getZk().subscribeForStreamClose(
+                () -> addTask(this::closeSubscriptionStreamCallback));
     }
 
     private void autocommitPeriodically() {
@@ -151,8 +152,8 @@ class StreamingState extends State {
         }
     }
 
-    private void resetSubscriptionCursorsCallback() {
-        final String message = "Resetting subscription cursors";
+    private void closeSubscriptionStreamCallback() {
+        final String message = "Resetting subscription cursors"; // TODO: that's a lie, but we don't know better
         sendMetadata(message);
         shutdownGracefully(message);
     }
@@ -559,12 +560,12 @@ class StreamingState extends State {
             }
         }
 
-        if (cursorResetSubscription != null) {
+        if (streamCloseSubscription != null) {
             try {
-                cursorResetSubscription.close();
+                streamCloseSubscription.close();
             } catch (IOException ignore) {
             }
-            cursorResetSubscription = null;
+            streamCloseSubscription = null;
         }
     }
 
