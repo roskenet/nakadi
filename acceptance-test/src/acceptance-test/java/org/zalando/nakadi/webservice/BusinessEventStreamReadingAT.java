@@ -1,19 +1,17 @@
 package org.zalando.nakadi.webservice;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.google.common.base.Charsets;
 import com.google.common.collect.Sets;
 import com.jayway.restassured.RestAssured;
 import com.jayway.restassured.http.ContentType;
 import com.jayway.restassured.response.Header;
 import com.jayway.restassured.response.Response;
-import org.apache.avro.data.Json;
-import org.hamcrest.Matchers;
-import org.junit.*;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.zalando.nakadi.domain.EnrichmentStrategyDescriptor;
@@ -21,38 +19,25 @@ import org.zalando.nakadi.domain.EventCategory;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.EventTypeStatistics;
 import org.zalando.nakadi.repository.kafka.KafkaTestHelper;
-import org.zalando.nakadi.service.BlacklistService;
-import org.zalando.nakadi.util.ThreadUtils;
 import org.zalando.nakadi.utils.EventTypeTestBuilder;
-import org.zalando.nakadi.utils.TestUtils;
 import org.zalando.nakadi.view.Cursor;
 import org.zalando.nakadi.webservice.utils.NakadiTestUtils;
 
-import javax.servlet.http.HttpServletResponse;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.text.MessageFormat;
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Predicate;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static com.jayway.restassured.RestAssured.given;
 import static java.text.MessageFormat.format;
-import static java.util.stream.IntStream.range;
 
 public class BusinessEventStreamReadingAT extends BaseAT {
 
-    private static final String TEST_PARTITION = "0";
     private static final int PARTITIONS_NUM = 8;
-    private static final String DUMMY_EVENT = "Dummy";
     private static final String SEPARATOR = "\n";
 
     private static String streamEndpoint;
@@ -98,9 +83,7 @@ public class BusinessEventStreamReadingAT extends BaseAT {
 
     @Test(timeout = 10000)
     @SuppressWarnings("unchecked")
-    public void whenConsumeEventsDontReceiveTestEvents()
-            throws ExecutionException, InterruptedException {
-
+    public void whenConsumeEventsDontReceiveTestEvents() {
         // ARRANGE //
         // push events to one of the partitions
         given()
@@ -149,13 +132,6 @@ public class BusinessEventStreamReadingAT extends BaseAT {
     }
 
     @SuppressWarnings("unchecked")
-    private Predicate<Map<String, Object>> isForPartition(final String partition) {
-        return batch -> {
-            final Map<String, String> cursor = (Map<String, String>) batch.get("cursor");
-            return partition.equals(cursor.get("partition"));
-        };
-    }
-
     private List<JsonNode> deserializeBatchesJsonNode(final String body) {
         return Arrays
                 .stream(body.split(SEPARATOR))
@@ -169,52 +145,6 @@ public class BusinessEventStreamReadingAT extends BaseAT {
                     }
                 })
                 .collect(Collectors.toList());
-    }
-
-    private List<Map<String, Object>> deserializeBatches(final String body) {
-        return Arrays
-                .stream(body.split(SEPARATOR))
-                .map(batch -> {
-                    try {
-                        return jsonMapper.readValue(batch,
-                                new TypeReference<HashMap<String, Object>>() {
-                                });
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                        Assert.fail("Could not deserialize response from streaming endpoint");
-                        return null;
-                    }
-                })
-                .collect(Collectors.toList());
-    }
-
-    @SuppressWarnings("unchecked")
-    private void validateBatchStructure(final Map<String, Object> batch, final String expectedEvent) {
-        Assert.assertThat(batch, Matchers.hasKey("cursor"));
-        final Map<String, String> cursor = (Map<String, String>) batch.get("cursor");
-
-        Assert.assertThat(cursor, Matchers.hasKey("partition"));
-        Assert.assertThat(cursor, Matchers.hasKey("offset"));
-
-        if (batch.containsKey("events")) {
-            final List<String> events = (List<String>) batch.get("events");
-            events.forEach(event -> Assert.assertThat(event, Matchers.equalTo(expectedEvent)));
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private void validateBatch(final Map<String, Object> batch, final String expectedPartition,
-                               final String expectedOffset, final int expectedEventNum) {
-        final Map<String, String> cursor = (Map<String, String>) batch.get("cursor");
-        Assert.assertThat(cursor.get("partition"), Matchers.equalTo(expectedPartition));
-        Assert.assertThat(cursor.get("offset"), Matchers.equalTo(expectedOffset));
-
-        if (batch.containsKey("events")) {
-            final List<String> events = (List<String>) batch.get("events");
-            Assert.assertThat(events.size(), Matchers.equalTo(expectedEventNum));
-        } else {
-            Assert.assertThat(0, Matchers.equalTo(expectedEventNum));
-        }
     }
 
 }
