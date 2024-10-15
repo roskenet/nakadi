@@ -124,13 +124,13 @@ public class AllowListService {
             final Integer nodes = nodesCache.size() - 1;
             final Integer currentConns = clientConnections.getOrDefault(client.getClientId(), 0);
             final Integer currentApproxConnects = nodes * currentConns;
+
+            LOG.debug("Client: `{}`, connections: {}, nodes: {}, limit: {}",
+                    client.getClientId(), currentConns, nodes, CONNS_PER_APPLICATION);
+
             if (currentApproxConnects > CONNS_PER_APPLICATION) {
-                LOG.debug("Can not accept connection for client `{}`, connections: {}, nodes: {}, limit: {}",
-                        client.getClientId(), currentConns, nodes, CONNS_PER_APPLICATION);
                 return false;
             }
-
-            LOG.debug("Accepted {} connections for client `{}`", client.getClientId(), currentConns);
 
             return true;
         } catch (final Exception e) {
