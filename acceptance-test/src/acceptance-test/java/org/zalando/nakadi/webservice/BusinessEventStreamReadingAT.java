@@ -71,16 +71,6 @@ public class BusinessEventStreamReadingAT extends BaseAT {
         xNakadiCursors = jsonMapper.writeValueAsString(initialCursors);
     }
 
-    private Set<String> extractBars(JsonNode batch) {
-        final Set<String> bars = Sets.newHashSet();
-        Optional
-                .ofNullable(batch.get("events"))
-                .map(evts -> evts.elements())
-                .orElse(Collections.emptyIterator())
-                .forEachRemaining(e -> bars.add(e.get("foo").asText()));
-        return bars;
-    }
-
     @Test(timeout = 10000)
     @SuppressWarnings("unchecked")
     public void whenConsumeEventsDontReceiveTestEvents() {
@@ -88,10 +78,29 @@ public class BusinessEventStreamReadingAT extends BaseAT {
         // push events to one of the partitions
         given()
                 .body("[" +
-                        "{\"metadata\":{\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a0\",\"occurred_at\":\"2024-10-10T15:42:03.746Z\"}, \"foo\": \"bar_01\"}," +
-                        "{\"metadata\":{\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a1\",\"occurred_at\":\"2024-10-10T15:42:03.746Z\",\"test_project_id\":\"beauty-pilot\"}, \"foo\": \"bar_02\" }," +
-                        "{\"metadata\":{\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a2\",\"occurred_at\":\"2024-10-10T15:42:03.746Z\"}, \"foo\": \"bar_03\"}" +
-                        "]")
+                        "{" +
+                            "\"metadata\":{" +
+                                "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a0\"," +
+                                "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"" +
+                            "}," +
+                            "\"foo\": \"bar_01\"" +
+                        "}," +
+                        "{" +
+                            "\"metadata\":{" +
+                                "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a1\"," +
+                                "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"," +
+                                "\"test_project_id\":\"beauty-pilot\"" +
+                            "}," +
+                            "\"foo\": \"bar_02\"" +
+                        "}," +
+                        "{" +
+                            "\"metadata\":{" +
+                                "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a2\"," +
+                                "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"" +
+                            "}," +
+                            "\"foo\": \"bar_03\"" +
+                        "}" +
+                      "]")
                 .contentType(ContentType.JSON)
                 .post(MessageFormat.format("/event-types/{0}/events", eventType.getName()))
                 .then()
@@ -106,7 +115,7 @@ public class BusinessEventStreamReadingAT extends BaseAT {
         final String body = response.print();
 
         final List<JsonNode> batches = deserializeBatchesJsonNode(body);
-        Set<String> responseBars = batches.stream()
+        final Set<String> responseBars = batches.stream()
                 .map(b -> extractBars(b))
                 .flatMap(Set::stream)
                 .collect(Collectors.toSet());
@@ -146,5 +155,16 @@ public class BusinessEventStreamReadingAT extends BaseAT {
                 })
                 .collect(Collectors.toList());
     }
+
+    private Set<String> extractBars(final JsonNode batch) {
+        final Set<String> bars = Sets.newHashSet();
+        Optional
+                .ofNullable(batch.get("events"))
+                .map(events -> events.elements())
+                .orElse(Collections.emptyIterator())
+                .forEachRemaining(e -> bars.add(e.get("foo").asText()));
+        return bars;
+    }
+
 
 }
