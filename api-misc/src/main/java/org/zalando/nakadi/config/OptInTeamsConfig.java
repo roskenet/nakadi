@@ -43,7 +43,7 @@ public class OptInTeamsConfig {
 
     @Autowired
     public OptInTeamsConfig(
-            @Value("${nakadi.aspd.opt-in.teams:aspd-opt-in-teams.json}") final Resource configuration,
+            @Value("${nakadi.aspd.opt.in.teams:aspd-opt-in-teams.json}") final Resource configuration,
             final ObjectMapper objectMapper
     ) {
         this.resource = configuration;
