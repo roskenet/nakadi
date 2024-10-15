@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
@@ -192,13 +193,17 @@ public interface ZkSubscriptionClient extends Closeable {
      *   4. deletes the /subscriptions/{SID}/close_subscription_stream znode - thus making the subscription available
      *      to the consumers again
      *
-     * @param action  perform action once streams are closed
-     * @param timeout maximum amount of time it will wait for the session count to go down to 0.
-     *                If exceeded an OperationTimeoutException is thrown.
+     * @param streamIdsToClose the set of stream ids that should be closed
+     * @param action           perform action once streams are closed
+     * @param timeout          maximum amount of time it will wait for the session count to go down to 0.
+     *                         If exceeded an OperationTimeoutException is thrown.
      * @throws OperationTimeoutException
      * @throws ZookeeperException
      */
-    void closeSubscriptionStreams(Runnable action, long timeout)
+    void closeSubscriptionStreams(Set<String> streamIdsToClose, Runnable action, long timeout)
+            throws OperationTimeoutException, ZookeeperException;
+
+    void closeAllSubscriptionStreams(Runnable action, long timeout)
             throws OperationTimeoutException, ZookeeperException;
 
     class Topology {

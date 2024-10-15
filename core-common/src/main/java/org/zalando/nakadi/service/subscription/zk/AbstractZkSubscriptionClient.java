@@ -1,6 +1,7 @@
 package org.zalando.nakadi.service.subscription.zk;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.cache.NodeCache;
@@ -19,6 +20,7 @@ import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableExcept
 import org.zalando.nakadi.exceptions.runtime.UnableProcessException;
 import org.zalando.nakadi.exceptions.runtime.ZookeeperException;
 import org.zalando.nakadi.repository.zookeeper.ZooKeeperHolder;
+import org.zalando.nakadi.service.subscription.model.CloseStreamData;
 import org.zalando.nakadi.service.subscription.model.Session;
 import org.zalando.nakadi.util.MDCUtils;
 import org.zalando.nakadi.view.Cursor;
@@ -34,6 +36,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -295,14 +298,42 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
     }
 
     @Override
-    public final void closeSubscriptionStreams(final Runnable action, final long timeout)
+    public final void closeSubscriptionStreams(
+            final Set<String> streamIdsToClose, final Runnable action, final long timeout)
+            throws OperationTimeoutException, ZookeeperException, OperationInterruptedException,
+            RequestInProgressException {
+
+        Preconditions.checkArgument(
+                streamIdsToClose == null || streamIdsToClose.isEmpty(),
+                "must provide set of stream ids to close");
+
+        closeSubscriptionStreamsInternal(streamIdsToClose, action, timeout);
+    }
+
+    @Override
+    public final void closeAllSubscriptionStreams(final Runnable action, final long timeout)
+            throws OperationTimeoutException, ZookeeperException, OperationInterruptedException,
+            RequestInProgressException {
+
+        closeSubscriptionStreamsInternal(Collections.emptySet(), action, timeout);
+    }
+
+    private void closeSubscriptionStreamsInternal(
+            final Set<String> streamIdsToClose, final Runnable action, final long timeout)
             throws OperationTimeoutException, ZookeeperException, OperationInterruptedException,
             RequestInProgressException {
 
         ZkSubscription<List<String>> sessionsListener = null;
         boolean closeWasAlreadyInitiated = false;
         try {
-            getCurator().create().withMode(CreateMode.EPHEMERAL).forPath(closeSubscriptionStream);
+            final boolean closeAllStreams = streamIdsToClose.isEmpty();
+            // TODO: fix type
+            final var closeStreamsNode = getCurator().create().withMode(CreateMode.EPHEMERAL);
+            if (closeAllStreams) {
+                closeStreamsNode.forPath(closeSubscriptionStream);
+            } else {
+                closeStreamsNode.forPath(closeSubscriptionStream, serializeCloseStreamData(new CloseStreamData(streamIdsToClose)));
+            }
 
             final AtomicBoolean sessionsChanged = new AtomicBoolean(true);
             sessionsListener = subscribeForSessionListChanges(() -> {
@@ -315,9 +346,16 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
             final long finishAt = System.currentTimeMillis() + timeout;
             while (finishAt > System.currentTimeMillis()) {
                 if (sessionsChanged.compareAndSet(true, false)) {
-                    if (sessionsListener.getData().isEmpty()) {
-                        action.run();
-                        return;
+                    if (closeAllStreams) {
+                        if (sessionsListener.getData().isEmpty()) {
+                            action.run();
+                            return;
+                        }
+                    } else {
+                        if (isAllExpectedStreamsClosed(sessionsListener.getData(), streamIdsToClose)) {
+                            action.run();
+                            return;
+                        }
                     }
                 }
                 synchronized (sessionsChanged) {
@@ -349,6 +387,10 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
         }
 
         throw new OperationTimeoutException("Timeout when closing subscription streams");
+    }
+
+    static boolean isAllExpectedStreamsClosed(List<String> openStreamIds, Set<String> streamIdsToClose) {
+        return false;
     }
 
     @Override
@@ -447,6 +489,11 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
     protected abstract byte[] serializeSession(Session session) throws NakadiRuntimeException;
 
     protected abstract Session deserializeSession(String sessionId, byte[] sessionZkData) throws NakadiRuntimeException;
+
+    protected abstract byte[] serializeCloseStreamData(final CloseStreamData data) throws NakadiRuntimeException;
+
+    protected abstract Optional<CloseStreamData> deserializeCloseStreamData(final byte[] closeStreamDataBytes)
+            throws NakadiRuntimeException;
 
     @Override
     public void close() throws IOException {

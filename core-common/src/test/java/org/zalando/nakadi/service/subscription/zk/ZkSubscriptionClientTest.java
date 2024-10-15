@@ -6,6 +6,8 @@ import org.zalando.nakadi.service.subscription.model.Partition;
 import org.zalando.nakadi.utils.TestUtils;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -90,4 +92,9 @@ public class ZkSubscriptionClientTest {
         Assert.assertEquals(first, second);
     }
 
+    @Test
+    public void testAllExpectedStreamsClosedCheck() {
+        Assert.assertTrue(
+                AbstractZkSubscriptionClient.isAllExpectedStreamsClosed(List.of(), Set.of("a", "b")));
+    }
 }

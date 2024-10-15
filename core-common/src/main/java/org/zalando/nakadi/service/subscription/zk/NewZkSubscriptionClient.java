@@ -17,6 +17,7 @@ import org.zalando.nakadi.exceptions.runtime.RebalanceConflictException;
 import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableException;
 import org.zalando.nakadi.exceptions.runtime.ZookeeperException;
 import org.zalando.nakadi.repository.zookeeper.ZooKeeperHolder;
+import org.zalando.nakadi.service.subscription.model.CloseStreamData;
 import org.zalando.nakadi.service.subscription.model.Partition;
 import org.zalando.nakadi.service.subscription.model.Session;
 import org.zalando.nakadi.view.SubscriptionCursorWithoutToken;
@@ -211,6 +212,27 @@ public class NewZkSubscriptionClient extends AbstractZkSubscriptionClient {
             } catch (final IOException e) {
                 throw new NakadiRuntimeException(e);
             }
+        }
+    }
+
+    protected byte[] serializeCloseStreamData(final CloseStreamData data)
+            throws NakadiRuntimeException {
+        try {
+            return objectMapper.writeValueAsBytes(data);
+        } catch (final JsonProcessingException e) {
+            throw new NakadiRuntimeException(e);
+        }
+    }
+
+    protected Optional<CloseStreamData> deserializeCloseStreamData(final byte[] closeStreamDataBytes)
+            throws NakadiRuntimeException {
+        if (closeStreamDataBytes.length == 0) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(objectMapper.readValue(closeStreamDataBytes, CloseStreamData.class));
+        } catch (final IOException e) {
+            throw new NakadiRuntimeException(e);
         }
     }
 
