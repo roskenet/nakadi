@@ -228,13 +228,10 @@ public class NewZkSubscriptionClient extends AbstractZkSubscriptionClient {
         }
     }
 
-    protected Optional<CloseStreamData> deserializeCloseStreamData(final byte[] closeStreamDataBytes)
+    protected CloseStreamData deserializeCloseStreamData(final byte[] closeStreamDataBytes)
             throws NakadiRuntimeException {
-        if (closeStreamDataBytes.length == 0) {
-            return Optional.empty();
-        }
         try {
-            return Optional.of(objectMapper.readValue(closeStreamDataBytes, CloseStreamData.class));
+            return objectMapper.readValue(closeStreamDataBytes, CloseStreamData.class);
         } catch (final IOException e) {
             throw new NakadiRuntimeException(e);
         }

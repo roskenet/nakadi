@@ -261,6 +261,8 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
             return !getCurator().getChildren().forPath(closePath).isEmpty();
         } catch (final KeeperException.NoNodeException ex) {
             // it's fine
+        } catch (final Exception e) {
+            throw new NakadiRuntimeException(e);
         }
         return false;
     }
@@ -274,8 +276,10 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
             }
         } catch (final KeeperException.NoNodeException ex) {
             // it's fine
+        } catch (final Exception e) {
+            throw new NakadiRuntimeException(e);
         }
-        return Collection.emptySet();
+        return Collections.emptySet();
     }
 
     @Override
@@ -285,8 +289,10 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
             getCurator().create().forPath(closePath);
         } catch (KeeperException.NodeExistsException ex) {
             // ignore: the node is already there
+        } catch (final Exception e) {
+            throw new NakadiRuntimeException(e);
         }
-        return new ZkSubscriptionImpl.ZkSubscriptionChildrenImpl<>(getCurator(), listener, closePath);
+        return new ZkSubscriptionImpl.ZkSubscriptionChildrenImpl(getCurator(), listener, closePath);
     }
 
     @Override
@@ -507,7 +513,7 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
 
     protected abstract byte[] serializeCloseStreamData(final CloseStreamData data) throws NakadiRuntimeException;
 
-    protected abstract Optional<CloseStreamData> deserializeCloseStreamData(final byte[] closeStreamDataBytes)
+    protected abstract CloseStreamData deserializeCloseStreamData(final byte[] closeStreamDataBytes)
             throws NakadiRuntimeException;
 
     @Override
