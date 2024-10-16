@@ -199,7 +199,6 @@ public class EventStreamController {
 
         return outputStream -> {
             try (MDCUtils.CloseableNoEx ignore1 = MDCUtils.withContext(requestContext)) {
-                allowListService.trackConnectionsCount(client, 1);
                 if (eventStreamChecks.isConsumptionBlocked(
                         Collections.singleton(eventTypeName), client.getClientId())) {
                     writeProblemResponse(response, outputStream,
@@ -214,12 +213,6 @@ public class EventStreamController {
                     return;
                 }
 
-                if (!allowListService.canAcceptConnection(client)) {
-                    writeProblemResponse(response, outputStream,
-                            Problem.valueOf(TOO_MANY_REQUESTS, "Exceeded max allowed connections"));
-                    return;
-                }
-
                 Counter consumerCounter = null;
                 Counter appConnectionsCounter = null;
                 EventStream eventStream = null;
@@ -230,6 +223,14 @@ public class EventStreamController {
                 try (Closeable ignore2 = eventTypeChangeListener.registerListener(
                         et -> needCheckAuthorization.set(true),
                         Collections.singletonList(eventTypeName))) {
+
+                    allowListService.trackConnectionsCount(client, 1);
+                    if (!allowListService.canAcceptConnection(client)) {
+                        writeProblemResponse(response, outputStream,
+                                Problem.valueOf(TOO_MANY_REQUESTS, "Exceeded max allowed connections"));
+                        return;
+                    }
+
                     final EventType eventType = eventTypeCache.getEventType(eventTypeName);
 
                     authorizationValidator.authorizeEventTypeView(eventType);
