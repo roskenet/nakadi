@@ -29,7 +29,7 @@ public class OptInTeamsConfig {
     private static final Logger LOG = LoggerFactory.getLogger(OptInTeamsConfig.class);
 
     static class TeamIds {
-        @JsonProperty("team-ids")
+        @JsonProperty("team_ids")
         private List<String> teamIds;
 
         public List<String> getTeamIds() {
@@ -43,7 +43,7 @@ public class OptInTeamsConfig {
 
     @Autowired
     public OptInTeamsConfig(
-            @Value("${nakadi.aspd.opt.in.teams:aspd-opt-in-teams.json}") final Resource configuration,
+            @Value("${nakadi.aspd.opt.in.teams:classpath:aspd-opt-in-teams.json}") final Resource configuration,
             final ObjectMapper objectMapper
     ) {
         this.resource = configuration;
