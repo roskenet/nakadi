@@ -1,5 +1,6 @@
 package org.zalando.nakadi.config;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -12,6 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
+import javax.validation.constraints.NotNull;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
@@ -29,15 +31,17 @@ public class OptInTeamsConfig {
     private static final Logger LOG = LoggerFactory.getLogger(OptInTeamsConfig.class);
 
     static class TeamIds {
-        @JsonProperty("team_ids")
+
+        @NotNull
         private List<String> teamIds;
+
+        @JsonCreator
+        TeamIds(@JsonProperty("team_ids") final List<String> teamIds) {
+            this.teamIds = teamIds;
+        }
 
         public List<String> getTeamIds() {
             return teamIds;
-        }
-
-        public void setTeamIds(final List<String> teamIds) {
-            this.teamIds = teamIds;
         }
     }
 
