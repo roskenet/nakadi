@@ -314,8 +314,8 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
             RequestInProgressException {
 
         Preconditions.checkArgument(
-                streamIdsToClose == null || streamIdsToClose.isEmpty(),
-                "must provide set of stream ids to close");
+                streamIdsToClose != null && !streamIdsToClose.isEmpty(),
+                "must provide non-empty set of stream ids to close");
 
         // TODO: toLowerCase in two separate places, could be brought closer together?..
         closeSubscriptionStreamsInternal(
