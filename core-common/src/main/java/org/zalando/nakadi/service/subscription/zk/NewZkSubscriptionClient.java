@@ -51,7 +51,7 @@ import static com.google.common.base.Charsets.UTF_8;
  *     | |- sessions                        //   Ephemeral node created to request selected sessions to close
  *     |                                    //   (contains the set of sessions in the node data).
  *     |                                    //
- *     |                                    // As long as there are nodes under `/close`, no new sessions can be created.
+ *     |                                    // As long as there are nodes under `/close` no new sessions can be created.
  *     |
  *     |- sessions                          // Node contains list of active sessions
  *     | |- {session_1}                     // Ephemeral node of session_1

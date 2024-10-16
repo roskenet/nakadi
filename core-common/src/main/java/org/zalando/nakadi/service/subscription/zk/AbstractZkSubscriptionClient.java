@@ -4,7 +4,6 @@ import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.curator.framework.CuratorFramework;
-import org.apache.curator.framework.recipes.cache.NodeCache;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
@@ -26,7 +25,6 @@ import org.zalando.nakadi.util.MDCUtils;
 import org.zalando.nakadi.view.Cursor;
 import org.zalando.nakadi.view.SubscriptionCursorWithoutToken;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
@@ -511,9 +509,9 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
 
     protected abstract Session deserializeSession(String sessionId, byte[] sessionZkData) throws NakadiRuntimeException;
 
-    protected abstract byte[] serializeCloseStreamData(final CloseStreamData data) throws NakadiRuntimeException;
+    protected abstract byte[] serializeCloseStreamData(CloseStreamData data) throws NakadiRuntimeException;
 
-    protected abstract CloseStreamData deserializeCloseStreamData(final byte[] closeStreamDataBytes)
+    protected abstract CloseStreamData deserializeCloseStreamData(byte[] closeStreamDataBytes)
             throws NakadiRuntimeException;
 
     @Override

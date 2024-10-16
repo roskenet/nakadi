@@ -7,7 +7,6 @@ import org.zalando.nakadi.exceptions.runtime.NakadiRuntimeException;
 import org.zalando.nakadi.exceptions.runtime.OperationTimeoutException;
 import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableException;
 import org.zalando.nakadi.exceptions.runtime.ZookeeperException;
-import org.zalando.nakadi.service.subscription.model.CloseStreamData;
 import org.zalando.nakadi.service.subscription.model.Partition;
 import org.zalando.nakadi.service.subscription.model.Session;
 import org.zalando.nakadi.view.SubscriptionCursorWithoutToken;
