@@ -52,18 +52,19 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
     private static final int COMMIT_CONFLICT_RETRY_TIMES = 5;
     private static final int MAX_ZK_RESPONSE_SECONDS = 5;
     private static final Logger LOG = LoggerFactory.getLogger(AbstractZkSubscriptionClient.class);
+    private static final String NODE_CLOSE = "/close";
     protected static final String NODE_TOPOLOGY = "/topology";
 
     private final String subscriptionId;
     private final ZooKeeperHolder.CloseableCuratorFramework closeableCuratorFramework;
-    private final String closeSubscriptionStreamPath;
+    private final String closePath;
 
     public AbstractZkSubscriptionClient(
             final String subscriptionId,
             final ZooKeeperHolder.CloseableCuratorFramework closeableCuratorFramework) throws ZookeeperException {
         this.subscriptionId = subscriptionId;
         this.closeableCuratorFramework = closeableCuratorFramework;
-        this.closeSubscriptionStreamPath = getSubscriptionPath("/close_subscription_stream");
+        this.closePath = getSubscriptionPath(NODE_CLOSE);
     }
 
     protected CuratorFramework getCurator() {
@@ -257,21 +258,35 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
     @Override
     public final boolean isCloseSubscriptionStreamsInProgress() {
         try {
-            return getCurator().checkExists().forPath(closeSubscriptionStreamPath) != null;
-        } catch (final Exception e) {
-            // nothing in the path
+            return !getCurator().getChildren().forPath(closePath).isEmpty();
+        } catch (final KeeperException.NoNodeException ex) {
+            // it's fine
         }
         return false;
     }
 
     @Override
-    public final ZkSubscription<Optional<CloseStreamData>> subscribeForStreamClose(final Runnable listener)
+    public final Set<String> getStreamIdsToClose() /*throws ZookeeperException*/ {
+        try {
+            final byte[] data = getCurator().getData().forPath(closePath + "/sessions");
+            if (data != null) {
+                return deserializeCloseStreamData(data).getStreamIdsToClose();
+            }
+        } catch (final KeeperException.NoNodeException ex) {
+            // it's fine
+        }
+        return Collection.emptySet();
+    }
+
+    @Override
+    public final ZkSubscription<List<String>> subscribeForStreamClose(final Runnable listener)
             throws NakadiRuntimeException {
-        return new ZkSubscriptionImpl.ZkSubscriptionValueImpl<>(
-                getCurator(),
-                listener,
-                this::deserializeCloseStreamData,
-                closeSubscriptionStreamPath);
+        try {
+            getCurator().create().forPath(closePath);
+        } catch (KeeperException.NodeExistsException ex) {
+            // ignore: the node is already there
+        }
+        return new ZkSubscriptionImpl.ZkSubscriptionChildrenImpl<>(getCurator(), listener, closePath);
     }
 
     @Override
@@ -308,7 +323,7 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
             throws OperationTimeoutException, ZookeeperException, OperationInterruptedException,
             RequestInProgressException {
 
-        closeSubscriptionStreamsInternal(Collections.emptySet(), action, timeout);
+        closeSubscriptionStreamsInternal(null, action, timeout);
     }
 
     private void closeSubscriptionStreamsInternal(
@@ -317,17 +332,20 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
             RequestInProgressException {
 
         ZkSubscription<List<String>> sessionsListener = null;
-        boolean closeWasAlreadyInitiated = false;
+        boolean nodeAlreadyExists = false;
+        String nodePath = null;
         try {
             if (streamIdsToClose == null) {
+                nodePath = closePath + "/all";
                 getCurator().create()
                         .withMode(CreateMode.EPHEMERAL)
-                        .forPath(closeSubscriptionStreamPath);
+                        .forPath(nodePath);
             } else {
                 final byte[] data = serializeCloseStreamData(new CloseStreamData(streamIdsToClose));
+                nodePath = closePath + "/sessions";
                 getCurator().create()
                         .withMode(CreateMode.EPHEMERAL)
-                        .forPath(closeSubscriptionStreamPath, data);
+                        .forPath(nodePath, data);
             }
 
             final AtomicBoolean sessionsChanged = new AtomicBoolean(true);
@@ -354,7 +372,7 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
             Thread.currentThread().interrupt();
             throw new OperationInterruptedException("Closing subscription streams is interrupted", e);
         } catch (final KeeperException.NodeExistsException e) {
-            closeWasAlreadyInitiated = true;
+            nodeAlreadyExists = true;
             throw new RequestInProgressException("Streams closing is already in progress for the subscription", e);
         } catch (final KeeperException.NoNodeException e) {
             throw new UnableProcessException("Impossible to close streams for subscription", e);
@@ -366,8 +384,9 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
                 sessionsListener.close();
             }
             try {
-                if (!closeWasAlreadyInitiated) {
-                    getCurator().delete().forPath(closeSubscriptionStreamPath);
+                // delete the node unless it was there before we tried to create it
+                if (nodePath != null && !nodeAlreadyExists) {
+                    getCurator().delete().forPath(nodePath);
                 }
             } catch (final Exception e) {
                 LOG.error(e.getMessage(), e);

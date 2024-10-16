@@ -246,7 +246,7 @@ public class CursorsService {
                 if (cursorsResetAffectsActiveSessions(node, newCursors)) {
                     // we add one second to the commit timeout in order to give time to finish reset if there are some
                     // uncommitted events
-                    zkClient.closeSubscriptionStreams(
+                    zkClient.closeAllSubscriptionStreams(
                             doResetCursors,
                             TimeUnit.SECONDS.toMillis(nakadiSettings.getMaxCommitTimeout() + 1));
                 } else {

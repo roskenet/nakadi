@@ -152,15 +152,18 @@ class StreamingState extends State {
     }
 
     private void closeSubscriptionStreamCallback() {
-        final Optional<CloseStreamData> data = streamCloseSubscription.getData();
-        if (data.isPresent() && !data.get().getStreamIdsToClose().contains(getSessionId().toLowerCase())) {
-            LOG.debug("Got notified of a stream close request {}, but my stream is not affected - ignoring it.",
-                    data.get());
-            return;
+        final List<String> childrenNodes = streamCloseSubscription.getData();
+        if (childrenNodes.contains("all")
+                || childrenNodes.contains("sessions")
+                && getZk().getStreamIdsToClose().contains(getSessionId().toLowerCase())) {
+
+            final String message = "Resetting subscription cursors"; // TODO: that's a lie, but we don't know any better
+            sendMetadata(message);
+            shutdownGracefully(message);
         }
-        final String message = "Resetting subscription cursors"; // TODO: that's a lie, but we don't know any better
-        sendMetadata(message);
-        shutdownGracefully(message);
+
+        LOG.debug("Got notified of a stream close request {}, but my stream is not affected - ignoring it.",
+                childrenNodes);
     }
 
     private void checkCommitTimeout() {
@@ -555,6 +558,16 @@ class StreamingState extends State {
                 new HashSet<>(offsets.keySet()).forEach(this::removeFromStreaming);
             }
         }
+        if (null != streamCloseSubscription) {
+            try {
+                streamCloseSubscription.close();
+            } catch (final RuntimeException ex) {
+                LOG.warn("Failed to cancel stream close subscription", ex);
+            } finally {
+                streamCloseSubscription = null;
+            }
+        }
+
         if (null != eventConsumer) {
             try {
                 eventConsumer.close();
@@ -563,14 +576,6 @@ class StreamingState extends State {
             } finally {
                 eventConsumer = null;
             }
-        }
-
-        if (streamCloseSubscription != null) {
-            try {
-                streamCloseSubscription.close();
-            } catch (IOException ignore) {
-            }
-            streamCloseSubscription = null;
         }
     }
 

@@ -160,9 +160,9 @@ public interface ZkSubscriptionClient extends Closeable {
      * Subscribes for subscription stream close event.
      *
      * @param listener callback which is called when some (or all) streams are requested close
-     * @return {@link Closeable}
+     * @return {@link ZkSubscription}
      */
-    ZkSubscription<Optional<CloseStreamData>> subscribeForStreamClose(Runnable listener) throws NakadiRuntimeException;
+    ZkSubscription<List<String>> subscribeForStreamClose(Runnable listener) throws NakadiRuntimeException;
 
     /**
      * Extends topology for subscription after event type partitions increased
@@ -182,16 +182,12 @@ public interface ZkSubscriptionClient extends Closeable {
     boolean isCloseSubscriptionStreamsInProgress();
 
     /**
+     * Gets the current set of streams requested to close explicitly.
+     */
+    Set<String> getStreamIdsToClose() /*throws ZookeeperException*/;
+
+    /**
      * Close subscription streams and perform provided action when streams are closed.
-     *
-     * Specifically the steps taken are:
-     *
-     *   1. It creates a /subscriptions/{SID}/close_subscription_stream znode - thus signaling to all the
-     *      consumers that they should terminate
-     *   2. waits for the session count on this subscription to go down to zero
-     *   3. executes the action
-     *   4. deletes the /subscriptions/{SID}/close_subscription_stream znode - thus making the subscription available
-     *      to the consumers again
      *
      * @param streamIdsToClose the set of stream ids that should be closed
      * @param action           perform action once streams are closed

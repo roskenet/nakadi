@@ -45,10 +45,14 @@ import static com.google.common.base.Charsets.UTF_8;
  * +- subscriptions
  *   +- {subscription_id}
  *     |- state                             // Node for initialization finish tracking.
- *     |- close_subscription_stream         // Optional node, presence of which indicates that an exclusive operation
- *     |                                    // (such as cursor reset or repartitioning) is in progress.
- *     |                                    // During this time no new streams can be created, and all existing
- *     |                                    // streaming sessions are being terminated.
+ *     |
+ *     |- close                             // Persistent node used to subscribe by open sessions for requests to close.
+ *     | |- all                             //   Ephemeral node created to request all currently open sessions to close.
+ *     | |- sessions                        //   Ephemeral node created to request selected sessions to close
+ *     |                                    //   (contains the set of sessions in the node data).
+ *     |                                    //
+ *     |                                    // As long as there are nodes under `/close`, no new sessions can be created.
+ *     |
  *     |- sessions                          // Node contains list of active sessions
  *     | |- {session_1}                     // Ephemeral node of session_1
  *     | |- ....

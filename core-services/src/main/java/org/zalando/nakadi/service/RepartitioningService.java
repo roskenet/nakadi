@@ -198,8 +198,7 @@ public class RepartitioningService {
                     NakadiCursor.of(timelineService.getActiveTimeline(eventTypeName), null, "-1"));
             zkClient.repartitionTopology(eventTypeName, partitions, cursor.getOffset());
 
-            // TODO: closeAllSubscriptionStreams
-            zkClient.closeSubscriptionStreams(
+            zkClient.closeAllSubscriptionStreams(
                     () -> LOG.info("subscription streams were closed, after repartitioning"),
                     TimeUnit.SECONDS.toMillis(nakadiSettings.getMaxCommitTimeout()));
         } finally {
