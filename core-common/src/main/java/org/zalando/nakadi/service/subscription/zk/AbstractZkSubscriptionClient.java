@@ -56,14 +56,14 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
 
     private final String subscriptionId;
     private final ZooKeeperHolder.CloseableCuratorFramework closeableCuratorFramework;
-    private final String closeSubscriptionStream;
+    private final String closeSubscriptionStreamPath;
 
     public AbstractZkSubscriptionClient(
             final String subscriptionId,
             final ZooKeeperHolder.CloseableCuratorFramework closeableCuratorFramework) throws ZookeeperException {
         this.subscriptionId = subscriptionId;
         this.closeableCuratorFramework = closeableCuratorFramework;
-        this.closeSubscriptionStream = getSubscriptionPath("/close_subscription_stream");
+        this.closeSubscriptionStreamPath = getSubscriptionPath("/close_subscription_stream");
     }
 
     protected CuratorFramework getCurator() {
@@ -257,7 +257,7 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
     @Override
     public final boolean isCloseSubscriptionStreamsInProgress() {
         try {
-            return getCurator().checkExists().forPath(closeSubscriptionStream) != null;
+            return getCurator().checkExists().forPath(closeSubscriptionStreamPath) != null;
         } catch (final Exception e) {
             // nothing in the path
         }
@@ -265,24 +265,13 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
     }
 
     @Override
-    public final Closeable subscribeForStreamClose(final Runnable listener)
-            throws NakadiRuntimeException, UnsupportedOperationException {
-        final NodeCache cursorResetCache = new NodeCache(getCurator(), closeSubscriptionStream);
-        cursorResetCache.getListenable().addListener(listener::run);
-
-        try {
-            cursorResetCache.start();
-        } catch (final Exception e) {
-            throw new NakadiRuntimeException(e);
-        }
-
-        return () -> {
-            try {
-                cursorResetCache.close();
-            } catch (final IOException e) {
-                throw new NakadiRuntimeException(e);
-            }
-        };
+    public final ZkSubscription<Optional<CloseStreamData>> subscribeForStreamClose(final Runnable listener)
+            throws NakadiRuntimeException {
+        return new ZkSubscriptionImpl.ZkSubscriptionValueImpl<>(
+                getCurator(),
+                listener,
+                this::deserializeCloseStreamData,
+                closeSubscriptionStreamPath);
     }
 
     @Override
@@ -330,13 +319,15 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
         ZkSubscription<List<String>> sessionsListener = null;
         boolean closeWasAlreadyInitiated = false;
         try {
-            final boolean closeAllStreams = streamIdsToClose.isEmpty();
-            // TODO: fix type
-            final var closeStreamsNode = getCurator().create().withMode(CreateMode.EPHEMERAL);
-            if (closeAllStreams) {
-                closeStreamsNode.forPath(closeSubscriptionStream);
+            if (streamIdsToClose == null) {
+                getCurator().create()
+                        .withMode(CreateMode.EPHEMERAL)
+                        .forPath(closeSubscriptionStreamPath);
             } else {
-                closeStreamsNode.forPath(closeSubscriptionStream, serializeCloseStreamData(new CloseStreamData(streamIdsToClose)));
+                final byte[] data = serializeCloseStreamData(new CloseStreamData(streamIdsToClose));
+                getCurator().create()
+                        .withMode(CreateMode.EPHEMERAL)
+                        .forPath(closeSubscriptionStreamPath, data);
             }
 
             final AtomicBoolean sessionsChanged = new AtomicBoolean(true);
@@ -350,16 +341,9 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
             final long finishAt = System.currentTimeMillis() + timeout;
             while (finishAt > System.currentTimeMillis()) {
                 if (sessionsChanged.compareAndSet(true, false)) {
-                    if (closeAllStreams) {
-                        if (sessionsListener.getData().isEmpty()) {
-                            action.run();
-                            return;
-                        }
-                    } else {
-                        if (isAllExpectedStreamsClosed(sessionsListener.getData(), streamIdsToClose)) {
-                            action.run();
-                            return;
-                        }
+                    if (isAllExpectedStreamsClosed(sessionsListener.getData(), streamIdsToClose)) {
+                        action.run();
+                        return;
                     }
                 }
                 synchronized (sessionsChanged) {
@@ -383,7 +367,7 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
             }
             try {
                 if (!closeWasAlreadyInitiated) {
-                    getCurator().delete().forPath(closeSubscriptionStream);
+                    getCurator().delete().forPath(closeSubscriptionStreamPath);
                 }
             } catch (final Exception e) {
                 LOG.error(e.getMessage(), e);
@@ -394,12 +378,15 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
     }
 
     /**
-     * Expects the stream ids to be all lower-case in the streamIdsToClose.
+     * Expects the stream ids to be all lower-case in the streamIdsToClose set.
+     *
+     * Special case: if streamIdsToClose is null all streams must be closed.
      */
     static boolean isAllExpectedStreamsClosed(final List<String> openStreamIds, final Set<String> streamIdsToClose) {
-        return openStreamIds.stream()
-                .map(String::toLowerCase)
-                .noneMatch(streamIdsToClose::contains);
+        if (streamIdsToClose == null) {
+            return openStreamIds.isEmpty();
+        }
+        return openStreamIds.stream().map(String::toLowerCase).noneMatch(streamIdsToClose::contains);
     }
 
     @Override

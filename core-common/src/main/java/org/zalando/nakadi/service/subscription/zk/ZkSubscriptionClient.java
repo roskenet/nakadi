@@ -7,6 +7,7 @@ import org.zalando.nakadi.exceptions.runtime.NakadiRuntimeException;
 import org.zalando.nakadi.exceptions.runtime.OperationTimeoutException;
 import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableException;
 import org.zalando.nakadi.exceptions.runtime.ZookeeperException;
+import org.zalando.nakadi.service.subscription.model.CloseStreamData;
 import org.zalando.nakadi.service.subscription.model.Partition;
 import org.zalando.nakadi.service.subscription.model.Session;
 import org.zalando.nakadi.view.SubscriptionCursorWithoutToken;
@@ -158,11 +159,10 @@ public interface ZkSubscriptionClient extends Closeable {
     /**
      * Subscribes for subscription stream close event.
      *
-     * @param listener callback which is called when stream is closed
+     * @param listener callback which is called when some (or all) streams are requested close
      * @return {@link Closeable}
      */
-    Closeable subscribeForStreamClose(Runnable listener)
-            throws NakadiRuntimeException, UnsupportedOperationException;
+    ZkSubscription<Optional<CloseStreamData>> subscribeForStreamClose(Runnable listener) throws NakadiRuntimeException;
 
     /**
      * Extends topology for subscription after event type partitions increased

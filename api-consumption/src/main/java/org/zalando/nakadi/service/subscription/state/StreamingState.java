@@ -22,6 +22,7 @@ import org.zalando.nakadi.exceptions.runtime.NakadiRuntimeException;
 import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableException;
 import org.zalando.nakadi.metrics.MetricUtils;
 import org.zalando.nakadi.service.subscription.IdleStreamWatcher;
+import org.zalando.nakadi.service.subscription.model.CloseStreamData;
 import org.zalando.nakadi.service.subscription.model.Partition;
 import org.zalando.nakadi.service.subscription.zk.ZkSubscription;
 import org.zalando.nakadi.service.subscription.zk.ZkSubscriptionClient;
@@ -30,7 +31,6 @@ import org.zalando.nakadi.view.Cursor;
 import org.zalando.nakadi.view.SubscriptionCursor;
 import org.zalando.nakadi.view.SubscriptionCursorWithoutToken;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -70,7 +70,7 @@ class StreamingState extends State {
     // Uncommitted offsets are calculated right on exiting from Streaming state.
     private Map<EventTypePartition, NakadiCursor> uncommittedOffsets;
 
-    private ZkSubscription<CloseStreamData> streamCloseSubscription;
+    private ZkSubscription<Optional<CloseStreamData>> streamCloseSubscription;
     private IdleStreamWatcher idleStreamWatcher;
     private boolean commitTimeoutReached = false;
 
@@ -127,8 +127,7 @@ class StreamingState extends State {
         this.lastCommitMillis = System.currentTimeMillis();
         scheduleTask(this::checkCommitTimeout, getParameters().commitTimeoutMillis, TimeUnit.MILLISECONDS);
 
-        streamCloseSubscription = getZk().subscribeForStreamClose(
-                () -> addTask(this::closeSubscriptionStreamCallback));
+        streamCloseSubscription = getZk().subscribeForStreamClose(() -> addTask(this::closeSubscriptionStreamCallback));
     }
 
     private void autocommitPeriodically() {
@@ -153,7 +152,13 @@ class StreamingState extends State {
     }
 
     private void closeSubscriptionStreamCallback() {
-        final String message = "Resetting subscription cursors"; // TODO: that's a lie, but we don't know better
+        final Optional<CloseStreamData> data = streamCloseSubscription.getData();
+        if (data.isPresent() && !data.get().getStreamIdsToClose().contains(getSessionId().toLowerCase())) {
+            LOG.debug("Got notified of a stream close request {}, but my stream is not affected - ignoring it.",
+                    data.get());
+            return;
+        }
+        final String message = "Resetting subscription cursors"; // TODO: that's a lie, but we don't know any better
         sendMetadata(message);
         shutdownGracefully(message);
     }

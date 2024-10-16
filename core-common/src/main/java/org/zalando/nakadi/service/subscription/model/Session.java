@@ -55,7 +55,7 @@ public class Session {
 
         final Session session = (Session) o;
         return weight == session.getWeight()
-                && id.equals(session.getId())
+                && id.equals(session.getId()) // equalsIgnoreCase?
                 && requestedPartitions.equals(session.getRequestedPartitions());
     }
 
