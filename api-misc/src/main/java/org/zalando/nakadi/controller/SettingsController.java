@@ -1,5 +1,6 @@
 package org.zalando.nakadi.controller;
 
+import com.google.common.collect.ImmutableMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.Errors;
@@ -81,7 +82,7 @@ public class SettingsController {
         return ResponseEntity.noContent().build();
     }
 
-    @RequestMapping(value = "/allowlist/applications/{application}", method = RequestMethod.POST)
+    @RequestMapping(value = "/lola/allowlist/applications/{application}", method = RequestMethod.POST)
     public ResponseEntity addToAllowlist(@PathVariable("application") final String application)
             throws ForbiddenOperationException {
         if (!adminService.isAdmin(AuthorizationService.Operation.WRITE)) {
@@ -92,7 +93,7 @@ public class SettingsController {
         return ResponseEntity.ok().build();
     }
 
-    @RequestMapping(value = "/allowlist/applications/{application}", method = RequestMethod.DELETE)
+    @RequestMapping(value = "/lola/allowlist/applications/{application}", method = RequestMethod.DELETE)
     public ResponseEntity removeFromAllowlist(@PathVariable("application") final String application)
             throws ForbiddenOperationException {
         if (!adminService.isAdmin(AuthorizationService.Operation.WRITE)) {
@@ -101,6 +102,16 @@ public class SettingsController {
 
         allowListService.remove(application);
         return ResponseEntity.ok().build();
+    }
+
+    @RequestMapping(value = "/lola/allowlist/applications", method = RequestMethod.GET)
+    public ResponseEntity listAllowlist()
+            throws ForbiddenOperationException {
+        if (!adminService.isAdmin(AuthorizationService.Operation.WRITE)) {
+            throw new ForbiddenOperationException("Admin privileges are required to perform this operation");
+        }
+
+        return ResponseEntity.ok(ImmutableMap.of("items", allowListService.list()));
     }
 
     @RequestMapping(path = "/features", method = RequestMethod.GET)
