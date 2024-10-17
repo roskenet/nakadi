@@ -170,11 +170,10 @@ public class AllowListService {
     public void remove(final String application) throws RuntimeException {
         try {
             final CuratorFramework curator = zooKeeperHolder.get();
-            final ChildData currentData = allowListCache.getCurrentData(
-                    PATH_ALLOWLIST + "/" + application);
+            final String applicationPath = String.format("%s/%s", PATH_ALLOWLIST, application);
+            final ChildData currentData = allowListCache.getCurrentData(applicationPath);
             if (currentData != null) {
-                curator.delete().forPath(
-                        String.format("%s/%s", PATH_ALLOWLIST, application));
+                curator.delete().forPath(applicationPath);
 
                 // danger to lose the audit event fixme
                 auditLogPublisher.publish(
