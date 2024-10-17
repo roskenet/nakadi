@@ -6,6 +6,9 @@ import org.zalando.nakadi.service.subscription.model.Partition;
 import org.zalando.nakadi.utils.TestUtils;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -90,4 +93,30 @@ public class ZkSubscriptionClientTest {
         Assert.assertEquals(first, second);
     }
 
+    @Test
+    public void testAllExpectedStreamsClosedCheck() {
+        Assert.assertTrue(
+                "all streams are closed as expected",
+                AbstractZkSubscriptionClient.isAllExpectedStreamsClosed(Collections.emptyList(), null));
+
+        Assert.assertFalse(
+                "all streams must be closed, but some are open",
+                AbstractZkSubscriptionClient.isAllExpectedStreamsClosed(List.of("b", "c"), null));
+
+        Assert.assertFalse(
+                "both relevant streams are open",
+                AbstractZkSubscriptionClient.isAllExpectedStreamsClosed(List.of("c", "b", "a"), Set.of("a", "b")));
+
+        Assert.assertFalse(
+                "one of the relevant streams still open",
+                AbstractZkSubscriptionClient.isAllExpectedStreamsClosed(List.of("c", "b"), Set.of("a", "b")));
+
+        Assert.assertTrue(
+                "all streams did close",
+                AbstractZkSubscriptionClient.isAllExpectedStreamsClosed(List.of("c"), Set.of("a", "b")));
+
+        Assert.assertFalse(
+                "matching of stream ids is case-insensitive",
+                AbstractZkSubscriptionClient.isAllExpectedStreamsClosed(List.of("d", "c", "B"), Set.of("a", "b")));
+    }
 }

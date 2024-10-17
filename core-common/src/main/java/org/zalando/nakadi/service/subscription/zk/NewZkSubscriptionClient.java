@@ -17,6 +17,7 @@ import org.zalando.nakadi.exceptions.runtime.RebalanceConflictException;
 import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableException;
 import org.zalando.nakadi.exceptions.runtime.ZookeeperException;
 import org.zalando.nakadi.repository.zookeeper.ZooKeeperHolder;
+import org.zalando.nakadi.service.subscription.model.CloseStreamData;
 import org.zalando.nakadi.service.subscription.model.Partition;
 import org.zalando.nakadi.service.subscription.model.Session;
 import org.zalando.nakadi.view.SubscriptionCursorWithoutToken;
@@ -44,10 +45,14 @@ import static com.google.common.base.Charsets.UTF_8;
  * +- subscriptions
  *   +- {subscription_id}
  *     |- state                             // Node for initialization finish tracking.
- *     |- close_subscription_stream         // Optional node, presence of which indicates that an exclusive operation
- *     |                                    // (such as cursor reset or repartitioning) is in progress.
- *     |                                    // During this time no new streams can be created, and all existing
- *     |                                    // streaming sessions are being terminated.
+ *     |
+ *     |- close                             // Persistent node used to subscribe by open sessions for requests to close.
+ *     | |- all                             //   Ephemeral node created to request all currently open sessions to close.
+ *     | |- sessions                        //   Ephemeral node created to request selected sessions to close
+ *     |                                    //   (contains the set of sessions in the node data).
+ *     |                                    //
+ *     |                                    // As long as there are nodes under `/close` no new sessions can be created.
+ *     |
  *     |- sessions                          // Node contains list of active sessions
  *     | |- {session_1}                     // Ephemeral node of session_1
  *     | |- ....
@@ -211,6 +216,24 @@ public class NewZkSubscriptionClient extends AbstractZkSubscriptionClient {
             } catch (final IOException e) {
                 throw new NakadiRuntimeException(e);
             }
+        }
+    }
+
+    protected byte[] serializeCloseStreamData(final CloseStreamData data)
+            throws NakadiRuntimeException {
+        try {
+            return objectMapper.writeValueAsBytes(data);
+        } catch (final JsonProcessingException e) {
+            throw new NakadiRuntimeException(e);
+        }
+    }
+
+    protected CloseStreamData deserializeCloseStreamData(final byte[] closeStreamDataBytes)
+            throws NakadiRuntimeException {
+        try {
+            return objectMapper.readValue(closeStreamDataBytes, CloseStreamData.class);
+        } catch (final IOException e) {
+            throw new NakadiRuntimeException(e);
         }
     }
 

@@ -38,6 +38,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -242,11 +243,12 @@ public class CursorsService {
 
                 // node must be present, as we have initialized it above
                 final ZkSubscriptionNode node = zkClient.getZkSubscriptionNode().get();
-
-                if (cursorsResetAffectsActiveSessions(node, newCursors)) {
+                final Set<String> affectedSessions = findActiveSessionsAffectedByCursorsReset(node, newCursors);
+                if (!affectedSessions.isEmpty()) {
                     // we add one second to the commit timeout in order to give time to finish reset if there are some
                     // uncommitted events
                     zkClient.closeSubscriptionStreams(
+                            affectedSessions,
                             doResetCursors,
                             TimeUnit.SECONDS.toMillis(nakadiSettings.getMaxCommitTimeout() + 1));
                 } else {
@@ -270,12 +272,14 @@ public class CursorsService {
         }
     }
 
-    static boolean cursorsResetAffectsActiveSessions(
+    static Set<String> findActiveSessionsAffectedByCursorsReset(
             final ZkSubscriptionNode node, final Collection<SubscriptionCursorWithoutToken> cursors) {
 
         return cursors.stream()
                 .map(c -> node.getPartitionWithActiveSession(c.getEventType(), c.getPartition()))
-                .anyMatch(Optional::isPresent);
+                .flatMap(Optional::stream)
+                .map(Partition::getSession)
+                .collect(Collectors.toSet());
     }
 
     private void checkCursorsStorageAvailability(final List<NakadiCursor> cursors)

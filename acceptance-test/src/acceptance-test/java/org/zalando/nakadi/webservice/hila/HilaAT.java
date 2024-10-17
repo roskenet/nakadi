@@ -537,7 +537,7 @@ public class HilaAT extends BaseAT {
     }
 
     @Test(timeout = 15000)
-    public void whenResetCursorsOfAssignedPartitionsThenAllStreamsClosed() throws Exception {
+    public void whenResetCursorsOfAssignedPartitionsThenOnlyAffectedStreamsClosed() throws Exception {
         final EventType eventType = NakadiTestUtils.createBusinessEventTypeWithPartitions(2);
         final Subscription subscription = createSubscription(
                 RandomSubscriptionBuilder.builder()
@@ -548,7 +548,7 @@ public class HilaAT extends BaseAT {
         publishBusinessEventWithUserDefinedPartition(
                 eventType.getName(), 50, i -> "{\"foo\":\"bar\"}", i -> String.valueOf(i % 2));
 
-        final TestStreamingClient client0 = new TestStreamingClient(URL, subscription.getId(), "",
+        final TestStreamingClient client0 = new TestStreamingClient(URL, subscription.getId(), "stream_timeout=5",
                 Optional.empty(),
                 Optional.of("{\"partitions\":[{\"event_type\":\"" + eventType.getName() + "\",\"partition\":\"0\"}]}"));
         client0.start();
@@ -574,7 +574,7 @@ public class HilaAT extends BaseAT {
         waitFor(() -> Assert.assertFalse(client0.isRunning()));
         Assert.assertTrue(
                 client0.getJsonBatches().stream()
-                .anyMatch(streamBatch -> streamBatch.getMetadata() != null
+                .noneMatch(streamBatch -> streamBatch.getMetadata() != null
                         && streamBatch.getMetadata().getDebug().equals("Resetting subscription cursors")));
     }
 

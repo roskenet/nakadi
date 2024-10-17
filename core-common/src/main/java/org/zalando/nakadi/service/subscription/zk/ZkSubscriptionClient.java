@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
@@ -157,11 +158,10 @@ public interface ZkSubscriptionClient extends Closeable {
     /**
      * Subscribes for subscription stream close event.
      *
-     * @param listener callback which is called when stream is closed
-     * @return {@link Closeable}
+     * @param listener callback which is called when some (or all) streams are requested close
+     * @return {@link ZkSubscription}
      */
-    Closeable subscribeForStreamClose(Runnable listener)
-            throws NakadiRuntimeException, UnsupportedOperationException;
+    ZkSubscription<List<String>> subscribeForStreamClose(Runnable listener) throws NakadiRuntimeException;
 
     /**
      * Extends topology for subscription after event type partitions increased
@@ -181,24 +181,24 @@ public interface ZkSubscriptionClient extends Closeable {
     boolean isCloseSubscriptionStreamsInProgress();
 
     /**
+     * Gets the current set of streams requested to close explicitly.
+     */
+    Set<String> getStreamIdsToClose() /*throws ZookeeperException*/;
+
+    /**
      * Close subscription streams and perform provided action when streams are closed.
      *
-     * Specifically the steps taken are:
-     *
-     *   1. It creates a /subscriptions/{SID}/close_subscription_stream znode - thus signaling to all the
-     *      consumers that they should terminate
-     *   2. waits for the session count on this subscription to go down to zero
-     *   3. executes the action
-     *   4. deletes the /subscriptions/{SID}/close_subscription_stream znode - thus making the subscription available
-     *      to the consumers again
-     *
-     * @param action  perform action once streams are closed
-     * @param timeout maximum amount of time it will wait for the session count to go down to 0.
-     *                If exceeded an OperationTimeoutException is thrown.
+     * @param streamIdsToClose the set of stream ids that should be closed
+     * @param action           perform action once streams are closed
+     * @param timeout          maximum amount of time it will wait for the session count to go down to 0.
+     *                         If exceeded an OperationTimeoutException is thrown.
      * @throws OperationTimeoutException
      * @throws ZookeeperException
      */
-    void closeSubscriptionStreams(Runnable action, long timeout)
+    void closeSubscriptionStreams(Set<String> streamIdsToClose, Runnable action, long timeout)
+            throws OperationTimeoutException, ZookeeperException;
+
+    void closeAllSubscriptionStreams(Runnable action, long timeout)
             throws OperationTimeoutException, ZookeeperException;
 
     class Topology {

@@ -30,7 +30,6 @@ import org.zalando.nakadi.view.Cursor;
 import org.zalando.nakadi.view.SubscriptionCursor;
 import org.zalando.nakadi.view.SubscriptionCursorWithoutToken;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -69,7 +68,8 @@ class StreamingState extends State {
     private Meter bytesSentMeterPerSubscription;
     // Uncommitted offsets are calculated right on exiting from Streaming state.
     private Map<EventTypePartition, NakadiCursor> uncommittedOffsets;
-    private Closeable cursorResetSubscription;
+
+    private ZkSubscription<List<String>> streamCloseSubscription;
     private IdleStreamWatcher idleStreamWatcher;
     private boolean commitTimeoutReached = false;
 
@@ -126,8 +126,7 @@ class StreamingState extends State {
         this.lastCommitMillis = System.currentTimeMillis();
         scheduleTask(this::checkCommitTimeout, getParameters().commitTimeoutMillis, TimeUnit.MILLISECONDS);
 
-        cursorResetSubscription = getZk().subscribeForStreamClose(
-                () -> addTask(this::resetSubscriptionCursorsCallback));
+        streamCloseSubscription = getZk().subscribeForStreamClose(() -> addTask(this::closeSubscriptionStreamCallback));
     }
 
     private void autocommitPeriodically() {
@@ -151,10 +150,19 @@ class StreamingState extends State {
         }
     }
 
-    private void resetSubscriptionCursorsCallback() {
-        final String message = "Resetting subscription cursors";
-        sendMetadata(message);
-        shutdownGracefully(message);
+    private void closeSubscriptionStreamCallback() {
+        final List<String> childrenNodes = streamCloseSubscription.getData();
+        if (childrenNodes.contains("all")
+                || childrenNodes.contains("sessions")
+                && getZk().getStreamIdsToClose().contains(getSessionId().toLowerCase())) {
+
+            final String message = "Resetting subscription cursors"; // TODO: that's a lie, but we don't know any better
+            sendMetadata(message);
+            shutdownGracefully(message);
+        }
+
+        LOG.debug("Got notified of a stream close request {}, but my stream is not affected - ignoring it.",
+                childrenNodes);
     }
 
     private void checkCommitTimeout() {
@@ -549,6 +557,16 @@ class StreamingState extends State {
                 new HashSet<>(offsets.keySet()).forEach(this::removeFromStreaming);
             }
         }
+        if (null != streamCloseSubscription) {
+            try {
+                streamCloseSubscription.close();
+            } catch (final RuntimeException ex) {
+                LOG.warn("Failed to cancel stream close subscription", ex);
+            } finally {
+                streamCloseSubscription = null;
+            }
+        }
+
         if (null != eventConsumer) {
             try {
                 eventConsumer.close();
@@ -557,14 +575,6 @@ class StreamingState extends State {
             } finally {
                 eventConsumer = null;
             }
-        }
-
-        if (cursorResetSubscription != null) {
-            try {
-                cursorResetSubscription.close();
-            } catch (IOException ignore) {
-            }
-            cursorResetSubscription = null;
         }
     }
 
