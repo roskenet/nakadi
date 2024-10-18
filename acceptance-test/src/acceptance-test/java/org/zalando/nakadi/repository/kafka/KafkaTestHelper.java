@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.zalando.nakadi.repository.kafka.KafkaCursor.toKafkaOffset;
@@ -51,17 +52,16 @@ public class KafkaTestHelper {
 
     public void writeMessageToPartition(final String partition, final String topic, final String message)
             throws ExecutionException, InterruptedException {
-        final String messageToSend = String.format("\"%s\"", message);
         final ProducerRecord<byte[], byte[]> producerRecord = new ProducerRecord<>(topic, Integer.parseInt(partition),
-                "someKey".getBytes(StandardCharsets.UTF_8), messageToSend.getBytes(StandardCharsets.UTF_8));
+                "someKey".getBytes(StandardCharsets.UTF_8), message.getBytes(StandardCharsets.UTF_8));
         createProducer().send(producerRecord).get();
     }
 
-    public void writeMultipleMessageToPartition(final String partition, final String topic, final String message,
+    public void writeMultipleMessageToPartition(final String partition, final String topic, final Function<Integer, String> message,
                                                 final int times)
             throws ExecutionException, InterruptedException {
         for (int i = 0; i < times; i++) {
-            writeMessageToPartition(partition, topic, message);
+            writeMessageToPartition(partition, topic, message.apply(i));
         }
     }
 
