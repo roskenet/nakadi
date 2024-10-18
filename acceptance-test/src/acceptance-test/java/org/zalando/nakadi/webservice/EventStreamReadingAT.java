@@ -2,11 +2,13 @@ package org.zalando.nakadi.webservice;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Sets;
 import com.jayway.restassured.RestAssured;
+import com.jayway.restassured.http.ContentType;
 import com.jayway.restassured.response.Header;
 import com.jayway.restassured.response.Response;
 import org.hamcrest.Matchers;
@@ -36,10 +38,13 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.MessageFormat;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -50,6 +55,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.jayway.restassured.RestAssured.given;
 import static java.text.MessageFormat.format;
 import static java.util.stream.IntStream.range;
 
@@ -519,6 +525,61 @@ public class EventStreamReadingAT extends BaseAT {
         }
     }
 
+    @Test(timeout = 10000)
+    @SuppressWarnings("unchecked")
+    public void whenConsumeEventsDontReceiveEventsWithTestProjectId() {
+        // ARRANGE //
+        // push events to one of the partitions
+        given()
+                .body("[" +
+                        "{" +
+                            "\"metadata\":{" +
+                                "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a0\"," +
+                                "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"" +
+                            "}," +
+                            "\"foo\": \"bar_01\"" +
+                        "}," +
+                        "{" +
+                            "\"metadata\":{" +
+                                "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a1\"," +
+                                "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"," +
+                                "\"test_project_id\":\"beauty-pilot\"" +
+                            "}," +
+                            "\"foo\": \"bar_02\"" +
+                        "}," +
+                        "{" +
+                            "\"metadata\":{" +
+                                "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a2\"," +
+                                "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"" +
+                            "}," +
+                            "\"foo\": \"bar_03\"" +
+                        "}" +
+                        "]")
+                .contentType(ContentType.JSON)
+                .post(MessageFormat.format("/event-types/{0}/events", eventType.getName()))
+                .then()
+                .statusCode(200);
+
+        // ACT //
+        final Response response = readEvents();
+
+        // ASSERT //
+        response.then().statusCode(HttpStatus.OK.value()).header(HttpHeaders.TRANSFER_ENCODING, "chunked");
+
+        final String body = response.print();
+
+        final List<JsonNode> batches = deserializeBatchesJsonNode(body);
+        final Set<String> responseBars = batches.stream()
+                .map(b -> extractBars(b))
+                .flatMap(Set::stream)
+                .collect(Collectors.toSet());
+
+        Assert.assertEquals(
+                Set.of("bar_01", "bar_03"), // notice bar_02 got filtered out
+                responseBars
+        );
+    }
+
 
     private static String createStreamEndpointUrl(final String eventType) {
         return format("/event-types/{0}/events", eventType);
@@ -578,6 +639,33 @@ public class EventStreamReadingAT extends BaseAT {
         } else {
             Assert.assertThat(0, Matchers.equalTo(expectedEventNum));
         }
+    }
+
+
+    @SuppressWarnings("unchecked")
+    private List<JsonNode> deserializeBatchesJsonNode(final String body) {
+        return Arrays
+                .stream(body.split(SEPARATOR))
+                .map(batch -> {
+                    try {
+                        return JSON_MAPPER.readTree(batch);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        Assert.fail("Could not deserialize response from streaming endpoint");
+                        return null;
+                    }
+                })
+                .collect(Collectors.toList());
+    }
+
+    private Set<String> extractBars(final JsonNode batch) {
+        final Set<String> bars = Sets.newHashSet();
+        Optional
+                .ofNullable(batch.get("events"))
+                .map(events -> events.elements())
+                .orElse(Collections.emptyIterator())
+                .forEachRemaining(e -> bars.add(e.get("foo").asText()));
+        return bars;
     }
 
 }
