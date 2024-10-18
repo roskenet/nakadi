@@ -57,8 +57,8 @@ public class KafkaTestHelper {
         createProducer().send(producerRecord).get();
     }
 
-    public void writeMultipleMessageToPartition(final String partition, final String topic, final Function<Integer, String> message,
-                                                final int times)
+    public void writeMultipleMessageToPartition(final String partition, final String topic,
+                                                final Function<Integer, String> message, final int times)
             throws ExecutionException, InterruptedException {
         for (int i = 0; i < times; i++) {
             writeMessageToPartition(partition, topic, message.apply(i));

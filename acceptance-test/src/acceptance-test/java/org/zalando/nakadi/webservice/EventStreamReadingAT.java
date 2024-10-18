@@ -2,7 +2,6 @@ package org.zalando.nakadi.webservice;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Charsets;
@@ -37,7 +36,12 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -51,7 +55,7 @@ import static java.util.stream.IntStream.range;
 
 public class EventStreamReadingAT extends BaseAT {
 
-    private static final ObjectMapper jsonMapper = new ObjectMapper();
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
     private static final String TEST_PARTITION = "0";
     private static final int PARTITIONS_NUM = 8;
@@ -66,8 +70,8 @@ public class EventStreamReadingAT extends BaseAT {
     //   "foo": "bar_<N>"
     // }
     private static final Function<Integer, String> DUMMY_EVENT = i -> {
-        ObjectNode event = jsonMapper.createObjectNode();
-        ObjectNode metadata = jsonMapper.createObjectNode();
+        final ObjectNode event = JSON_MAPPER.createObjectNode();
+        final ObjectNode metadata = JSON_MAPPER.createObjectNode();
         event.set("metadata", metadata);
         metadata.put("eid", UUID.randomUUID().toString());
         metadata.put("occurred_at", "2016-06-14T13:00:00Z");
@@ -101,7 +105,7 @@ public class EventStreamReadingAT extends BaseAT {
         kafkaHelper = new KafkaTestHelper(KAFKA_URL);
         initialCursors = kafkaHelper.getOffsetsToReadFromLatest(topicName);
         kafkaInitialNextOffsets = kafkaHelper.getNextOffsets(topicName);
-        xNakadiCursors = jsonMapper.writeValueAsString(initialCursors);
+        xNakadiCursors = JSON_MAPPER.writeValueAsString(initialCursors);
     }
 
     @Test(timeout = 10000)
@@ -533,7 +537,7 @@ public class EventStreamReadingAT extends BaseAT {
                 .stream(body.split(SEPARATOR))
                 .map(batch -> {
                     try {
-                        return jsonMapper.readValue(batch,
+                        return JSON_MAPPER.readValue(batch,
                                 new TypeReference<HashMap<String, Object>>() {
                                 });
                     } catch (IOException e) {
