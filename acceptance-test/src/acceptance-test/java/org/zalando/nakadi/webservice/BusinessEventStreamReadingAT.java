@@ -73,7 +73,7 @@ public class BusinessEventStreamReadingAT extends BaseAT {
 
     @Test(timeout = 10000)
     @SuppressWarnings("unchecked")
-    public void whenConsumeEventsDontReceiveTestEvents() {
+    public void whenConsumeEventsDontReceiveEventsWithTestProjectId() {
         // ARRANGE //
         // push events to one of the partitions
         given()
