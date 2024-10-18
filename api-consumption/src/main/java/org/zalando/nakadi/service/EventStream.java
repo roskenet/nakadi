@@ -85,8 +85,7 @@ public class EventStream {
                 if (consumedEvents.isEmpty()) {
                     final List<ConsumedEvent> eventsFromKafka = eventConsumer.readEvents();
                     for (final ConsumedEvent evt : eventsFromKafka) {
-                        if (evt.getConsumerTags().containsKey(HeaderTag.CONSUMER_SUBSCRIPTION_ID)
-                                || eventStreamChecks.isConsumptionBlocked(evt)) {
+                        if (shouldEventBeDiscarded(evt)) {
                             continue;
                         }
                         consumedEvents.add(evt);
@@ -183,6 +182,14 @@ public class EventStream {
         } finally {
             kpiCollector.sendKpi();
         }
+    }
+
+    private boolean shouldEventBeDiscarded(final ConsumedEvent evt) {
+        return evt.getConsumerTags().containsKey(HeaderTag.CONSUMER_SUBSCRIPTION_ID)
+                // the default behavior in HILA is to discard test events,
+                // despite not allowing you to opt-in
+                || evt.getTestProjectIdHeader().isPresent()
+                || eventStreamChecks.isConsumptionBlocked(evt);
     }
 
     private boolean isMemoryLimitReached(final long memoryUsed) {
