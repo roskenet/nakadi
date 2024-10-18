@@ -82,7 +82,7 @@ public class SettingsController {
         return ResponseEntity.noContent().build();
     }
 
-    @RequestMapping(value = "/lola/allowlist/applications/{application}", method = RequestMethod.POST)
+    @RequestMapping(value = "/lola/allowlist/applications/{application}", method = RequestMethod.PUT)
     public ResponseEntity addToAllowlist(@PathVariable("application") final String application)
             throws ForbiddenOperationException {
         if (!adminService.isAdmin(AuthorizationService.Operation.WRITE)) {
@@ -107,7 +107,7 @@ public class SettingsController {
     @RequestMapping(value = "/lola/allowlist/applications", method = RequestMethod.GET)
     public ResponseEntity listAllowlist()
             throws ForbiddenOperationException {
-        if (!adminService.isAdmin(AuthorizationService.Operation.WRITE)) {
+        if (!adminService.isAdmin(AuthorizationService.Operation.READ)) {
             throw new ForbiddenOperationException("Admin privileges are required to perform this operation");
         }
 
