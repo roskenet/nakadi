@@ -186,10 +186,10 @@ public class EventStream {
 
     private boolean shouldEventBeDiscarded(final ConsumedEvent evt) {
         return evt.getConsumerTags().containsKey(HeaderTag.CONSUMER_SUBSCRIPTION_ID)
-                || eventStreamChecks.isConsumptionBlocked(evt)
                 // the default behavior in HILA is to discard test events,
                 // despite not allowing you to opt-in
-                || evt.getTestProjectIdHeader().isPresent();
+                || evt.getTestProjectIdHeader().isPresent()
+                || eventStreamChecks.isConsumptionBlocked(evt);
     }
 
     private boolean isMemoryLimitReached(final long memoryUsed) {
