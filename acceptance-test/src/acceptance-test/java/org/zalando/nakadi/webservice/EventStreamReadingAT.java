@@ -2,10 +2,13 @@ package org.zalando.nakadi.webservice;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Sets;
 import com.jayway.restassured.RestAssured;
+import com.jayway.restassured.http.ContentType;
 import com.jayway.restassured.response.Header;
 import com.jayway.restassured.response.Response;
 import org.hamcrest.Matchers;
@@ -16,6 +19,8 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.zalando.nakadi.domain.EnrichmentStrategyDescriptor;
+import org.zalando.nakadi.domain.EventCategory;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.EventTypeStatistics;
 import org.zalando.nakadi.repository.kafka.KafkaTestHelper;
@@ -33,33 +38,56 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.MessageFormat;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.jayway.restassured.RestAssured.given;
 import static java.text.MessageFormat.format;
 import static java.util.stream.IntStream.range;
 
 public class EventStreamReadingAT extends BaseAT {
 
+    private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
+
     private static final String TEST_PARTITION = "0";
     private static final int PARTITIONS_NUM = 8;
-    private static final String DUMMY_EVENT = "Dummy";
     private static final String SEPARATOR = "\n";
+
+    // Dummy events to push to Kafka
+    // {
+    //   "metadata": {
+    //     "eid": "d3b3b3b3-3b3b-3b3b-3b3b-3b3b3b3b3b3b",
+    //     "occurred_at": "2016-06-14T13:00:00Z"
+    //   },
+    //   "foo": "bar_<N>"
+    // }
+    private static final Function<Integer, String> DUMMY_EVENT = i -> {
+        final ObjectNode event = JSON_MAPPER.createObjectNode();
+        final ObjectNode metadata = JSON_MAPPER.createObjectNode();
+        event.set("metadata", metadata);
+        metadata.put("eid", UUID.randomUUID().toString());
+        metadata.put("occurred_at", "2016-06-14T13:00:00Z");
+        event.put("foo", "bar_" + i);
+        return event.toString();
+    };
 
     private static String streamEndpoint;
     private static String topicName;
     private static EventType eventType;
-
-    private final ObjectMapper jsonMapper = new ObjectMapper();
     private KafkaTestHelper kafkaHelper;
     private String xNakadiCursors;
     private List<Cursor> initialCursors;
@@ -68,6 +96,8 @@ public class EventStreamReadingAT extends BaseAT {
     @BeforeClass
     public static void setupClass() throws JsonProcessingException {
         eventType = EventTypeTestBuilder.builder()
+                .category(EventCategory.BUSINESS)
+                .enrichmentStrategies(Arrays.asList(EnrichmentStrategyDescriptor.METADATA_ENRICHMENT))
                 .defaultStatistic(new EventTypeStatistics(PARTITIONS_NUM, PARTITIONS_NUM))
                 .build();
         NakadiTestUtils.createEventTypeInNakadi(eventType);
@@ -81,7 +111,7 @@ public class EventStreamReadingAT extends BaseAT {
         kafkaHelper = new KafkaTestHelper(KAFKA_URL);
         initialCursors = kafkaHelper.getOffsetsToReadFromLatest(topicName);
         kafkaInitialNextOffsets = kafkaHelper.getNextOffsets(topicName);
-        xNakadiCursors = jsonMapper.writeValueAsString(initialCursors);
+        xNakadiCursors = JSON_MAPPER.writeValueAsString(initialCursors);
     }
 
     @Test(timeout = 10000)
@@ -105,7 +135,7 @@ public class EventStreamReadingAT extends BaseAT {
 
         // validate amount of batches and structure of each batch
         Assert.assertThat(batches, Matchers.hasSize(PARTITIONS_NUM));
-        batches.forEach(batch -> validateBatchStructure(batch, DUMMY_EVENT));
+        batches.forEach(batch -> validateBatchStructure(batch));
 
         // find the batch where we expect to see the messages we pushed
         final Map<String, Object> batchToCheck = batches
@@ -179,7 +209,7 @@ public class EventStreamReadingAT extends BaseAT {
         // validate amount of batches and structure of each batch
         // for partition with events we should get 2 batches
         Assert.assertThat(batches, Matchers.hasSize(PARTITIONS_NUM + 1));
-        batches.forEach(batch -> validateBatchStructure(batch, DUMMY_EVENT));
+        batches.forEach(batch -> validateBatchStructure(batch));
 
         // find the batches where we expect to see the messages we pushed
         final List<Map<String, Object>> batchesToCheck = batches
@@ -223,7 +253,7 @@ public class EventStreamReadingAT extends BaseAT {
 
         // validate amount of batches and structure of each batch
         Assert.assertThat(batches, Matchers.hasSize(PARTITIONS_NUM));
-        batches.forEach(batch -> validateBatchStructure(batch, DUMMY_EVENT));
+        batches.forEach(batch -> validateBatchStructure(batch));
 
         // validate that the latest offsets in batches correspond to the newest offsets
         final Set<Cursor> offsets = batches
@@ -255,7 +285,7 @@ public class EventStreamReadingAT extends BaseAT {
 
         // validate amount of batches and structure of each batch
         Assert.assertThat(batches, Matchers.hasSize(PARTITIONS_NUM * keepAliveLimit));
-        batches.forEach(batch -> validateBatchStructure(batch, null));
+        batches.forEach(batch -> validateBatchStructure(batch));
     }
 
     @Test(timeout = 5000)
@@ -495,6 +525,61 @@ public class EventStreamReadingAT extends BaseAT {
         }
     }
 
+    @Test(timeout = 10000)
+    @SuppressWarnings("unchecked")
+    public void whenConsumeEventsDontReceiveEventsWithTestProjectId() {
+        // ARRANGE //
+        // push events to one of the partitions
+        given()
+                .body("[" +
+                        "{" +
+                            "\"metadata\":{" +
+                                "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a0\"," +
+                                "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"" +
+                            "}," +
+                            "\"foo\": \"bar_01\"" +
+                        "}," +
+                        "{" +
+                            "\"metadata\":{" +
+                                "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a1\"," +
+                                "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"," +
+                                "\"test_project_id\":\"beauty-pilot\"" +
+                            "}," +
+                            "\"foo\": \"bar_02\"" +
+                        "}," +
+                        "{" +
+                            "\"metadata\":{" +
+                                "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a2\"," +
+                                "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"" +
+                            "}," +
+                            "\"foo\": \"bar_03\"" +
+                        "}" +
+                        "]")
+                .contentType(ContentType.JSON)
+                .post(MessageFormat.format("/event-types/{0}/events", eventType.getName()))
+                .then()
+                .statusCode(200);
+
+        // ACT //
+        final Response response = readEvents();
+
+        // ASSERT //
+        response.then().statusCode(HttpStatus.OK.value()).header(HttpHeaders.TRANSFER_ENCODING, "chunked");
+
+        final String body = response.print();
+
+        final List<JsonNode> batches = deserializeBatchesJsonNode(body);
+        final Set<String> responseBars = batches.stream()
+                .map(b -> extractBars(b))
+                .flatMap(Set::stream)
+                .collect(Collectors.toSet());
+
+        Assert.assertEquals(
+                Set.of("bar_01", "bar_03"), // notice bar_02 got filtered out
+                responseBars
+        );
+    }
+
 
     private static String createStreamEndpointUrl(final String eventType) {
         return format("/event-types/{0}/events", eventType);
@@ -513,7 +598,7 @@ public class EventStreamReadingAT extends BaseAT {
                 .stream(body.split(SEPARATOR))
                 .map(batch -> {
                     try {
-                        return jsonMapper.readValue(batch,
+                        return JSON_MAPPER.readValue(batch,
                                 new TypeReference<HashMap<String, Object>>() {
                                 });
                     } catch (IOException e) {
@@ -526,7 +611,7 @@ public class EventStreamReadingAT extends BaseAT {
     }
 
     @SuppressWarnings("unchecked")
-    private void validateBatchStructure(final Map<String, Object> batch, final String expectedEvent) {
+    private void validateBatchStructure(final Map<String, Object> batch) {
         Assert.assertThat(batch, Matchers.hasKey("cursor"));
         final Map<String, String> cursor = (Map<String, String>) batch.get("cursor");
 
@@ -534,8 +619,10 @@ public class EventStreamReadingAT extends BaseAT {
         Assert.assertThat(cursor, Matchers.hasKey("offset"));
 
         if (batch.containsKey("events")) {
-            final List<String> events = (List<String>) batch.get("events");
-            events.forEach(event -> Assert.assertThat(event, Matchers.equalTo(expectedEvent)));
+            final List<Map<String,Object>> events = (List<Map<String,Object>>) batch.get("events");
+            events.forEach(event -> {
+                Assert.assertThat((String) event.get("foo"), Matchers.startsWith("bar_"));
+            });
         }
     }
 
@@ -552,6 +639,33 @@ public class EventStreamReadingAT extends BaseAT {
         } else {
             Assert.assertThat(0, Matchers.equalTo(expectedEventNum));
         }
+    }
+
+
+    @SuppressWarnings("unchecked")
+    private List<JsonNode> deserializeBatchesJsonNode(final String body) {
+        return Arrays
+                .stream(body.split(SEPARATOR))
+                .map(batch -> {
+                    try {
+                        return JSON_MAPPER.readTree(batch);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        Assert.fail("Could not deserialize response from streaming endpoint");
+                        return null;
+                    }
+                })
+                .collect(Collectors.toList());
+    }
+
+    private Set<String> extractBars(final JsonNode batch) {
+        final Set<String> bars = Sets.newHashSet();
+        Optional
+                .ofNullable(batch.get("events"))
+                .map(events -> events.elements())
+                .orElse(Collections.emptyIterator())
+                .forEachRemaining(e -> bars.add(e.get("foo").asText()));
+        return bars;
     }
 
 }
