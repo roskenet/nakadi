@@ -314,8 +314,9 @@ public class UserJourneyAT extends RealEnvironmentAT {
         // read events
         final Response response = requestSpec()
                 .header(new Header("X-nakadi-cursors", "[{\"partition\": \"0\", \"offset\": \"BEGIN\"}]"))
-                .param("batch_limit", "3")
-                .param("stream_limit", "3")
+                // we expect to receive only 2 events since one has a test project id and LOLA discards those
+                .param("batch_limit", "2")
+                .param("stream_limit", "2")
                 .when()
                 .get("/event-types/" + eventTypeNameBusiness + "/events");
 
@@ -541,17 +542,17 @@ public class UserJourneyAT extends RealEnvironmentAT {
     }
 
     private static void validateBusinessEvents(final Response response) {
+        // businessEvent2 is skipped because it has a test project id in the metadata
         final List<JSONObject> expectedBusinessEvents = List.of(
                 new JSONObject(businessEvent1),
-                new JSONObject(businessEvent2),
                 new JSONObject(businessEvent3)
         );
 
         final JSONObject eventFetchResponse = new JSONObject(response.body().asString());
         final JSONArray responseEvents = eventFetchResponse.getJSONArray("events");
-        assertThat(responseEvents.length(), equalTo(3));
+        assertThat(responseEvents.length(), equalTo(expectedBusinessEvents.size()));
 
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < responseEvents.length(); i++) {
             final JSONObject event = responseEvents.getJSONObject(i);
             // we expect the user submitted fields to propagate unaltered
             final JSONObject metadata = event.getJSONObject("metadata");

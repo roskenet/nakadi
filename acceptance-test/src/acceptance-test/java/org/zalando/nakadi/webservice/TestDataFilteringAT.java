@@ -15,8 +15,10 @@ import org.zalando.nakadi.utils.TestUtils;
 import org.zalando.nakadi.webservice.utils.TestStreamingClient;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -35,10 +37,10 @@ public class TestDataFilteringAT extends RealEnvironmentAT {
 
     private String eventTypeNameBusiness;
     private String eventTypeBodyBusiness;
-    private static String businessEvent1;
-    private static String businessEvent2;
-    private static String businessTestEvent1;
-    private static String businessTestEvent2;
+    private static String event1;
+    private static String event2;
+    private static String event3;
+    private static String event4;
     private Subscription subscription;
 
     @Before
@@ -47,10 +49,12 @@ public class TestDataFilteringAT extends RealEnvironmentAT {
         eventTypeBody = getEventTypeJsonFromFile("sample-event-type.json", eventTypeName, owningApp);
         createEventType(eventTypeBody);
 
-        businessEvent1 = getJsonFromResource("business_events/sample_business_event_1.json");
-        businessEvent2 = getJsonFromResource("business_events/sample_business_event_2.json");
-        businessTestEvent1 = getJsonFromResource("business_events/sample_business_event_3.json");
-        businessTestEvent2 = getJsonFromResource("business_events/sample_business_event_4.json");
+        // event2 and event4 have a test project id in the metadata
+        event1 = getJsonFromResource("business_events/sample_business_event_1.json");
+        event2 = getJsonFromResource("business_events/sample_business_event_2.json");
+        event3 = getJsonFromResource("business_events/sample_business_event_3.json");
+        event4 = getJsonFromResource("business_events/sample_business_event_4.json");
+        
         eventTypeNameBusiness = eventTypeName + ".business";
         eventTypeBodyBusiness = getEventTypeJsonFromFile("sample-event-type-business.json",
                 eventTypeNameBusiness, owningApp);
@@ -69,10 +73,7 @@ public class TestDataFilteringAT extends RealEnvironmentAT {
     @Test(timeout = 15000)
     public void testDefaultConfigurationWhenStreamParametersNotProvidedToGetEndpoint() throws IOException {
         // DEFAULT CONFIGURATION over GET
-        final Set<String> expectedEIDsDefault = Set.of(
-                TestUtils.getEventEid(new JSONObject(businessEvent1)),
-                TestUtils.getEventEid(new JSONObject(businessEvent2))
-        );
+        final Set<String> expectedEIDsDefault = getEventEids(event1, event3);
         testEventsFlow(expectedEIDsDefault, "", Optional.empty());
     }
 
@@ -80,9 +81,7 @@ public class TestDataFilteringAT extends RealEnvironmentAT {
     @Test(timeout = 15000)
     public void testDefaultConfigurationWhenStreamParametersNotProvidedToPostEndpoint() throws IOException {
         // DEFAULT CONFIGURATION over POST
-        final Set<String> expectedEIDsDefault = Set.of(
-                TestUtils.getEventEid(new JSONObject(businessEvent1)),
-                TestUtils.getEventEid(new JSONObject(businessEvent2)));
+        final Set<String> expectedEIDsDefault = getEventEids(event1, event3);
         testEventsFlow(expectedEIDsDefault, "", Optional.of("{}"));
     }
 
@@ -90,12 +89,7 @@ public class TestDataFilteringAT extends RealEnvironmentAT {
     @Test(timeout = 15000)
     public void testLiveAndTestConfigurationProvidedToGetEndpoint() throws IOException {
         // LIVE_AND_TEST CONFIGURATION over GET
-        final Set<String> expectedEIDsDefault = Set.of(
-                TestUtils.getEventEid(new JSONObject(businessEvent1)),
-                TestUtils.getEventEid(new JSONObject(businessTestEvent1)),
-                TestUtils.getEventEid(new JSONObject(businessEvent2)),
-                TestUtils.getEventEid(new JSONObject(businessTestEvent2))
-        );
+        final Set<String> expectedEIDsDefault = getEventEids(event1, event2, event3, event4);
         testEventsFlow(expectedEIDsDefault, "test_data_filter=LIVE_AND_TEST", Optional.empty());
     }
 
@@ -103,12 +97,7 @@ public class TestDataFilteringAT extends RealEnvironmentAT {
     @Test(timeout = 15000)
     public void testLiveAndTestConfigurationProvidedToPostEndpoint() throws IOException {
         // LIVE_AND_TEST CONFIGURATION over POST
-        final Set<String> expectedEIDsDefault = Set.of(
-                TestUtils.getEventEid(new JSONObject(businessEvent1)),
-                TestUtils.getEventEid(new JSONObject(businessTestEvent1)),
-                TestUtils.getEventEid(new JSONObject(businessEvent2)),
-                TestUtils.getEventEid(new JSONObject(businessTestEvent2))
-        );
+        final Set<String> expectedEIDsDefault = getEventEids(event1, event2, event3, event4);
         testEventsFlow(expectedEIDsDefault, "", Optional.of("{\"test_data_filter\": \"LIVE_AND_TEST\"}"));
     }
 
@@ -116,10 +105,7 @@ public class TestDataFilteringAT extends RealEnvironmentAT {
     @Test(timeout = 15000)
     public void checkTestOnlyConfigurationProvidedToGetEndpoint() throws IOException {
         // TEST CONFIGURATION over GET
-        final Set<String> expectedEIDsDefault = Set.of(
-                TestUtils.getEventEid(new JSONObject(businessTestEvent1)),
-                TestUtils.getEventEid(new JSONObject(businessTestEvent2))
-        );
+        final Set<String> expectedEIDsDefault = getEventEids(event2, event4);
         testEventsFlow(expectedEIDsDefault, "test_data_filter=TEST", Optional.empty());
     }
 
@@ -127,10 +113,7 @@ public class TestDataFilteringAT extends RealEnvironmentAT {
     @Test(timeout = 1500000)
     public void checkTestOnlyConfigurationProvidedToPostEndpoint() throws IOException {
         // TEST CONFIGURATION over POST
-        final Set<String> expectedEIDsDefault = Set.of(
-                TestUtils.getEventEid(new JSONObject(businessTestEvent1)),
-                TestUtils.getEventEid(new JSONObject(businessTestEvent2))
-        );
+        final Set<String> expectedEIDsDefault = getEventEids(event2, event4);
         testEventsFlow(expectedEIDsDefault, "", Optional.of("{\"test_data_filter\": \"TEST\"}"));
     }
 
@@ -138,10 +121,7 @@ public class TestDataFilteringAT extends RealEnvironmentAT {
     @Test(timeout = 15000)
     public void testLiveOnlyConfigurationProvidedToGetEndpoint() throws IOException {
         // LIVE CONFIGURATION over GET
-        final Set<String> expectedEIDsDefault = Set.of(
-                TestUtils.getEventEid(new JSONObject(businessEvent1)),
-                TestUtils.getEventEid(new JSONObject(businessEvent2))
-        );
+        final Set<String> expectedEIDsDefault = getEventEids(event1, event3);
         testEventsFlow(expectedEIDsDefault, "test_data_filter=LIVE", Optional.empty());
     }
 
@@ -149,9 +129,7 @@ public class TestDataFilteringAT extends RealEnvironmentAT {
     @Test(timeout = 15000)
     public void testLiveOnlyConfigurationProvidedToPostEndpoint() throws IOException {
         // LIVE CONFIGURATION over POST
-        final Set<String> expectedEIDsDefault = Set.of(
-                TestUtils.getEventEid(new JSONObject(businessEvent1)),
-                TestUtils.getEventEid(new JSONObject(businessEvent2)));
+        final Set<String> expectedEIDsDefault = getEventEids(event1, event3);
         testEventsFlow(expectedEIDsDefault, "", Optional.of("{\"test_data_filter\": \"LIVE\"}"));
     }
 
@@ -160,7 +138,7 @@ public class TestDataFilteringAT extends RealEnvironmentAT {
             final String getParams,
             final Optional<String> bodyPayload
     ) throws IOException {
-        postEvents(eventTypeNameBusiness, businessEvent1, businessTestEvent1, businessEvent2, businessTestEvent2);
+        postEvents(eventTypeNameBusiness, event1, event2, event3, event4);
 
         // read events
         // create client and wait till we receive all events
@@ -209,4 +187,12 @@ public class TestDataFilteringAT extends RealEnvironmentAT {
         final String json = getJsonFromResource(resourceName);
         return json.replace("NAME_PLACEHOLDER", eventTypeName).replace("OWNING_APP_PLACEHOLDER", owningApp);
     }
+
+    private static Set<String> getEventEids(final String... events) {
+        return Arrays.stream(events)
+                .map(JSONObject::new)
+                .map(TestUtils::getEventEid)
+                .collect(Collectors.toSet());
+    }
+
 }
