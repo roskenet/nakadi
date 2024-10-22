@@ -4,6 +4,7 @@ import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.TreeCache;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,8 +19,10 @@ import org.zalando.nakadi.service.publishing.NakadiAuditLogPublisher;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -157,6 +160,8 @@ public class AllowListService {
                     NakadiAuditLogPublisher.ResourceType.BLACKLIST_ENTRY,
                     NakadiAuditLogPublisher.ActionType.CREATED,
                     application);
+        } catch (final KeeperException.NodeExistsException e) {
+            // skipping the node is already in place
         } catch (final Exception e) {
             throw new RuntimeException("Issue occurred while creating node in zk", e);
         }
@@ -165,10 +170,10 @@ public class AllowListService {
     public void remove(final String application) throws RuntimeException {
         try {
             final CuratorFramework curator = zooKeeperHolder.get();
-            final ChildData currentData = allowListCache.getCurrentData(application);
+            final String applicationPath = String.format("%s/%s", PATH_ALLOWLIST, application);
+            final ChildData currentData = allowListCache.getCurrentData(applicationPath);
             if (currentData != null) {
-                curator.delete().forPath(
-                        String.format("%s/%s", PATH_ALLOWLIST, application));
+                curator.delete().forPath(applicationPath);
 
                 // danger to lose the audit event fixme
                 auditLogPublisher.publish(
@@ -178,6 +183,21 @@ public class AllowListService {
                         NakadiAuditLogPublisher.ActionType.DELETED,
                         application);
             }
+        } catch (final KeeperException.NoNodeException e) {
+            // skipping the node was deleted or did not exist
+        } catch (final Exception e) {
+            throw new RuntimeException("Issue occurred while deleting node from zk", e);
+        }
+    }
+
+    public Set<String> list() throws RuntimeException {
+        try {
+            final Map<String, ChildData> appsData = allowListCache
+                    .getCurrentChildren(PATH_ALLOWLIST);
+            if (appsData == null) {
+                return Collections.emptySet();
+            }
+            return appsData.keySet();
         } catch (final Exception e) {
             throw new RuntimeException("Issue occurred while deleting node from zk", e);
         }
