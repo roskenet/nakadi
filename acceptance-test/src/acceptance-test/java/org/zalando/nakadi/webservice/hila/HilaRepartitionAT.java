@@ -97,6 +97,19 @@ public class HilaRepartitionAT extends BaseAT {
         }
     }
 
+    @Test(timeout = 5000)
+    public void whenSubscriptionIsNotInitializedThenRepartitionStillWorks() throws Exception {
+        final EventType eventType = NakadiTestUtils.createBusinessEventTypeWithPartitions(1);
+        final Subscription subscription = NakadiTestUtils.createSubscription(
+                RandomSubscriptionBuilder.builder()
+                        .withEventType(eventType.getName())
+                        .withStartFrom(SubscriptionBase.InitialPosition.BEGIN)
+                        .buildSubscriptionBase());
+
+        NakadiTestUtils.repartitionEventType(eventType, 2);
+        // no throw
+    }
+
     @Test(timeout = 30000)
     public void whenEventTypeRepartitionedSubscriptionStartsStreamNewPartitions() throws Exception {
         final EventType eventType = NakadiTestUtils.createBusinessEventTypeWithPartitions(1);

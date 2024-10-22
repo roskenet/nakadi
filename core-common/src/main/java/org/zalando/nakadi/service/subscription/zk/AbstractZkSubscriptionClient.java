@@ -111,6 +111,7 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
     public final void fillEmptySubscription(final Collection<SubscriptionCursorWithoutToken> cursors) {
         try {
             createSessionsZNode();
+            createCloseStreamsZNode();
             createOffsetZNodes(cursors);
             createTopologyZNode(cursors);
             createStateZNodeAsInitialized();
@@ -128,6 +129,16 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
                     .forPath(getSubscriptionPath("/sessions"));
         } catch (final KeeperException.NodeExistsException ex) {
             LOG.info("ZNode for {} exists, not creating new one", getSubscriptionPath("/sessions"));
+        }
+    }
+
+    private void createCloseStreamsZNode() {
+        try {
+            getCurator().create().creatingParentsIfNeeded().forPath(closePath);
+        } catch (KeeperException.NodeExistsException ex) {
+            // ignore: the node is already there
+        } catch (final Exception e) {
+            throw new NakadiRuntimeException(e);
         }
     }
 
@@ -283,13 +294,7 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
     @Override
     public final ZkSubscription<List<String>> subscribeForStreamClose(final Runnable listener)
             throws NakadiRuntimeException {
-        try {
-            getCurator().create().forPath(closePath);
-        } catch (KeeperException.NodeExistsException ex) {
-            // ignore: the node is already there
-        } catch (final Exception e) {
-            throw new NakadiRuntimeException(e);
-        }
+        createCloseStreamsZNode();
         return new ZkSubscriptionImpl.ZkSubscriptionChildrenImpl(getCurator(), listener, closePath);
     }
 
@@ -339,6 +344,9 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
         boolean nodeAlreadyExists = false;
         String nodePath = null;
         try {
+            // ensure that the `/close` node is present for pre-existing subscriptions
+            createCloseStreamsZNode();
+
             if (streamIdsToClose == null) {
                 nodePath = closePath + "/all";
                 getCurator().create()
