@@ -62,12 +62,6 @@ public class ServiceFactoryTest {
                 ServiceFactory.createMerchantRegistryInternal("merchant_url", httpClient, tokenProvider),
                 "merchant"
         });
-        result.add(new Object[]{
-                httpClient,
-                tokenProvider,
-                ServiceFactory.createApplicationRegistryInternal("user_url", httpClient, tokenProvider),
-                "application"
-        });
         return result;
     }
 

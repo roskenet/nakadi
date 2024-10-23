@@ -65,7 +65,7 @@ public class TokenAuthorizationServiceTest {
     @Mock
     private ValueRegistry userRegistry;
     @Mock
-    private ValueRegistry serviceRegistry;
+    private KioService kioService;
     @Mock
     private ValueRegistry merchantRegistry;
     @Mock
@@ -82,7 +82,7 @@ public class TokenAuthorizationServiceTest {
 
         authzService = new TokenAuthorizationService(
                 USERS_TYPE, userRegistry,
-                SERVICES_TYPE, serviceRegistry,
+                SERVICES_TYPE, kioService,
                 BUSINESS_PARTNER_TYPE, merchantRegistry,
                 teamService,
                 opaClient,
@@ -98,7 +98,7 @@ public class TokenAuthorizationServiceTest {
                 .build();
 
         when(principal.isExternal()).thenReturn(false);
-        when(serviceRegistry.isValid(anyString())).thenReturn(true);
+        when(kioService.exists(anyString())).thenReturn(true);
 
         // serviceRegistry should be called, so that mockito is not reporting about isValid not called.
         authzService.isAuthorizationForResourceValid(rb("warmup-mockito", "event-type")
@@ -119,10 +119,10 @@ public class TokenAuthorizationServiceTest {
                 .build();
         when(principal.isExternal()).thenReturn(false);
 
-        when(serviceRegistry.isValid(eq("idonotexist"))).thenReturn(false);
+        when(kioService.exists(eq("idonotexist"))).thenReturn(false);
         assertThrows(AuthorizationInvalidException.class, () -> authzService.isAuthorizationForResourceValid(r));
 
-        when(serviceRegistry.isValid(eq("idonotexist"))).thenReturn(true);
+        when(kioService.exists(eq("idonotexist"))).thenReturn(true);
         authzService.isAuthorizationForResourceValid(r);
     }
 
@@ -142,7 +142,7 @@ public class TokenAuthorizationServiceTest {
         final Resource r = rb("myResource1", "event-type")
                 .add(AuthorizationService.Operation.READ, SERVICES_TYPE, "stups_merchant-uid")
                 .build();
-        when(serviceRegistry.isValid(eq("merchant-uid"))).thenReturn(true);
+        when(kioService.exists(eq("merchant-uid"))).thenReturn(true);
 
         final AuthorizationInvalidException e = assertThrows(
                 AuthorizationInvalidException.class,
@@ -319,7 +319,7 @@ public class TokenAuthorizationServiceTest {
                 .add(AuthorizationService.Operation.READ, "*", "*")
                 .build();
         when(principal.isExternal()).thenReturn(true);
-        when(serviceRegistry.isValid(any())).thenReturn(true);
+        when(kioService.exists(any())).thenReturn(true);
 
         final AuthorizationInvalidException e = assertThrows(AuthorizationInvalidException.class,
                 () -> authzService.isAuthorizationForResourceValid(r));
@@ -333,7 +333,7 @@ public class TokenAuthorizationServiceTest {
                 .add(AuthorizationService.Operation.READ, "services", "stups_nakadi")
                 .build();
 
-        when(serviceRegistry.isValid(eq("nakadi"))).thenReturn(true);
+        when(kioService.exists(eq("nakadi"))).thenReturn(true);
         when(principal.isExternal()).thenReturn(false);
 
         authzService.isAuthorizationForResourceValid(r);

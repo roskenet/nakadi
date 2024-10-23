@@ -12,6 +12,7 @@ import org.junit.Test;
 import org.zalando.nakadi.plugin.auth.utils.Fixture;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -89,7 +90,7 @@ public class ZalandoTeamServiceTest {
     public void getEmptyListWhenZeroMember() throws IOException {
         final var objectMapper = new ObjectMapper();
         final var teamInfo = objectMapper.readTree(Fixture.fixture("/fixtures/aruha-team-response.json"));
-        ((ObjectNode)teamInfo).putNull("member");
+        ((ObjectNode) teamInfo).putNull("member");
 
         WireMock.stubFor(get(urlEqualTo("/api/teams/aruha"))
                 .withHeader("Authorization", equalTo("Bearer " + MOCK_TOKEN))
@@ -100,4 +101,19 @@ public class ZalandoTeamServiceTest {
         assertEquals("Should return 0 members for aruha", 0, members.size());
     }
 
+    @Test
+    public void getOfficialTeamId() throws IOException {
+        final String expectedOfficialTeamId = "50061346";
+        WireMock.stubFor(get(urlEqualTo("/api/teams/aruha"))
+                .withHeader("Authorization", equalTo("Bearer " + MOCK_TOKEN))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withBody(Fixture.fixture("/fixtures/aruha-team-response.json"))));
+        final var actualOfficialTeamId = teamService.getOfficialTeamId("aruha");
+        assertEquals(
+                "Should return official teamId",
+                Optional.of(expectedOfficialTeamId),
+                actualOfficialTeamId
+        );
+    }
 }

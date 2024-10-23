@@ -1,6 +1,5 @@
 package org.zalando.nakadi.plugin.auth;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
 import org.zalando.nakadi.plugin.api.SystemProperties;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
@@ -29,9 +28,9 @@ public class TokenAuthorizationServiceFactory implements AuthorizationServiceFac
         try {
             return new TokenAuthorizationService(
                     usersType, serviceFactory.getOrCreateUserRegistry(),
-                    servicesType, serviceFactory.getOrCreateApplicationRegistry(),
+                    servicesType, serviceFactory.getOrCreateKioService(),
                     businessPartnersType, serviceFactory.getOrCreateMerchantRegistry(),
-                    teamService(serviceFactory),
+                    serviceFactory.getOrCreateZalandoTeamService(),
                     createOpaClient(serviceFactory),
                     merchantUids);
         } catch (URISyntaxException e) {
@@ -68,15 +67,4 @@ public class TokenAuthorizationServiceFactory implements AuthorizationServiceFac
         }
     }
 
-    public ZalandoTeamService teamService(final ServiceFactory serviceFactory) {
-        try {
-            return new ZalandoTeamService(
-                    serviceFactory.getProperty("nakadi.plugins.authz.teams-endpoint"),
-                    serviceFactory.getOrCreateHttpClient(),
-                    serviceFactory.getOrCreateTokenProvider(),
-                    new ObjectMapper());
-        } catch (URISyntaxException e) {
-            throw new PluginException(e);
-        }
-    }
 }

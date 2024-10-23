@@ -64,7 +64,7 @@ public class TokenAuthorizationService implements AuthorizationService {
         put(EVENT_TYPE_RESOURCE, Arrays.asList(Operation.READ.toString()));
     }};
 
-    private final ValueRegistry applicatoinRegistry;
+    private final KioService kioService;
     private final ValueRegistry merchantRegistry;
     private final ValueRegistry userRegistry;
     private final ZalandoTeamService teamService;
@@ -74,7 +74,7 @@ public class TokenAuthorizationService implements AuthorizationService {
     public TokenAuthorizationService(final String usersType,
                                      final ValueRegistry userRegistry,
                                      final String servicesType,
-                                     final ValueRegistry applicationRegistry,
+                                     final KioService kioService,
                                      final String businessPartnersType,
                                      final ValueRegistry merchantRegistry,
                                      final ZalandoTeamService teamService,
@@ -84,7 +84,7 @@ public class TokenAuthorizationService implements AuthorizationService {
         this.servicesType = servicesType;
         this.businessPartnersType = businessPartnersType;
         this.merchantUids = merchantUids;
-        this.applicatoinRegistry = applicationRegistry;
+        this.kioService = kioService;
         this.merchantRegistry = merchantRegistry;
         this.teamService = teamService;
         this.userRegistry = userRegistry;
@@ -275,7 +275,7 @@ public class TokenAuthorizationService implements AuthorizationService {
         if (authorizationAttribute.getDataType().equals(servicesType)) {
             final String serviceName = authorizationAttribute.getValue();
             if (serviceName.startsWith(SERVICE_PREFIX)) {
-                return applicatoinRegistry.isValid(serviceName.substring(SERVICE_PREFIX.length()));
+                return kioService.exists(serviceName.substring(SERVICE_PREFIX.length()));
             } else {
                 // A UUID could be one of the statically created clients used by eg. Lounge.
                 // Cannot be validated, so we have to hope that the user who adds this doesn't make a typo.

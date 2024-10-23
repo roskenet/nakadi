@@ -1,0 +1,22 @@
+{
+  "last_modified": "2024-09-18T14:51:10.512Z",
+  "description": "Nakadi is Zalando's central event bus. It provides event publishing / subscription in a RESTful way with guarantees regarding the quality of the content of events. Each event is of a predefined type with a schema which can be registered and looked up in Nakadi's schema registry.\n\nOn top, Nakadi provides out of the box Data Integration to Zalando's data lake.\n## Components\n### Open policy agent (opa)\nThe `opa` component is meant to detect the retailer_ids of application/token that is publishing or consuming from nakadi. This information is further used to detect ability to publish data with different ownership.\n\n+ **Service URL :** https://nakadi-opa.aruha.svc.cluster.local\n+ **SCM URL :** https://github.bus.zalan.do/aruha/opa ",
+  "documentation_url": "https://nakadi.docs.zalando.net/",
+  "specification_url": "https://github.bus.zalan.do/aruha/team-aruha/issues",
+  "publicly_accessible": false,
+  "service_url": "https://nakadi-live.nakadi.zalan.do",
+  "name": "Nakadi Messaging Bus",
+  "criticality_level": 1,
+  "created": "2015-12-22T15:32:07.280Z",
+  "scm_url": "https://github.bus.zalan.do/aruha/nakadi",
+  "last_modified_by": "fghibellini",
+  "required_approvers": 1,
+  "active": true,
+  "id": "nakadi",
+  "subtitle": "The Nakadi Event Broker Application",
+  "team_id": "aruha",
+  "incident_contact": "Aruha",
+  "created_by": "tomuehl",
+  "specification_type": "github",
+  "support_url": "https://github.bus.zalan.do/aruha/issues/issues/new/choose"
+}

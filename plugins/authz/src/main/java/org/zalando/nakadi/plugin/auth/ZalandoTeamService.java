@@ -67,6 +67,11 @@ public class ZalandoTeamService {
                 .orElse(Collections.emptyList());
     }
 
+    public Optional<String> getOfficialTeamId(final String team) throws PluginException {
+        return fetchTeamInfo(team)
+                .map(teamInfo -> teamInfo.teamId);
+    }
+
     private boolean isTeamInfoValid(final String team, final TeamInfo teamInfo) {
         if (!OFFICIAL_TEAM_TYPE.equals(teamInfo.type)) {
             return false;

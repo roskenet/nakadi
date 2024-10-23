@@ -1,5 +1,6 @@
 package org.zalando.nakadi.plugin.auth;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
@@ -20,8 +21,9 @@ public class ServiceFactory {
     private HttpClient httpClient;
     private TokenProvider tokenProvider;
     private ValueRegistry merchantRegistry;
-    private ValueRegistry applicationRegistry;
     private ValueRegistry userRegistry;
+    private KioService kioService;
+    private ZalandoTeamService zalandoTeamService;
 
     public ServiceFactory(final SystemProperties properties) {
         this.properties = properties;
@@ -99,30 +101,6 @@ public class ServiceFactory {
                 new int[]{HttpStatus.SC_NOT_FOUND, HttpStatus.SC_BAD_REQUEST});
     }
 
-    public ValueRegistry getOrCreateApplicationRegistry()
-            throws URISyntaxException {
-        if (null == applicationRegistry) {
-            applicationRegistry = createApplicationRegistryInternal(
-                    getProperty("nakadi.plugins.authz.services-endpoint"),
-                    getOrCreateHttpClient(),
-                    getOrCreateTokenProvider()
-            );
-        }
-        return applicationRegistry;
-    }
-
-    static ValueRegistry createApplicationRegistryInternal(
-            final String servicesEndpoint, final HttpClient httpClient, final TokenProvider tokenProvider) {
-        return new ValueRegistry.FilteringValueRegistry(
-                new ValueRegistry.PatternFilter(Pattern.compile("^[a-z][a-z0-9-]*[a-z0-9]$")),
-                new ValueRegistry.HttpValidatedValueRegistry(
-                        tokenProvider,
-                        httpClient,
-                        servicesEndpoint,
-                        new int[]{HttpStatus.SC_OK},
-                        new int[]{HttpStatus.SC_NOT_FOUND}));
-    }
-
     public ValueRegistry getOrCreateUserRegistry() throws URISyntaxException {
         if (null == userRegistry) {
             final boolean validatePrincipalExists = Boolean.parseBoolean(
@@ -138,6 +116,36 @@ public class ServiceFactory {
             }
         }
         return userRegistry;
+    }
+
+    public KioService getOrCreateKioService() {
+        if (null == kioService) {
+            try {
+                kioService = new KioService(
+                        getProperty("nakadi.plugins.authz.services-endpoint"),
+                        getOrCreateHttpClient(),
+                        getOrCreateTokenProvider(),
+                        new ObjectMapper());
+            } catch (URISyntaxException e) {
+                throw new PluginException(e);
+            }
+        }
+        return kioService;
+    }
+
+    public ZalandoTeamService getOrCreateZalandoTeamService() {
+        if (null == zalandoTeamService) {
+            try {
+                zalandoTeamService = new ZalandoTeamService(
+                        getProperty("nakadi.plugins.authz.teams-endpoint"),
+                        getOrCreateHttpClient(),
+                        getOrCreateTokenProvider(),
+                        new ObjectMapper());
+            } catch (URISyntaxException e) {
+                throw new PluginException(e);
+            }
+        }
+        return zalandoTeamService;
     }
 
     static ValueRegistry createUserRegistryInternal(
