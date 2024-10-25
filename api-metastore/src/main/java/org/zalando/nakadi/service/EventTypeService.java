@@ -63,7 +63,6 @@ import org.zalando.nakadi.service.timeline.TimelineSync;
 import org.zalando.nakadi.service.validation.EventOwnerValidator;
 import org.zalando.nakadi.service.validation.EventTypeAnnotationsValidator;
 import org.zalando.nakadi.service.validation.EventTypeOptionsValidator;
-import org.zalando.nakadi.view.EventOwnerSelector;
 
 import javax.annotation.Nullable;
 import java.io.Closeable;
@@ -471,9 +470,6 @@ public class EventTypeService {
             validateStatisticsUpdate(original, eventType);
             updateAnnotationsAndLabels(original, eventType);
             eventTypeAnnotationsValidator.validateAnnotations(original, eventTypeBase);
-            if (!isAdmin) {
-                validateEventOwnerSelectorUnchanged(original, eventType);
-            }
             EventOwnerValidator.validateEventOwnerSelector(eventType);
 
             updateRetentionTime(original, eventType);
@@ -653,21 +649,6 @@ public class EventTypeService {
             InvalidEventTypeException {
         if (original.getAudience() != null && eventTypeBase.getAudience() == null) {
             throw new InvalidEventTypeException("event audience must not be set back to null");
-        }
-    }
-
-    private void validateEventOwnerSelectorUnchanged(final EventType original, final EventTypeBase eventTypeBase) throws
-            InvalidEventTypeException {
-        final EventOwnerSelector originalEventOwnerSelector = original.getEventOwnerSelector();
-        final EventOwnerSelector updatedEventOwnerSelector = eventTypeBase.getEventOwnerSelector();
-        if (updatedEventOwnerSelector != null && originalEventOwnerSelector != null) {
-            if (!updatedEventOwnerSelector.equals(originalEventOwnerSelector)) {
-                throw new InvalidEventTypeException(
-                        String.format("event_owner_selector must not be changed, original: %s, updated: %s",
-                                originalEventOwnerSelector.toString(), updatedEventOwnerSelector.toString()));
-            }
-        } else if (updatedEventOwnerSelector == null && originalEventOwnerSelector != null) {
-            throw new InvalidEventTypeException("event_owner_selector can't be set back to null");
         }
     }
 }

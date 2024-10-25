@@ -481,7 +481,7 @@ public class EventTypeControllerTest extends EventTypeControllerTestCase {
     }
 
     @Test
-    public void whenPutWithAChangedEventOwnerSelectorThen422() throws Exception {
+    public void whenPutWithAChangedEventOwnerSelectorThen200() throws Exception {
         final EventType originalEventType = EventTypeTestBuilder.builder()
                 .eventOwnerSelector(new EventOwnerSelector(EventOwnerSelector.Type.STATIC, "team", "aruha"))
                 .build();
@@ -494,7 +494,7 @@ public class EventTypeControllerTest extends EventTypeControllerTestCase {
         doReturn(originalEventType).when(eventTypeRepository).findByName(any());
 
         putEventType(updatedEventType, originalEventType.getName())
-                .andExpect(status().isUnprocessableEntity());
+                .andExpect(status().isOk());
     }
 
     @Test
