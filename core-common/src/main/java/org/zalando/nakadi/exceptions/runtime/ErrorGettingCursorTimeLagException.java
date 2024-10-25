@@ -2,18 +2,14 @@ package org.zalando.nakadi.exceptions.runtime;
 
 import org.zalando.nakadi.domain.NakadiCursor;
 
+import java.util.Optional;
+
 public class ErrorGettingCursorTimeLagException extends NakadiBaseException {
 
-    private final NakadiCursor failedCursor;
-
-    public ErrorGettingCursorTimeLagException(final NakadiCursor failedCursor,
-                                              final Throwable cause) {
-        super("Error occurred when getting subscription time lag as as subscription cursor is wrong or expired: " +
-                failedCursor.toString(), cause);
-        this.failedCursor = failedCursor;
-    }
-
-    public NakadiCursor getFailedCursor() {
-        return failedCursor;
+    public ErrorGettingCursorTimeLagException(
+            final NakadiCursor failedCursor,
+            final Optional<NakadiCursor> endCursor,
+            final Throwable cause) {
+        super("Could not determine time lag: failedCursor=" + failedCursor + "; endCursor=" + endCursor, cause);
     }
 }

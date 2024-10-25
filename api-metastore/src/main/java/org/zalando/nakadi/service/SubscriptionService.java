@@ -378,7 +378,7 @@ public class SubscriptionService {
             if (statsMode == StatsMode.LIGHT) {
                 return loadLightStats(eventTypes, zkSubscriptionNode);
             } else {
-                return loadStats(eventTypes, zkSubscriptionNode, subscriptionClient, statsMode);
+                return loadStats(subscription, eventTypes, zkSubscriptionNode, subscriptionClient, statsMode);
             }
         } catch (IOException io) {
             throw new ServiceTemporarilyUnavailableException(io.getMessage(), io);
@@ -421,6 +421,7 @@ public class SubscriptionService {
     }
 
     private List<SubscriptionEventTypeStats> loadStats(
+            final Subscription subscription,
             final Collection<EventType> eventTypes,
             final Optional<ZkSubscriptionNode> subscriptionNode,
             final ZkSubscriptionClient client, final StatsMode statsMode)
@@ -430,7 +431,7 @@ public class SubscriptionService {
         final List<PartitionEndStatistics> stats = loadPartitionEndStatistics(eventTypes);
 
         final Map<EventTypePartition, Duration> timeLags = statsMode == StatsMode.TIMELAG ?
-                subscriptionTimeLagService.getTimeLags(committedPositions, stats) :
+                subscriptionTimeLagService.getTimeLags(subscription.getId(), committedPositions, stats) :
                 ImmutableMap.of();
 
         for (final EventType eventType : eventTypes) {

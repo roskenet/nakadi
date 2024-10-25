@@ -12,25 +12,23 @@ import org.zalando.nakadi.domain.NakadiCursor;
 import org.zalando.nakadi.domain.PartitionEndStatistics;
 import org.zalando.nakadi.exceptions.runtime.ErrorGettingCursorTimeLagException;
 import org.zalando.nakadi.exceptions.runtime.InconsistentStateException;
-import org.zalando.nakadi.exceptions.runtime.InvalidCursorException;
 import org.zalando.nakadi.service.timeline.HighLevelConsumer;
 import org.zalando.nakadi.service.timeline.TimelineService;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import static org.echocat.jomon.runtime.concurrent.Retryer.executeWithRetry;
 
@@ -55,18 +53,31 @@ public class SubscriptionTimeLagService {
                 new SynchronousQueue<>());
     }
 
-    public Map<EventTypePartition, Duration> getTimeLags(final Collection<NakadiCursor> committedPositions,
-                                                         final List<PartitionEndStatistics> endPositions) {
+    public Map<EventTypePartition, Duration> getTimeLags(
+            final String subscriptionId,
+            final Collection<NakadiCursor> committedPositions,
+            final List<PartitionEndStatistics> endPositions) {
 
         final TimeLagRequestHandler timeLagHandler = new TimeLagRequestHandler(timelineService, threadPool);
         final Map<EventTypePartition, Duration> timeLags = new HashMap<>();
         final Map<EventTypePartition, CompletableFuture<Duration>> futureTimeLags = new HashMap<>();
+        // TODO: to Map<ETP,Cursor>?
+        final List<NakadiCursor> endCursors = endPositions.stream()
+                .map(PartitionEndStatistics::getLast)
+                .collect(Collectors.toList());
+
         try {
             for (final NakadiCursor cursor : committedPositions) {
-                if (isCursorAtTail(cursor, endPositions)) {
+                final Optional<NakadiCursor> end = endCursors.stream()
+                        .filter(c -> c.getEventType().equals(cursor.getEventType())
+                                && c.getPartition().equals(cursor.getPartition()))
+                        .findFirst();
+                if (end.isPresent() && cursorComparator.compare(cursor, end.get()) >= 0) {
+                    // committed cursor is in the tail position
                     timeLags.put(cursor.getEventTypePartition(), Duration.ZERO);
                 } else {
-                    final CompletableFuture<Duration> timeLagFuture = timeLagHandler.getCursorTimeLagFuture(cursor);
+                    final CompletableFuture<Duration> timeLagFuture =
+                            timeLagHandler.getCursorTimeLagFuture(cursor, end);
                     futureTimeLags.put(cursor.getEventTypePartition(), timeLagFuture);
                 }
             }
@@ -74,25 +85,15 @@ public class SubscriptionTimeLagService {
                     .allOf(futureTimeLags.values().toArray(new CompletableFuture[futureTimeLags.size()]))
                     .get(timeLagHandler.getRemainingTimeoutMs(), TimeUnit.MILLISECONDS);
 
+            // FIXME: this should be done after catch
             for (final EventTypePartition partition : futureTimeLags.keySet()) {
                 timeLags.put(partition, futureTimeLags.get(partition).get());
             }
-        } catch (RejectedExecutionException | TimeoutException | ExecutionException e) {
-            LOG.warn("caught exception the timelag stats are not complete: {}", e.toString());
-        } catch (Throwable e) {
-            LOG.warn("caught throwable the timelag stats are not complete: {}", e.toString());
+        } catch (final Exception e) {
+            LOG.warn("caught exception the timelag stats are not complete for subscription {}: {}",
+                    subscriptionId, e.toString());
         }
         return timeLags;
-    }
-
-    private boolean isCursorAtTail(final NakadiCursor cursor, final List<PartitionEndStatistics> endPositions) {
-        return endPositions.stream()
-                .map(PartitionEndStatistics::getLast)
-                .filter(last -> last.getEventType().equals(cursor.getEventType())
-                        && last.getPartition().equals(cursor.getPartition()))
-                .findAny()
-                .map(last -> cursorComparator.compare(cursor, last) >= 0)
-                .orElse(false);
     }
 
     private static class TimeLagRequestHandler {
@@ -109,16 +110,17 @@ public class SubscriptionTimeLagService {
             this.timeoutTimestampMs = System.currentTimeMillis() + REQUEST_TIMEOUT_MS;
         }
 
-        CompletableFuture<Duration> getCursorTimeLagFuture(final NakadiCursor cursor)
+        CompletableFuture<Duration> getCursorTimeLagFuture(
+                final NakadiCursor cursor, final Optional<NakadiCursor> endCursor)
                 throws InterruptedException, TimeoutException {
 
             final CompletableFuture<Duration> future = new CompletableFuture<>();
             if (semaphore.tryAcquire(getRemainingTimeoutMs(), TimeUnit.MILLISECONDS)) {
                 threadPool.submit(() -> {
                     try {
-                        final Duration timeLag = getNextEventTimeLag(cursor);
+                        final Duration timeLag = getNextEventTimeLag(cursor, endCursor);
                         future.complete(timeLag);
-                    } catch (final Throwable e) {
+                    } catch (final Exception e) {
                         future.completeExceptionally(e);
                     } finally {
                         semaphore.release();
@@ -138,8 +140,8 @@ public class SubscriptionTimeLagService {
             }
         }
 
-        private Duration getNextEventTimeLag(final NakadiCursor cursor) throws ErrorGettingCursorTimeLagException,
-                InconsistentStateException {
+        private Duration getNextEventTimeLag(final NakadiCursor cursor, final Optional<NakadiCursor> endCursor)
+                throws ErrorGettingCursorTimeLagException, InconsistentStateException {
 
             final String clientId = String.format("time-lag-checker-%s-%s",
                     cursor.getEventType(), cursor.getPartition());
@@ -160,10 +162,8 @@ public class SubscriptionTimeLagService {
                 } else {
                     return Duration.ofMillis(new Date().getTime() - nextEvent.getTimestamp());
                 }
-            } catch (final IOException e) {
-                throw new InconsistentStateException("Unexpected error happened when getting consumer time lag", e);
-            } catch (final InvalidCursorException e) {
-                throw new ErrorGettingCursorTimeLagException(cursor, e);
+            } catch (final Exception e) {
+                throw new ErrorGettingCursorTimeLagException(cursor, endCursor, e);
             } finally {
                 LOG.trace("client:{}, finished reading events for lag calculation", clientId);
             }
