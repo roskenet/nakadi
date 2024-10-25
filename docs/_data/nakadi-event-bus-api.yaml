@@ -3247,6 +3247,13 @@ definitions:
   EventTypeAuthExplainResult:
     type: object
     properties:
+      error:
+        type: object
+        properties:
+          message:
+            type: string
+        required:
+          - message
       readers:
         type: array
         items:

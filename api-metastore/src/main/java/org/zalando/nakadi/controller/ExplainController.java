@@ -7,19 +7,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 import org.zalando.nakadi.exceptions.runtime.InvalidEventTypeException;
-import org.zalando.nakadi.exceptions.runtime.UnableProcessException;
 import org.zalando.nakadi.model.EventTypeAuthExplainRequest;
 import org.zalando.nakadi.model.EventTypeAuthExplainResult;
-import org.zalando.nakadi.plugin.api.authz.Resource;
-import org.zalando.nakadi.plugin.api.exceptions.AuthorizationInvalidException;
+import org.zalando.nakadi.plugin.api.exceptions.PluginException;
 import org.zalando.nakadi.service.AuthorizationValidator;
 import org.zalando.nakadi.service.auth.AuthorizationResourceMapping;
 import org.zalando.nakadi.service.validation.EventOwnerValidator;
 import org.zalando.nakadi.service.validation.EventTypeAnnotationsValidator;
 
 import javax.validation.Valid;
-import java.util.Collections;
-import java.util.Optional;
 
 @RestController
 @RequestMapping(value = "/explanations")
@@ -37,22 +33,28 @@ public class ExplainController {
     }
     @RequestMapping(value = "/event-type-auth", method = RequestMethod.POST)
     public ResponseEntity<EventTypeAuthExplainResult> explainEventTypeAuth(
-            @Valid @RequestBody final EventTypeAuthExplainRequest eventTypeAuthExplainRequest)
-            throws IllegalArgumentException, InvalidEventTypeException,
-            AuthorizationInvalidException, UnableProcessException {
-
-        final var newAnnotations = Optional.ofNullable(eventTypeAuthExplainRequest.getAnnotations())
-                .orElseGet(Collections::emptyMap);
-        eventTypeAnnotationsValidator.validateDataComplianceAnnotations(null, newAnnotations);
+            @Valid @RequestBody final EventTypeAuthExplainRequest eventTypeAuthExplainRequest) {
 
         final var authResource = eventTypeAuthExplainRequest.asEventTypeBase();
-        EventOwnerValidator.validateEventOwnerSelector(authResource);
+        try {
+            eventTypeAnnotationsValidator.validateDataComplianceAnnotations(null, authResource.getAnnotations());
+            EventOwnerValidator.validateEventOwnerSelector(authResource);
+        } catch (InvalidEventTypeException ex) {
+            return ResponseEntity.ok(EventTypeAuthExplainResult.fromErrorMessage(ex.getMessage()));
+        }
 
-        final Resource eventTypeResource = AuthorizationResourceMapping.mapToResource(authResource);
-        authorizationValidator.validateAuthorization(eventTypeResource);
+        final var eventTypeResource = AuthorizationResourceMapping.mapToResource(authResource);
+        try {
+            authorizationValidator.validateAuthorization(eventTypeResource);
+        } catch (RuntimeException ex) {
+            if (ex instanceof PluginException) {
+                throw ex;
+            }
+            return ResponseEntity.ok(EventTypeAuthExplainResult.fromErrorMessage(ex.getMessage()));
+        }
 
         final var result = authorizationValidator.explainAuthorization(eventTypeResource);
-        return ResponseEntity.ok(new EventTypeAuthExplainResult(result));
+        return ResponseEntity.ok(EventTypeAuthExplainResult.fromExplainResult(result));
     }
 }
 

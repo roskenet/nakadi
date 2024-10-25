@@ -79,7 +79,16 @@ public class ExplainControllerTest {
         final var request = new EventTypeAuthExplainRequest(
                 Map.of("compliance.zalando.org/aspd-classification", "invalid"),
                 null, authSection);
-        postEvenTypeAuthExplain(request).andExpect(status().isUnprocessableEntity());
+        postEvenTypeAuthExplain(request)
+                .andExpect(status().isOk())
+                .andExpect(content()
+                        .json(
+                                "{\"error\": {\"message\": \"" +
+                                "Annotation compliance.zalando.org/aspd-classification is not valid. " +
+                                "Provided value: \\\"invalid\\\". " +
+                                "Possible values are: \\\"none\\\" or \\\"aspd\\\" or \\\"mcf-aspd\\\"." +
+                                "\"}}"
+                        ));
     }
 
     @Test
@@ -90,7 +99,14 @@ public class ExplainControllerTest {
                 Map.of("compliance.zalando.org/aspd-classification", "aspd"),
                 new EventOwnerSelector(EventOwnerSelector.Type.PATH, "retailer_id", "some_path"),
                 authSection);
-        postEvenTypeAuthExplain(request).andExpect(status().isUnprocessableEntity());
+        postEvenTypeAuthExplain(request)
+                .andExpect(status().isOk())
+                .andExpect(content()
+                        .json(
+                                "{\"error\": {\"message\": \"" +
+                                "\\\"aspd\\\" data classification with event_owner_selector is not allowed" +
+                                "\"}}"
+                        ));
     }
 
     @Test
@@ -114,10 +130,11 @@ public class ExplainControllerTest {
         when(authorizationValidator.explainAuthorization(any())).
                 thenReturn(List.of(result));
 
-        postEvenTypeAuthExplain(request).andExpect(status().is2xxSuccessful()).
-                andExpect(content().string(
+        postEvenTypeAuthExplain(request)
+                .andExpect(status().isOk())
+                .andExpect(content().string(
                         TestUtils.OBJECT_MAPPER.
-                        writeValueAsString(new EventTypeAuthExplainResult(List.of(result)))));
+                        writeValueAsString(EventTypeAuthExplainResult.fromExplainResult(List.of(result)))));
     }
 
 
