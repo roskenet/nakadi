@@ -4,9 +4,11 @@ import com.google.common.annotations.VisibleForTesting;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.zalando.nakadi.config.OptInTeamsConfig;
 import org.zalando.nakadi.domain.EventTypeBase;
 import org.zalando.nakadi.domain.Feature;
 import org.zalando.nakadi.exceptions.runtime.InvalidEventTypeException;
+import org.zalando.nakadi.plugin.api.ApplicationService;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.Subject;
 import org.zalando.nakadi.service.FeatureToggleService;
@@ -32,29 +34,34 @@ public class EventTypeAnnotationsValidator {
 
     private final FeatureToggleService featureToggleService;
     private final AuthorizationService authorizationService;
+    private final OptInTeamsConfig optInTeamsConfig;
+    private final ApplicationService applicationService;
     private final List<String> enforcedAuthSubjects;
 
     @Autowired
     public EventTypeAnnotationsValidator(
             final FeatureToggleService featureToggleService,
             final AuthorizationService authorizationService,
+            final OptInTeamsConfig optInTeamsConfig,
+            final ApplicationService applicationService,
             @Value("${nakadi.data_lake.annotations.enforced_auth_subjects:}") final List<String> enforcedAuthSubjects
     ) {
         this.featureToggleService = featureToggleService;
         this.authorizationService = authorizationService;
         this.enforcedAuthSubjects = enforcedAuthSubjects;
+        this.applicationService = applicationService;
+        this.optInTeamsConfig = optInTeamsConfig;
     }
 
     public void validateAnnotations(
             final EventTypeBase oldEventType,
-            @NotNull final EventTypeBase newEventType)
-            throws InvalidEventTypeException {
+            @NotNull final EventTypeBase newEventType) throws InvalidEventTypeException {
 
         final var oldAnnotations = oldEventType == null ?
                 null : Optional.ofNullable(oldEventType.getAnnotations()).orElseGet(Collections::emptyMap);
         final var newAnnotations = Optional.ofNullable(newEventType.getAnnotations())
                 .orElseGet(Collections::emptyMap);
-        validateDataComplianceAnnotations(oldAnnotations, newAnnotations);
+        validateDataComplianceAnnotations(oldAnnotations, newAnnotations, newEventType.getOwningApplication());
         validateDataLakeAnnotations(oldAnnotations, newAnnotations);
     }
 
@@ -62,26 +69,39 @@ public class EventTypeAnnotationsValidator {
     public void validateDataComplianceAnnotations(
             // null iff we're validating a new event type (i.e. there is no old event type)
             final Map<String, String> oldAnnotations,
-            @NotNull final Map<String, String> annotations) {
+            @NotNull final Map<String, String> annotations,
+            final String owningApplication) {
 
         final var aspdClassification = annotations.get(DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
         if (aspdClassification != null) {
             if (!List.of("none", "aspd", "mcf-aspd").contains(aspdClassification)) {
                 throw new InvalidEventTypeException(
                         "Annotation " + DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION
-                                + " is not valid. Provided value: \""
-                                + aspdClassification
-                                + "\". Possible values are: \"none\" or \"aspd\" or \"mcf-aspd\".");
+                        + " is not valid. Provided value: \""
+                        + aspdClassification
+                        + "\". Possible values are: \"none\" or \"aspd\" or \"mcf-aspd\".");
             }
         }
 
-        final boolean isRequired = oldAnnotations != null &&
-                oldAnnotations.containsKey(DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
-        if (isRequired) {
+        if (isDataComplianceAnnotationRequired(oldAnnotations, owningApplication)) {
             if (aspdClassification == null) {
                 throw new InvalidEventTypeException(
                         "Annotation " + DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION + " is required");
             }
+        }
+    }
+
+    private boolean isDataComplianceAnnotationRequired(
+            final Map<String, String> oldAnnotations,
+            final String owningApplication) {
+        if (oldAnnotations == null) { // Triggered when a new event type is created
+            return owningApplication != null &&
+                    (applicationService
+                            .getOwningTeamId(owningApplication)
+                            .filter(teamId -> optInTeamsConfig.getOptInTeams().contains(teamId))
+                            .isPresent());
+        } else {
+            return oldAnnotations.containsKey(DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
         }
     }
 
@@ -97,9 +117,9 @@ public class EventTypeAnnotationsValidator {
             if (!materializeEvents.equals("off") && !materializeEvents.equals("on")) {
                 throw new InvalidEventTypeException(
                         "Annotation " + DATA_LAKE_MATERIALIZE_EVENTS_ANNOTATION
-                        + " is not valid. Provided value: \""
-                        + materializeEvents
-                        + "\". Possible values are: \"on\" or \"off\".");
+                                + " is not valid. Provided value: \""
+                                + materializeEvents
+                                + "\". Possible values are: \"on\" or \"off\".");
             }
             if (materializeEvents.equals("on")) {
                 if (retentionPeriod == null) {
@@ -114,7 +134,7 @@ public class EventTypeAnnotationsValidator {
             if (retentionReason == null || retentionReason.isEmpty()) {
                 throw new InvalidEventTypeException(
                         "Annotation " + DATA_LAKE_RETENTION_REASON_ANNOTATION + " is required, when "
-                        + DATA_LAKE_RETENTION_PERIOD_ANNOTATION + " is specified.");
+                                + DATA_LAKE_RETENTION_PERIOD_ANNOTATION + " is specified.");
             }
 
             if (!DATA_LAKE_ANNOTATIONS_PERIOD_PATTERN.matcher(retentionPeriod).find()) {

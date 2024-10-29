@@ -1,28 +1,30 @@
 package org.zalando.nakadi.service.validation;
 
-import java.util.Collections;
-import java.util.Map;
-import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Stream;
-import javax.annotation.Nullable;
-
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.NullSource;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.zalando.nakadi.config.OptInTeamsConfig;
 import org.zalando.nakadi.domain.Feature;
 import org.zalando.nakadi.exceptions.runtime.InvalidEventTypeException;
+import org.zalando.nakadi.plugin.api.ApplicationService;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.service.FeatureToggleService;
 import org.zalando.nakadi.service.auth.AuthorizationResourceMapping;
 
+import javax.annotation.Nullable;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Stream;
+
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 public class EventTypeAnnotationsValidatorTest {
@@ -30,37 +32,81 @@ public class EventTypeAnnotationsValidatorTest {
 
     private FeatureToggleService featureToggleService;
     private AuthorizationService authorizationService;
+    private OptInTeamsConfig optInTeamsConfig;
+    private ApplicationService applicationService;
     private EventTypeAnnotationsValidator validator;
+    private static final String OWNING_APPLICATION_1 = "stups_nakadi";
+    private static final String OWNING_APPLICATION_2 = "stups_erases";
 
     @BeforeEach
     public void setUp() {
         featureToggleService = mock(FeatureToggleService.class);
         authorizationService = mock(AuthorizationService.class);
+        optInTeamsConfig = mock(OptInTeamsConfig.class);
+        applicationService = mock(ApplicationService.class);
         validator = new EventTypeAnnotationsValidator(
-            featureToggleService, authorizationService, Collections.singletonList(A_TEST_APPLICATION));
+                featureToggleService,
+                authorizationService,
+                optInTeamsConfig,
+                applicationService,
+                Collections.singletonList(A_TEST_APPLICATION));
+
+        final String teamId1 = "50061346";
+        final String teamId2 = "9876543";
+
+        when(applicationService.getOwningTeamId(OWNING_APPLICATION_1)).thenReturn(Optional.of(teamId1));
+        when(applicationService.getOwningTeamId(OWNING_APPLICATION_2)).thenReturn(Optional.of(teamId2));
+        when(optInTeamsConfig.getOptInTeams()).thenReturn(Set.of(teamId1));
     }
 
     @ParameterizedTest
-    @NullSource
-    @ValueSource(strings = {"none", "aspd", "mcf-aspd"})
-    public void testValidDataComplianceAnnotations(@Nullable final String value) {
-        final Map<String, String> annotations = value != null ?
-                Map.of(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, value) :
+    @MethodSource("getValidDataComplianceAnnotations")
+    public void testValidDataComplianceAnnotations(
+            @Nullable final String annotationValue,
+            @Nullable final String owningApplication) {
+        final Map<String, String> annotations = annotationValue != null ?
+                Map.of(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, annotationValue) :
                 Collections.emptyMap();
-        validator.validateDataComplianceAnnotations(null, annotations);
+        validator.validateDataComplianceAnnotations(null, annotations, owningApplication);
+    }
+
+    private static Stream<Arguments> getValidDataComplianceAnnotations() {
+        return Stream.of(
+                Arguments.of("none", OWNING_APPLICATION_1),
+                Arguments.of("aspd", OWNING_APPLICATION_1),
+                Arguments.of("mcf-aspd", OWNING_APPLICATION_1),
+                Arguments.of("none", null),
+                Arguments.of("aspd", null),
+                Arguments.of("mcf-aspd", null),
+                Arguments.of(null, OWNING_APPLICATION_2)
+        );
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"NONE", "ASPD", "MCF-ASPD", "mcf_aspd"})
-    public void testInvalidDataComplianceAnnotations(final String value) {
-        final Map<String, String> annotations =
-                Map.of(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, value);
+    @MethodSource("getInvalidDataComplianceAnnotations")
+    public void testInvalidDataComplianceAnnotations(
+            @Nullable final String annotationValue,
+            @Nullable final String owningApplication
+    ) {
+        final Map<String, String> annotations = annotationValue != null ?
+                Map.of(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, annotationValue) :
+                Collections.emptyMap();
 
         final var exception = assertThrows(
                 InvalidEventTypeException.class,
-                () -> validator.validateDataComplianceAnnotations(null, annotations));
+                () -> validator.validateDataComplianceAnnotations(null, annotations, owningApplication));
         Assertions.assertThat(exception.getMessage())
                 .contains(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
+    }
+
+    private static Stream<Arguments> getInvalidDataComplianceAnnotations() {
+        return Stream.of(
+                Arguments.of("NONE", OWNING_APPLICATION_2),
+                Arguments.of("ASPD", OWNING_APPLICATION_1),
+                Arguments.of("MCF-ASPD", null),
+                Arguments.of("mcf_aspd", OWNING_APPLICATION_2),
+                Arguments.of(null, OWNING_APPLICATION_1)
+        );
     }
 
     @Test
@@ -69,11 +115,20 @@ public class EventTypeAnnotationsValidatorTest {
                 InvalidEventTypeException.class,
                 () -> validator.validateDataComplianceAnnotations(
                         Map.of(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, "a-value"),
-                        Collections.emptyMap()));
+                        Collections.emptyMap(),
+                        OWNING_APPLICATION_1));
         Assertions.assertThat(exception.getMessage())
                 .contains(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, " is required");
     }
 
+    @Test
+    public void testDataComplianceAnnotationsOnlyWhenNewEventTypeCreated() {
+        final Map<String, String> annotations =
+                Map.of(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, "aspd");
+        validator.validateDataComplianceAnnotations(annotations, annotations, OWNING_APPLICATION_1);
+
+        verifyNoInteractions(applicationService, optInTeamsConfig);
+    }
 
     @ParameterizedTest
     @MethodSource("getValidDataLakeAnnotations")

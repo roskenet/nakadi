@@ -37,7 +37,11 @@ public class ExplainController {
 
         final var authResource = eventTypeAuthExplainRequest.asEventTypeBase();
         try {
-            eventTypeAnnotationsValidator.validateDataComplianceAnnotations(null, authResource.getAnnotations());
+            eventTypeAnnotationsValidator.validateDataComplianceAnnotations(
+                    null,
+                    authResource.getAnnotations(),
+                    null
+            );
             EventOwnerValidator.validateEventOwnerSelector(authResource);
         } catch (InvalidEventTypeException ex) {
             return ResponseEntity.ok(EventTypeAuthExplainResult.fromErrorMessage(ex.getMessage()));

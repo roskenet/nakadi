@@ -6,12 +6,14 @@ import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.zalando.nakadi.config.OptInTeamsConfig;
 import org.zalando.nakadi.controller.advice.ExplainExceptionHandler;
 import org.zalando.nakadi.controller.advice.NakadiProblemExceptionHandler;
 import org.zalando.nakadi.domain.ResourceAuthorization;
 import org.zalando.nakadi.domain.ResourceAuthorizationAttribute;
 import org.zalando.nakadi.model.EventTypeAuthExplainRequest;
 import org.zalando.nakadi.model.EventTypeAuthExplainResult;
+import org.zalando.nakadi.plugin.api.ApplicationService;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult;
@@ -43,14 +45,18 @@ public class ExplainControllerTest {
 
     private FeatureToggleService featureToggleService = mock(FeatureToggleService.class);
     private AuthorizationService authorizationService = mock(AuthorizationService.class);
+    private OptInTeamsConfig optInTeamsConfig = mock(OptInTeamsConfig.class);
+    private ApplicationService applicationService = mock(ApplicationService.class);
     private final AuthorizationValidator authorizationValidator = mock(AuthorizationValidator.class);
     private EventTypeAnnotationsValidator validator;
     private MockMvc mockMvc;
 
     @Before
-    public void setUp() throws Exception {
+    public void setUp() {
         validator = new EventTypeAnnotationsValidator(featureToggleService,
                 authorizationService,
+                optInTeamsConfig,
+                applicationService,
                 Collections.emptyList());
         final ExplainController explainController = new ExplainController(validator,
                 authorizationValidator);

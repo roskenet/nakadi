@@ -193,7 +193,9 @@ public class EventTypeService {
         validateOwningApplication(null, eventType.getOwningApplication());
 
         presetAnnotationsAndLabels(eventType);
-        eventTypeAnnotationsValidator.validateAnnotations(null, eventType);
+        eventTypeAnnotationsValidator.validateAnnotations(
+                null,
+                eventType);
         EventOwnerValidator.validateEventOwnerSelector(eventType);
 
         final AtomicReference<EventType> createdEventType = new AtomicReference<>(null);
@@ -469,7 +471,10 @@ public class EventTypeService {
             eventType = schemaEvolutionService.evolve(original, eventTypeBase);
             validateStatisticsUpdate(original, eventType);
             updateAnnotationsAndLabels(original, eventType);
-            eventTypeAnnotationsValidator.validateAnnotations(original, eventTypeBase);
+            eventTypeAnnotationsValidator.validateAnnotations(
+                    original,
+                    eventTypeBase
+            );
             EventOwnerValidator.validateEventOwnerSelector(eventType);
 
             updateRetentionTime(original, eventType);
