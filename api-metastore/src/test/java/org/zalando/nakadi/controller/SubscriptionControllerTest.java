@@ -24,7 +24,7 @@ import org.zalando.nakadi.domain.ItemsWrapper;
 import org.zalando.nakadi.domain.NakadiCursor;
 import org.zalando.nakadi.domain.PaginationLinks;
 import org.zalando.nakadi.domain.PaginationWrapper;
-import org.zalando.nakadi.domain.PartitionEndStatistics;
+import org.zalando.nakadi.domain.PartitionStatistics;
 import org.zalando.nakadi.domain.Subscription;
 import org.zalando.nakadi.domain.SubscriptionEventTypeStats;
 import org.zalando.nakadi.domain.Timeline;
@@ -36,7 +36,7 @@ import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
 import org.zalando.nakadi.repository.TopicRepository;
 import org.zalando.nakadi.repository.db.EventTypeRepository;
 import org.zalando.nakadi.repository.db.SubscriptionDbRepository;
-import org.zalando.nakadi.repository.kafka.KafkaPartitionEndStatistics;
+import org.zalando.nakadi.repository.kafka.KafkaPartitionStatistics;
 import org.zalando.nakadi.security.NakadiClient;
 import org.zalando.nakadi.service.AuthorizationValidator;
 import org.zalando.nakadi.service.CursorConverter;
@@ -280,9 +280,9 @@ public class SubscriptionControllerTest {
         when(zkSubscriptionClient.getOffsets(Collections.singleton(etp))).thenReturn(offsets);
         when(eventTypeCache.getEventType(TIMELINE.getEventType()))
                 .thenReturn(EventTypeTestBuilder.builder().name(TIMELINE.getEventType()).build());
-        final List<PartitionEndStatistics> statistics = Collections.singletonList(
-                new KafkaPartitionEndStatistics(TIMELINE, 0, 13));
-        when(topicRepository.loadTopicEndStatistics(eq(Collections.singletonList(TIMELINE)))).thenReturn(statistics);
+        final List<PartitionStatistics> statistics = Collections.singletonList(
+                new KafkaPartitionStatistics(TIMELINE, 0, 7, 13));
+        when(topicRepository.loadTopicStatistics(eq(Collections.singletonList(TIMELINE)))).thenReturn(statistics);
         final NakadiCursor currentCursor = mock(NakadiCursor.class);
         when(currentCursor.getEventTypePartition()).thenReturn(new EventTypePartition(TIMELINE.getEventType(), "0"));
         when(cursorConverter.convert((List<SubscriptionCursorWithoutToken>) any()))
