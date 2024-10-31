@@ -85,15 +85,6 @@ securityDefinitions:
     type: oauth2
     flow: implicit
     authorizationUrl: 'https://auth.example.com/oauth2/tokeninfo'
-    scopes:
-      nakadi.config.write: |
-        Grants access for changing Nakadi configuration.
-      nakadi.event_type.write: |
-        Grants access for applications to define and update EventTypes.
-      nakadi.event_stream.write: |
-        Grants access for applications to submit Events.
-      nakadi.event_stream.read: |
-        Grants access for consuming Event streams.
 
 paths:
   /metrics:
@@ -153,8 +144,6 @@ paths:
     post:
       tags:
         - schema-registry-api
-      security:
-        - oauth2: ['nakadi.event_type.write']
       description: |
         Creates a new `EventType`.
 
@@ -273,8 +262,6 @@ paths:
     put:
       tags:
         - schema-registry-api
-      security:
-        - oauth2: ['nakadi.event_type.write']
       description: |
         Updates the `EventType` identified by its name. Behaviour is the same as creation of
         `EventType` (See POST /event-type) except where noted below.
@@ -324,8 +311,6 @@ paths:
     delete:
       tags:
         - schema-registry-api
-      security:
-        - oauth2: ['nakadi.config.write']
       description: |
         Deletes an `EventType` identified by its name. All events in the `EventType`'s stream' will
         also be removed. **Note**: deletion happens asynchronously, which has the following
@@ -369,8 +354,6 @@ paths:
     post:
       tags:
         - stream-api
-      security:
-        - oauth2: ['nakadi.event_stream.write']
       description: |
         Publishes a batch of `Event`s of this `EventType`. All items must be of the EventType
         identified by `name`.
@@ -482,8 +465,6 @@ paths:
       tags:
         - stream-api
         - unmanaged-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: |
         **The Low Level API is deprecated. It will be removed in a future version.**
 
@@ -709,8 +690,6 @@ paths:
         - unmanaged-api
         - monitoring
         - management-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: |
         GET with payload.
 
@@ -751,7 +730,7 @@ paths:
           schema:
             $ref: '#/definitions/Problem'
         '403':
-          description: Access forbidden because of missing scope or EventType authorization failure.
+          description: Access forbidden because of EventType authorization failure.
           schema:
             $ref: '#/definitions/Problem'
 
@@ -761,8 +740,6 @@ paths:
         - unmanaged-api
         - monitoring
         - management-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: |
         GET with payload.
 
@@ -819,7 +796,7 @@ paths:
           schema:
             $ref: '#/definitions/Problem'
         '403':
-          description: Access forbidden because of missing scope or EventType authorization failure.
+          description: Access forbidden because of EventType authorization failure.
           schema:
             $ref: '#/definitions/Problem'
 
@@ -829,8 +806,6 @@ paths:
         - unmanaged-api
         - monitoring
         - management-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: |
         Lists the `Partition`s for the given event-type.
 
@@ -881,7 +856,7 @@ paths:
           schema:
             $ref: '#/definitions/Problem'
         '403':
-          description: Access forbidden because of missing scope or EventType authorization failure.
+          description: Access forbidden because of EventType authorization failure.
           schema:
             $ref: '#/definitions/Problem'
 
@@ -924,7 +899,7 @@ paths:
           schema:
             $ref: '#/definitions/Problem'
         '403':
-          description: Access forbidden because of missing scope or EventType authorization failure.
+          description: Access forbidden because of EventType authorization failure.
           schema:
             $ref: '#/definitions/Problem'
 
@@ -933,9 +908,6 @@ paths:
       tags:
         - unmanaged-api
         - management-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
-
       description: |
         Returns the given `Partition` of this EventType. If per-EventType authorization is enabled, the caller must
         be authorized to read from the EventType.
@@ -972,7 +944,7 @@ paths:
           schema:
             $ref: '#/definitions/Problem'
         '403':
-          description: Access forbidden because of missing scope or EventType authorization failure.
+          description: Access forbidden because of EventType authorization failure.
           schema:
             $ref: '#/definitions/Problem'
 
@@ -982,8 +954,6 @@ paths:
         - unmanaged-api
         - monitoring
         - management-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: |
         Transforms a list of Cursors with `shift` into a list without `shift`s. This is useful when there is the need
         for randomly access events in the stream.
@@ -1041,7 +1011,7 @@ paths:
           schema:
             $ref: '#/definitions/Problem'
         '403':
-          description: Access forbidden because of missing scope or EventType authorization failure.
+          description: Access forbidden because of EventType authorization failure.
           schema:
             $ref: '#/definitions/Problem'
 
@@ -1049,8 +1019,6 @@ paths:
     post:
       tags:
         - stream-api
-      security:
-        - oauth2: ['nakadi.event_stream.write']
       description: |
         Once an event is published to a log compacted event-type in nakadi, it
         will stay there until another event with the same key is published.
@@ -1116,8 +1084,6 @@ paths:
     post:
       tags:
         - subscription-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: |
         This endpoint creates a subscription for EventTypes. The subscription is needed to be able to
         consume events from EventTypes in a high level way when Nakadi stores the offsets and manages the
@@ -1171,8 +1137,6 @@ paths:
     get:
       tags:
         - subscription-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: |
         Lists all subscriptions that exist in a system. List is ordered by creation date/time descending (newest
         subscriptions come first).
@@ -1262,8 +1226,6 @@ paths:
     get:
       tags:
         - subscription-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: Returns a subscription identified by id.
       parameters:
         - $ref: '#/parameters/SubscriptionId'
@@ -1279,8 +1241,6 @@ paths:
     delete:
       tags:
         - subscription-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: Deletes a subscription.
       parameters:
         - $ref: '#/parameters/SubscriptionId'
@@ -1298,8 +1258,6 @@ paths:
     put:
       tags:
         - subscription-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: |
         This endpoint only allows to update the authorization section of a subscription. All other properties are
         immutable. This operation is restricted to subjects with administrative role. This call captures the timestamp
@@ -1332,8 +1290,6 @@ paths:
     get:
       tags:
         - subscription-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: Exposes the currently committed offsets of a subscription.
       parameters:
         - $ref: '#/parameters/SubscriptionId'
@@ -1357,8 +1313,6 @@ paths:
     post:
       tags:
         - subscription-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: |
         Endpoint for committing offsets of the subscription. If there is uncommited data, and no commits happen
         for 60 seconds, then Nakadi will consider the client to be gone, and will close the connection. As long
@@ -1428,8 +1382,6 @@ paths:
     patch:
       tags:
         - subscription-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: |
         Reset subscription offsets to specified values.
         Client connected after this operation will get events starting from next offset position.
@@ -1488,8 +1440,6 @@ paths:
     get:
       tags:
         - subscription-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: |
         Starts a new stream for reading events from this subscription. The data will be automatically rebalanced
         between streams of one subscription. The minimal consumption unit is a partition, so it is possible to start as
@@ -1553,8 +1503,6 @@ paths:
     post:
       tags:
         - subscription-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: |
         GET with body.
 
@@ -1738,8 +1686,6 @@ paths:
     get:
       tags:
         - subscription-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: exposes statistics of specified subscription
       parameters:
         - $ref: '#/parameters/SubscriptionId'
@@ -1775,8 +1721,6 @@ paths:
     get:
       tags:
         - schema-registry-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: |
         Lists all of the enrichment strategies supported by this Nakadi installation. Special or
         custom strategies besides the defaults will be listed here.
@@ -1796,8 +1740,6 @@ paths:
     get:
       tags:
         - schema-registry-api
-      security:
-        - oauth2: ['nakadi.event_stream.read']
       description: |
         Lists all of the partition resolution strategies supported by this installation of Nakadi.
         Special or custom strategies besides the defaults will be listed here.
