@@ -523,6 +523,7 @@ paths:
         - $ref: '#/parameters/BatchFlushTimeout'
         - $ref: '#/parameters/StreamTimeout'
         - $ref: '#/parameters/StreamKeepAliveLimit'
+        - $ref: '#/parameters/TestDataFilter'
         - name: X-Flow-Id
           in: header
           description: |
