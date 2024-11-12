@@ -1260,7 +1260,7 @@ paths:
       tags:
         - subscription-api
       description: |
-        This endpoint only allows to update the authorization section, the labels and the annotations of a subscription. All other properties are
+        This endpoint only allows to update the authorization section of a subscription. All other properties are
         immutable. This operation is restricted to subjects with administrative role. This call captures the timestamp
         of the update request.
       parameters:
