@@ -1,7 +1,6 @@
 package org.zalando.nakadi.service;
 
 import org.zalando.nakadi.domain.NakadiCursor;
-import org.zalando.nakadi.domain.TestDataFilter;
 import org.zalando.nakadi.exceptions.runtime.InvalidLimitException;
 import org.zalando.nakadi.security.Client;
 
@@ -32,12 +31,10 @@ public class EventStreamConfig {
     private final Client consumingClient;
     private final long maxMemoryUsageBytes;
 
-    private final TestDataFilter testDataFilter;
-
     private EventStreamConfig(final List<NakadiCursor> cursors, final int batchLimit,
                               final int streamLimit, final int batchTimeout, final int streamTimeout,
                               final int streamKeepAliveLimit, final String etName, final Client consumingClient,
-                              final long maxMemoryUsageBytes, final TestDataFilter testDataFilter) {
+                              final long maxMemoryUsageBytes) {
         this.cursors = cursors;
         this.batchLimit = batchLimit;
         this.streamLimit = streamLimit;
@@ -47,7 +44,6 @@ public class EventStreamConfig {
         this.etName = etName;
         this.consumingClient= consumingClient;
         this.maxMemoryUsageBytes = maxMemoryUsageBytes;
-        this.testDataFilter = testDataFilter;
     }
 
     public List<NakadiCursor> getCursors() {
@@ -84,10 +80,6 @@ public class EventStreamConfig {
 
     public long getMaxMemoryUsageBytes() {
         return maxMemoryUsageBytes;
-    }
-
-    public TestDataFilter getTestDataFilter() {
-        return testDataFilter;
     }
 
     @Override
@@ -143,7 +135,6 @@ public class EventStreamConfig {
         private long maxMemoryUsageBytes = DEF_MAX_MEMORY_USAGE_BYTES;
         private String etName;
         private Client consumingClient;
-        private TestDataFilter testDataFilter;
 
         public Builder withCursors(final List<NakadiCursor> cursors) {
             this.cursors = cursors;
@@ -206,10 +197,6 @@ public class EventStreamConfig {
             return this;
         }
 
-        public Builder withTestDataFilter(final TestDataFilter testDataFilter) {
-            this.testDataFilter = testDataFilter;
-            return this;
-        }
 
         public EventStreamConfig build() throws InvalidLimitException {
             if (streamLimit != 0 && streamLimit < batchLimit) {
@@ -220,9 +207,8 @@ public class EventStreamConfig {
                 throw new InvalidLimitException("batch_limit can't be lower than 1");
             }
             return new EventStreamConfig(cursors, batchLimit, streamLimit, batchTimeout, streamTimeout,
-                    streamKeepAliveLimit, etName, consumingClient, maxMemoryUsageBytes, testDataFilter);
+                    streamKeepAliveLimit, etName, consumingClient, maxMemoryUsageBytes);
         }
-
     }
 
 }
