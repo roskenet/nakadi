@@ -1,6 +1,7 @@
 package org.zalando.nakadi.service;
 
 import com.google.common.collect.ImmutableList;
+import org.echocat.jomon.runtime.concurrent.RetryForSpecifiedTimeStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,7 +9,7 @@ import org.springframework.stereotype.Component;
 import org.zalando.nakadi.domain.ConsumedEvent;
 import org.zalando.nakadi.domain.EventTypePartition;
 import org.zalando.nakadi.domain.NakadiCursor;
-import org.zalando.nakadi.domain.PartitionStatistics;
+import org.zalando.nakadi.domain.PartitionEndStatistics;
 import org.zalando.nakadi.exceptions.runtime.ErrorGettingCursorTimeLagException;
 import org.zalando.nakadi.exceptions.runtime.InconsistentStateException;
 import org.zalando.nakadi.service.timeline.HighLevelConsumer;
@@ -27,8 +28,9 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static org.echocat.jomon.runtime.concurrent.Retryer.executeWithRetry;
 
 @Component
 public class SubscriptionTimeLagService {
@@ -54,58 +56,42 @@ public class SubscriptionTimeLagService {
     public Map<EventTypePartition, Duration> getTimeLags(
             final String subscriptionId,
             final Collection<NakadiCursor> committedPositions,
-            final List<PartitionStatistics> stats) {
+            final List<PartitionEndStatistics> endPositions) {
 
         final TimeLagRequestHandler timeLagHandler = new TimeLagRequestHandler(timelineService, threadPool);
         final Map<EventTypePartition, Duration> timeLags = new HashMap<>();
         final Map<EventTypePartition, CompletableFuture<Duration>> futureTimeLags = new HashMap<>();
-        final Map<EventTypePartition, PartitionStatistics> statsByEventTypePartition =
-                stats.stream()
-                .collect(Collectors.toMap(
-                                s -> s.getLast().getEventTypePartition(),
-                                Function.identity()));
+        // TODO: to Map<ETP,Cursor>?
+        final List<NakadiCursor> endCursors = endPositions.stream()
+                .map(PartitionEndStatistics::getLast)
+                .collect(Collectors.toList());
+
         try {
             for (final NakadiCursor cursor : committedPositions) {
-                final EventTypePartition etp = cursor.getEventTypePartition();
-                final Optional<PartitionStatistics> ps = Optional.ofNullable(statsByEventTypePartition.get(etp));
-                final NakadiCursor cursorToReadFrom;
-
-                // first, check if committed cursor is past data available in kafka and adjust accordingly
-                final Optional<NakadiCursor> beforeFirst = ps.map(PartitionStatistics::getBeforeFirst);
-                if (beforeFirst.isPresent() && cursorComparator.compare(beforeFirst.get(), cursor) > 0) {
-                    cursorToReadFrom = beforeFirst.get();
-                    LOG.debug("updated cursor to read from: {} (committed is {})", cursorToReadFrom, cursor);
+                final Optional<NakadiCursor> end = endCursors.stream()
+                        .filter(c -> c.getEventType().equals(cursor.getEventType())
+                                && c.getPartition().equals(cursor.getPartition()))
+                        .findFirst();
+                if (end.isPresent() && cursorComparator.compare(cursor, end.get()) >= 0) {
+                    // committed cursor is in the tail position
+                    timeLags.put(cursor.getEventTypePartition(), Duration.ZERO);
                 } else {
-                    cursorToReadFrom = cursor;
-                }
-
-                // now check if committed cursor is in the tail position: then there's nothing to read and the lag is 0
-                final Optional<NakadiCursor> last = ps.map(PartitionStatistics::getLast);
-                if (last.isPresent() && cursorComparator.compare(cursorToReadFrom, last.get()) >= 0) {
-                    timeLags.put(etp, Duration.ZERO);
-                } else {
-                    // OK, let's try to actually read some events
                     final CompletableFuture<Duration> timeLagFuture =
-                            timeLagHandler.getCursorTimeLagFuture(cursorToReadFrom, last);
-                    futureTimeLags.put(etp, timeLagFuture);
+                            timeLagHandler.getCursorTimeLagFuture(cursor, end);
+                    futureTimeLags.put(cursor.getEventTypePartition(), timeLagFuture);
                 }
             }
             CompletableFuture
                     .allOf(futureTimeLags.values().toArray(new CompletableFuture[futureTimeLags.size()]))
                     .get(timeLagHandler.getRemainingTimeoutMs(), TimeUnit.MILLISECONDS);
 
-        } catch (final Exception e) {
-            LOG.error("caught exception the timelag stats are not complete for subscription {}", subscriptionId);
-        }
-
-        for (final EventTypePartition etp : futureTimeLags.keySet()) {
-            final CompletableFuture<Duration> future = futureTimeLags.get(etp);
-            if (future.isDone() && !future.isCompletedExceptionally()) {
-                final Duration lag = future.getNow(null);
-                if (lag != null) {
-                    timeLags.put(etp, lag);
-                }
+            // FIXME: this should be done after catch
+            for (final EventTypePartition partition : futureTimeLags.keySet()) {
+                timeLags.put(partition, futureTimeLags.get(partition).get());
             }
+        } catch (final Exception e) {
+            LOG.warn("caught exception the timelag stats are not complete for subscription {}: {}",
+                    subscriptionId, e.toString());
         }
         return timeLags;
     }
@@ -125,14 +111,14 @@ public class SubscriptionTimeLagService {
         }
 
         CompletableFuture<Duration> getCursorTimeLagFuture(
-                final NakadiCursor cursor, final Optional<NakadiCursor> lastCursor)
+                final NakadiCursor cursor, final Optional<NakadiCursor> endCursor)
                 throws InterruptedException, TimeoutException {
 
             final CompletableFuture<Duration> future = new CompletableFuture<>();
             if (semaphore.tryAcquire(getRemainingTimeoutMs(), TimeUnit.MILLISECONDS)) {
                 threadPool.submit(() -> {
                     try {
-                        final Duration timeLag = getNextEventTimeLag(cursor, lastCursor);
+                        final Duration timeLag = getNextEventTimeLag(cursor, endCursor);
                         future.complete(timeLag);
                     } catch (final Exception e) {
                         future.completeExceptionally(e);
@@ -154,7 +140,7 @@ public class SubscriptionTimeLagService {
             }
         }
 
-        private Duration getNextEventTimeLag(final NakadiCursor cursor, final Optional<NakadiCursor> lastCursor)
+        private Duration getNextEventTimeLag(final NakadiCursor cursor, final Optional<NakadiCursor> endCursor)
                 throws ErrorGettingCursorTimeLagException, InconsistentStateException {
 
             final String clientId = String.format("time-lag-checker-%s-%s",
@@ -162,16 +148,22 @@ public class SubscriptionTimeLagService {
             try (HighLevelConsumer consumer = timelineService.createEventConsumer(
                     clientId, ImmutableList.of(cursor))) {
                 LOG.trace("client:{}, reading events for lag calculation", clientId);
+                final ConsumedEvent nextEvent = executeWithRetry(
+                        () -> {
+                            // We ignore per event authorization here, because we are not exposing any data.
+                            final List<ConsumedEvent> events = consumer.readEvents();
+                            return events.isEmpty() ? null : events.iterator().next();
+                        },
+                        new RetryForSpecifiedTimeStrategy<ConsumedEvent>(EVENT_FETCH_WAIT_TIME_MS)
+                                .withResultsThatForceRetry((ConsumedEvent) null));
 
-                final List<ConsumedEvent> events = consumer.readEvents();
-                if (events.isEmpty()) {
-                    // expected some events due to newer offsets being availabile, but got none: must be only tombstones
-                    return Duration.ZERO;
+                if (nextEvent == null) {
+                    throw new InconsistentStateException("Timeout waiting for events when getting consumer time lag");
                 } else {
-                    return Duration.ofMillis(new Date().getTime() - events.iterator().next().getTimestamp());
+                    return Duration.ofMillis(new Date().getTime() - nextEvent.getTimestamp());
                 }
             } catch (final Exception e) {
-                throw new ErrorGettingCursorTimeLagException(cursor, lastCursor, e);
+                throw new ErrorGettingCursorTimeLagException(cursor, endCursor, e);
             } finally {
                 LOG.trace("client:{}, finished reading events for lag calculation", clientId);
             }

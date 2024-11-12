@@ -8,8 +8,8 @@ public class ErrorGettingCursorTimeLagException extends NakadiBaseException {
 
     public ErrorGettingCursorTimeLagException(
             final NakadiCursor failedCursor,
-            final Optional<NakadiCursor> lastCursor,
+            final Optional<NakadiCursor> endCursor,
             final Throwable cause) {
-        super("Could not determine time lag: failedCursor=" + failedCursor + "; lastCursor=" + lastCursor, cause);
+        super("Could not determine time lag: failedCursor=" + failedCursor + "; endCursor=" + endCursor, cause);
     }
 }
