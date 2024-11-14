@@ -22,7 +22,6 @@ import org.zalando.nakadi.domain.PaginationLinks;
 import org.zalando.nakadi.domain.PaginationWrapper;
 import org.zalando.nakadi.domain.PartitionBaseStatistics;
 import org.zalando.nakadi.domain.PartitionEndStatistics;
-import org.zalando.nakadi.domain.PartitionStatistics;
 import org.zalando.nakadi.domain.Subscription;
 import org.zalando.nakadi.domain.SubscriptionBase;
 import org.zalando.nakadi.domain.SubscriptionEventTypeStats;
@@ -396,18 +395,18 @@ public class SubscriptionService {
                 .collect(Collectors.toList());
     }
 
-    private List<PartitionStatistics> loadPartitionStatistics(final Collection<EventType> eventTypes)
+    private List<PartitionEndStatistics> loadPartitionEndStatistics(final Collection<EventType> eventTypes)
             throws ServiceTemporarilyUnavailableException {
-        final List<PartitionStatistics> stats = new ArrayList<>();
+        final List<PartitionEndStatistics> topicPartitions = new ArrayList<>();
 
         final Map<TopicRepository, List<Timeline>> timelinesByRepo = getTimelinesByRepository(eventTypes);
 
         for (final Map.Entry<TopicRepository, List<Timeline>> repoEntry : timelinesByRepo.entrySet()) {
             final TopicRepository topicRepository = repoEntry.getKey();
             final List<Timeline> timelinesForRepo = repoEntry.getValue();
-            stats.addAll(topicRepository.loadTopicStatistics(timelinesForRepo));
+            topicPartitions.addAll(topicRepository.loadTopicEndStatistics(timelinesForRepo));
         }
-        return stats;
+        return topicPartitions;
     }
 
     private Map<TopicRepository, List<Timeline>> getTimelinesByRepository(final Collection<EventType> eventTypes) {
@@ -429,7 +428,7 @@ public class SubscriptionService {
             throws ServiceTemporarilyUnavailableException, InconsistentStateException {
         final List<SubscriptionEventTypeStats> result = new ArrayList<>(eventTypes.size());
         final Collection<NakadiCursor> committedPositions = getCommittedPositions(subscriptionNode, client);
-        final List<PartitionStatistics> stats = loadPartitionStatistics(eventTypes);
+        final List<PartitionEndStatistics> stats = loadPartitionEndStatistics(eventTypes);
 
         final Map<EventTypePartition, Duration> timeLags = statsMode == StatsMode.TIMELAG ?
                 subscriptionTimeLagService.getTimeLags(subscription.getId(), committedPositions, stats) :

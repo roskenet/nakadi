@@ -518,19 +518,19 @@ public class EventStreamControllerTest {
     }
 
     protected StreamingResponseBody createStreamingResponseBody() throws IOException {
-        return controller.streamEvents(TEST_EVENT_TYPE_NAME, 1, 0, 0, 0, 0,
-                null, null, responseMock, FULL_ACCESS_CLIENT);
+        return controller.streamEvents(TEST_EVENT_TYPE_NAME, 1, 0, 0, 0, 0, null, responseMock,
+                FULL_ACCESS_CLIENT);
     }
 
     private StreamingResponseBody createStreamingResponseBody(final Client client) throws Exception {
         return controller.streamEvents(
-                TEST_EVENT_TYPE_NAME, 1, 2, 3, 4, 5, null,
-                "[{\"partition\":\"0\",\"offset\":\"000000000000000000\"}]", responseMock, client);
+                TEST_EVENT_TYPE_NAME, 1, 2, 3, 4, 5, "[{\"partition\":\"0\",\"offset\":\"000000000000000000\"}]",
+                responseMock, client);
     }
 
     private StreamingResponseBody createStreamingResponseBody(final String cursorsStr) throws Exception {
-        return controller.streamEvents(TEST_EVENT_TYPE_NAME, 1, 2, 3, 4,
-                5, null, cursorsStr, responseMock, FULL_ACCESS_CLIENT);
+        return controller.streamEvents(TEST_EVENT_TYPE_NAME, 1, 2, 3, 4, 5, cursorsStr,
+                responseMock, FULL_ACCESS_CLIENT);
     }
 
     private StreamingResponseBody createStreamingResponseBody(final Integer batchLimit,
@@ -540,7 +540,7 @@ public class EventStreamControllerTest {
                                                               final Integer streamKeepAliveLimit,
                                                               final String cursorsStr) {
         return controller.streamEvents(TEST_EVENT_TYPE_NAME, batchLimit, streamLimit, batchTimeout, streamTimeout,
-                streamKeepAliveLimit, null, cursorsStr, responseMock, FULL_ACCESS_CLIENT);
+                streamKeepAliveLimit, cursorsStr, responseMock, FULL_ACCESS_CLIENT);
     }
 
 }

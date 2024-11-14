@@ -24,7 +24,6 @@ import org.zalando.nakadi.domain.CursorError;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.NakadiCursor;
 import org.zalando.nakadi.domain.PartitionStatistics;
-import org.zalando.nakadi.domain.TestDataFilter;
 import org.zalando.nakadi.domain.Timeline;
 import org.zalando.nakadi.domain.storage.Storage;
 import org.zalando.nakadi.exceptions.runtime.AccessDeniedException;
@@ -194,7 +193,6 @@ public class EventStreamController {
             @Nullable @RequestParam(value = "stream_timeout", required = false) final Integer streamTimeout,
             @Nullable
             @RequestParam(value = "stream_keep_alive_limit", required = false) final Integer streamKeepAliveLimit,
-            @Nullable @RequestParam(value = "test_data_filter", required = false) final TestDataFilter testDataFilter,
             @Nullable @RequestHeader(name = "X-nakadi-cursors", required = false) final String cursorsStr,
             final HttpServletResponse response, final Client client) {
         final MDCUtils.Context requestContext = MDCUtils.getContext();
@@ -221,7 +219,6 @@ public class EventStreamController {
                 final AtomicBoolean needCheckAuthorization = new AtomicBoolean(false);
 
                 LOG.info("[X-NAKADI-CURSORS] \"{}\" {}", eventTypeName, Optional.ofNullable(cursorsStr).orElse("-"));
-
 
                 try (Closeable ignore2 = eventTypeChangeListener.registerListener(
                         et -> needCheckAuthorization.set(true),
@@ -250,7 +247,6 @@ public class EventStreamController {
                             .withConsumingClient(client)
                             .withCursors(getStreamingStart(eventType, cursorsStr))
                             .withMaxMemoryUsageBytes(maxMemoryUsageBytes)
-                            .withTestDataFilter(Optional.ofNullable(testDataFilter).orElse(TestDataFilter.LIVE))
                             .build();
 
                     consumerCounter = metricRegistry.counter(metricNameFor(eventTypeName, CONSUMERS_COUNT_METRIC_NAME));

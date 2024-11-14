@@ -15,7 +15,6 @@ import org.zalando.nakadi.repository.zookeeper.ZooKeeperHolder;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
@@ -168,20 +167,17 @@ public class KafkaLocationManager {
     private static class Broker implements Comparable<Broker> {
         final String host;
         final Integer port;
-        public static final Comparator<Broker> BROKER_COMPARATOR = Comparator
-                .<Broker, String>comparing(b -> b.host)
-                .thenComparing(b -> b.port);
 
         private Broker(final String host, final Integer port) {
             this.host = host;
             this.port = port;
         }
 
-        static Broker fromByteJson(final byte[] data, final Optional<Integer> portOverride)
+        static Broker fromByteJson(final byte[] data, final Optional<Integer> portOpt)
                 throws JSONException, UnsupportedEncodingException {
             final JSONObject json = new JSONObject(new String(data, "UTF-8"));
             final String host = json.getString("host");
-            return new Broker(host, portOverride.orElse(json.getInt("port")));
+            return new Broker(host, portOpt.orElse(json.getInt("port")));
         }
 
         public String toString() {
@@ -190,7 +186,7 @@ public class KafkaLocationManager {
 
         @Override
         public int compareTo(final Broker broker) {
-            return BROKER_COMPARATOR.compare(this, broker);
+            return host.compareTo(broker.host);
         }
     }
 }
