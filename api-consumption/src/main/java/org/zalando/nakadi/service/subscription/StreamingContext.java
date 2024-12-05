@@ -13,7 +13,6 @@ import org.zalando.nakadi.domain.Feature;
 import org.zalando.nakadi.domain.HeaderTag;
 import org.zalando.nakadi.domain.NakadiCursor;
 import org.zalando.nakadi.domain.Subscription;
-import org.zalando.nakadi.domain.TestDataFilter;
 import org.zalando.nakadi.domain.UnprocessableEventPolicy;
 import org.zalando.nakadi.exceptions.runtime.AccessDeniedException;
 import org.zalando.nakadi.exceptions.runtime.NakadiRuntimeException;
@@ -48,6 +47,8 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+
+import static org.zalando.nakadi.service.StreamingFilters.shouldEventBeFilteredBecauseOfTestProjectId;
 
 public class StreamingContext implements SubscriptionStreamer {
 
@@ -320,12 +321,7 @@ public class StreamingContext implements SubscriptionStreamer {
             }
         }
 
-        // For the "testing in production" feature.
-        // If the user requested only LIVE events we need to discard any test events.
-        // If the user requested only TEST events we need to discard any non-test events.
-        final boolean isTestEvent = event.getTestProjectIdHeader().isPresent();
-        if ((parameters.getTestDataFilter() == TestDataFilter.LIVE && isTestEvent) ||
-                (parameters.getTestDataFilter() == TestDataFilter.TEST && !isTestEvent)) {
+        if (shouldEventBeFilteredBecauseOfTestProjectId(parameters.getTestDataFilter(), event)) {
             return true;
         }
 
