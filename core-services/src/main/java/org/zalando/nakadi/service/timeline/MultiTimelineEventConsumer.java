@@ -116,7 +116,7 @@ public class MultiTimelineEventConsumer implements HighLevelConsumer {
             if (timelineBorderReached) {
                 timelinesChanged.set(true);
             }
-            // Here we are trying to avoid the null events
+            // filter out tombstones
             if (event.getEvent() != null) {
                 filteredResult.add(event);
             }
