@@ -95,7 +95,7 @@ public class SubscriptionTimeLagService {
                     .get(timeLagHandler.getRemainingTimeoutMs(), TimeUnit.MILLISECONDS);
 
         } catch (final Exception e) {
-            LOG.error("caught exception the timelag stats are not complete for subscription {}", subscriptionId);
+            LOG.error("caught exception the timelag stats are not complete for subscription {}", subscriptionId, e);
         }
 
         for (final EventTypePartition etp : futureTimeLags.keySet()) {
