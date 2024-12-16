@@ -1,7 +1,7 @@
 buildscript {
     dependencies {
         classpath "org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}"
-        classpath 'org.yaml:snakeyaml:1.21'
+        classpath 'org.yaml:snakeyaml:2.3'
         classpath 'org.owasp:dependency-check-gradle:5.3.2.1'
     }
 }

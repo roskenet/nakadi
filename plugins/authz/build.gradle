@@ -61,7 +61,7 @@ dependencies {
     // use same version as Nakadi
     compile "org.springframework.boot:spring-boot-starter-json"
     compile 'org.echocat.jomon:runtime:1.6.3'
-    compile 'com.googlecode.libphonenumber:libphonenumber:8.12.7'
+    compile 'com.googlecode.libphonenumber:libphonenumber:8.13.47'
 
     // open tracing
     compile 'io.opentracing:opentracing-api:0.33.0'
