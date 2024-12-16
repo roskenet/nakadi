@@ -33,6 +33,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class RepartitioningServiceTest {
+    private static final String DLQ_REDRIVE_EVENT_TYPE_NAME = "dlq-redrive";
 
     private EventTypeRepository eventTypeRepository;
     private EventTypeCache eventTypeCache;
@@ -45,7 +46,6 @@ class RepartitioningServiceTest {
     private NakadiAuditLogPublisher auditLogPublisher;
     private RepartitioningService repartitioningService;
     private TopicRepository topicRepository;
-    private final String dlqEventTypeName = "dlq-event";
 
     @BeforeEach
     public void setup() {
@@ -68,7 +68,7 @@ class RepartitioningServiceTest {
                 nakadiSettings,
                 cursorConverter,
                 timelineSync,
-                dlqEventTypeName,
+                DLQ_REDRIVE_EVENT_TYPE_NAME,
                 auditLogPublisher
         );
     }
@@ -76,7 +76,7 @@ class RepartitioningServiceTest {
     @Test
     public void shouldThrowExceptionIfEventTypeIsDeadLetterQueue() {
         // Given
-        final String eventTypeName = dlqEventTypeName;
+        final String eventTypeName = DLQ_REDRIVE_EVENT_TYPE_NAME;
         final int partitions = 2;
 
         // When And Then

@@ -6,6 +6,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -20,7 +21,6 @@ import org.zalando.nakadi.domain.ItemsWrapper;
 import org.zalando.nakadi.domain.NakadiCursor;
 import org.zalando.nakadi.domain.PaginationLinks;
 import org.zalando.nakadi.domain.PaginationWrapper;
-import org.zalando.nakadi.domain.PartitionBaseStatistics;
 import org.zalando.nakadi.domain.PartitionEndStatistics;
 import org.zalando.nakadi.domain.PartitionStatistics;
 import org.zalando.nakadi.domain.Subscription;
@@ -97,23 +97,26 @@ public class SubscriptionService {
     private final EventTypeCache eventTypeCache;
     private final TransactionTemplate transactionTemplate;
     private final EventTypeRepository eventTypeRepository;
+    private final String dlqRedriveEventTypeName;
 
     @Autowired
-    public SubscriptionService(final SubscriptionDbRepository subscriptionDbRepository,
-                               final SubscriptionCache subscriptionCache,
-                               final SubscriptionClientFactory subscriptionClientFactory,
-                               final TimelineService timelineService,
-                               final SubscriptionValidationService subscriptionValidationService,
-                               final CursorConverter converter,
-                               final CursorOperationsService cursorOperationsService,
-                               final NakadiKpiPublisher nakadiKpiPublisher,
-                               final FeatureToggleService featureToggleService,
-                               final SubscriptionTimeLagService subscriptionTimeLagService,
-                               final NakadiAuditLogPublisher nakadiAuditLogPublisher,
-                               final AuthorizationValidator authorizationValidator,
-                               final EventTypeCache eventTypeCache,
-                               final TransactionTemplate transactionTemplate,
-                               final EventTypeRepository eventTypeRepository) {
+    public SubscriptionService(
+            final SubscriptionDbRepository subscriptionDbRepository,
+            final SubscriptionCache subscriptionCache,
+            final SubscriptionClientFactory subscriptionClientFactory,
+            final TimelineService timelineService,
+            final SubscriptionValidationService subscriptionValidationService,
+            final CursorConverter converter,
+            final CursorOperationsService cursorOperationsService,
+            final NakadiKpiPublisher nakadiKpiPublisher,
+            final FeatureToggleService featureToggleService,
+            final SubscriptionTimeLagService subscriptionTimeLagService,
+            final NakadiAuditLogPublisher nakadiAuditLogPublisher,
+            final AuthorizationValidator authorizationValidator,
+            final EventTypeCache eventTypeCache,
+            final TransactionTemplate transactionTemplate,
+            final EventTypeRepository eventTypeRepository,
+            @Value("${nakadi.dlq.redriveEventTypeName}") final String dlqRedriveEventTypeName) {
         this.subscriptionDbRepository = subscriptionDbRepository;
         this.subscriptionCache = subscriptionCache;
         this.subscriptionClientFactory = subscriptionClientFactory;
@@ -129,6 +132,7 @@ public class SubscriptionService {
         this.eventTypeCache = eventTypeCache;
         this.transactionTemplate = transactionTemplate;
         this.eventTypeRepository = eventTypeRepository;
+        this.dlqRedriveEventTypeName = dlqRedriveEventTypeName;
     }
 
     public Subscription createSubscription(final SubscriptionBase subscriptionBase)
@@ -386,7 +390,6 @@ public class SubscriptionService {
         }
     }
 
-
     private List<EventType> getEventTypesForSubscription(final Subscription subscription)
             throws NoSuchEventTypeException {
         return subscription.getEventTypes().stream()
@@ -427,8 +430,12 @@ public class SubscriptionService {
             final Optional<ZkSubscriptionNode> subscriptionNode,
             final ZkSubscriptionClient client, final StatsMode statsMode)
             throws ServiceTemporarilyUnavailableException, InconsistentStateException {
+
         final List<SubscriptionEventTypeStats> result = new ArrayList<>(eventTypes.size());
-        final Collection<NakadiCursor> committedPositions = getCommittedPositions(subscriptionNode, client);
+        // disregard the DLQ redrive topic committed offsets, as we won't report them
+        final List<NakadiCursor> committedPositions = getCommittedPositions(subscriptionNode, client).stream()
+                .filter(c -> !c.getEventType().equals(dlqRedriveEventTypeName))
+                .collect(Collectors.toList());
         final List<PartitionStatistics> stats = loadPartitionStatistics(eventTypes);
 
         final Map<EventTypePartition, Duration> timeLags = statsMode == StatsMode.TIMELAG ?
@@ -436,7 +443,7 @@ public class SubscriptionService {
                 ImmutableMap.of();
 
         for (final EventType eventType : eventTypes) {
-            final List<PartitionBaseStatistics> statsForEventType = stats.stream()
+            final List<PartitionEndStatistics> statsForEventType = stats.stream()
                     .filter(s -> s.getTimeline().getEventType().equals(eventType.getName()))
                     .collect(Collectors.toList());
             result.add(getEventTypeStats(subscriptionNode, eventType.getName(), statsForEventType,
@@ -457,14 +464,14 @@ public class SubscriptionService {
 
     private SubscriptionEventTypeStats getEventTypeStats(final Optional<ZkSubscriptionNode> subscriptionNode,
                                                          final String eventTypeName,
-                                                         final List<? extends PartitionBaseStatistics> stats,
+                                                         final List<PartitionEndStatistics> stats,
                                                          final Collection<NakadiCursor> committedPositions,
                                                          final Map<EventTypePartition, Duration> timeLags) {
         final List<SubscriptionEventTypeStats.Partition> resultPartitions =
                 new ArrayList<>(stats.size());
-        for (final PartitionBaseStatistics stat : stats) {
+        for (final PartitionEndStatistics stat : stats) {
             final String partition = stat.getPartition();
-            final NakadiCursor lastPosition = ((PartitionEndStatistics) stat).getLast();
+            final NakadiCursor lastPosition = stat.getLast();
             final Long distance = computeDistance(committedPositions, lastPosition);
             final Long lagSeconds = Optional.ofNullable(timeLags.get(new EventTypePartition(eventTypeName, partition)))
                     .map(Duration::getSeconds)

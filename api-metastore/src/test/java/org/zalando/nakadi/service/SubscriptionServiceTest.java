@@ -39,6 +39,8 @@ import static org.mockito.ArgumentMatchers.eq;
 @RunWith(MockitoJUnitRunner.class)
 public class SubscriptionServiceTest {
 
+    private static final String DLQ_REDRIVE_EVENT_TYPE_NAME = "dlq-redrive";
+
     private SubscriptionDbRepository subscriptionRepository;
     private SubscriptionCache subscriptionCache;
     private NakadiKpiPublisher nakadiKpiPublisher;
@@ -76,7 +78,7 @@ public class SubscriptionServiceTest {
                 timelineService, subscriptionValidationService, cursorConverter,
                 cursorOperationsService, nakadiKpiPublisher, featureToggleService, null,
                 nakadiAuditLogPublisher, authorizationValidator, cache,
-                transactionTemplate, eventTypeRepository);
+                transactionTemplate, eventTypeRepository, DLQ_REDRIVE_EVENT_TYPE_NAME);
     }
 
     @Test(expected = AuthorizationNotPresentException.class)

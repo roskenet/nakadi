@@ -94,6 +94,7 @@ public class SubscriptionControllerTest {
     private static final String PROBLEM_CONTENT_TYPE = "application/problem+json";
     private static final int PARTITIONS_PER_SUBSCRIPTION = 5;
     private static final Timeline TIMELINE = TestUtils.buildTimelineWithTopic("topic");
+    private static final String DLQ_REDRIVE_EVENT_TYPE_NAME = "dlq-redrive";
 
     private final SubscriptionDbRepository subscriptionRepository = mock(SubscriptionDbRepository.class);
     private final SubscriptionCache subscriptionCache = mock(SubscriptionCache.class);
@@ -141,7 +142,7 @@ public class SubscriptionControllerTest {
                 zkSubscriptionClientFactory, timelineService, subscriptionValidationService,
                 cursorConverter, cursorOperationsService, nakadiKpiPublisher, featureToggleService, null,
                 nakadiAuditLogPublisher, mock(AuthorizationValidator.class), eventTypeCache,
-                transactionTemplate, eventTypeRepository);
+                transactionTemplate, eventTypeRepository, DLQ_REDRIVE_EVENT_TYPE_NAME);
         final SubscriptionController controller = new SubscriptionController(subscriptionService);
         final ApplicationService applicationService = mock(ApplicationService.class);
         doReturn(true).when(applicationService).exists(any());
@@ -284,6 +285,7 @@ public class SubscriptionControllerTest {
                 new KafkaPartitionStatistics(TIMELINE, 0, 7, 13));
         when(topicRepository.loadTopicStatistics(eq(Collections.singletonList(TIMELINE)))).thenReturn(statistics);
         final NakadiCursor currentCursor = mock(NakadiCursor.class);
+        when(currentCursor.getEventType()).thenReturn(TIMELINE.getEventType());
         when(currentCursor.getEventTypePartition()).thenReturn(new EventTypePartition(TIMELINE.getEventType(), "0"));
         when(cursorConverter.convert((List<SubscriptionCursorWithoutToken>) any()))
                 .thenReturn(Collections.singletonList(currentCursor));
