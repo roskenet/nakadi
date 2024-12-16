@@ -124,11 +124,12 @@ public class AllowListService {
 
         try {
             // -1, do not count root (PATH_NODES) itself, only child nodes
-            final Integer nodes = nodesCache.size() - 1;
+            // count at least one node, as we know this pod is definitely alive
+            final Integer nodes = Math.max(1, nodesCache.size() - 1);
             final Integer currentConns = clientConnections.getOrDefault(client.getClientId(), 0);
             final Integer currentApproxConnects = nodes * currentConns;
 
-            LOG.debug("Client: `{}`, connections: {}, nodes: {}, limit: {}",
+            LOG.debug("Client: {}, connections: {}, nodes: {}, limit: {}",
                     client.getClientId(), currentConns, nodes, CONNS_PER_APPLICATION);
 
             if (currentApproxConnects > CONNS_PER_APPLICATION) {
