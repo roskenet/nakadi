@@ -19,6 +19,7 @@ import org.zalando.nakadi.domain.PaginationWrapper;
 import org.zalando.nakadi.exceptions.runtime.InternalNakadiException;
 import org.zalando.nakadi.exceptions.runtime.InvalidLimitException;
 import org.zalando.nakadi.exceptions.runtime.InvalidVersionNumberException;
+import org.zalando.nakadi.exceptions.runtime.NoEffectiveSchemaException;
 import org.zalando.nakadi.exceptions.runtime.NoSuchEventTypeException;
 import org.zalando.nakadi.exceptions.runtime.NoSuchSchemaException;
 import org.zalando.nakadi.exceptions.runtime.SchemaEvolutionException;
@@ -157,17 +158,27 @@ public class SchemaController {
     }
 
     @RequestMapping("/event-types/{name}/schemas/{version}")
-    public ResponseEntity<?> getSchemaVersion(@PathVariable("name") final String name,
-                                              @PathVariable("version") final String version,
-                                              final NativeWebRequest request)
+    public ResponseEntity<?> getSchemaVersion(
+            @PathVariable("name") final String name,
+            @PathVariable("version") final String version,
+            @RequestParam(
+                    value = "use_effective_schema",
+                    required = false,
+                    defaultValue = "false") final boolean useEffectiveSchema,
+            final NativeWebRequest request)
             throws NoSuchEventTypeException, InternalNakadiException,
-            NoSuchSchemaException, InvalidVersionNumberException {
+            NoSuchSchemaException, InvalidVersionNumberException, NoEffectiveSchemaException {
         final EventType eventType = eventTypeService.get(name);
-        if (version.equals("latest")) { // latest schema might be cached with the event type
-            return ResponseEntity.status(HttpStatus.OK).body(eventType.getSchema());
+        // latest schema might be cached with the event type
+        final EventTypeSchema eventTypeSchema = version.equals("latest") ? eventType.getSchema()
+                : schemaService.getSchemaVersion(name, version);
+
+        if (useEffectiveSchema) {
+            final EventTypeSchema effectiveEventTypeSchema = schemaService.getEffectiveEventTypeSchema(
+                    eventType, eventTypeSchema);
+            return ResponseEntity.status(HttpStatus.OK).body(effectiveEventTypeSchema);
         }
 
-        final EventTypeSchema result = schemaService.getSchemaVersion(name, version);
-        return ResponseEntity.status(HttpStatus.OK).body(result);
+        return ResponseEntity.status(HttpStatus.OK).body(eventTypeSchema);
     }
 }

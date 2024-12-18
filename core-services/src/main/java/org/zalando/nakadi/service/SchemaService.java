@@ -31,6 +31,7 @@ import org.zalando.nakadi.domain.StrictJsonParser;
 import org.zalando.nakadi.exceptions.runtime.EventTypeUnavailableException;
 import org.zalando.nakadi.exceptions.runtime.InvalidLimitException;
 import org.zalando.nakadi.exceptions.runtime.InvalidVersionNumberException;
+import org.zalando.nakadi.exceptions.runtime.NoEffectiveSchemaException;
 import org.zalando.nakadi.exceptions.runtime.NoSuchSchemaException;
 import org.zalando.nakadi.exceptions.runtime.SchemaValidationException;
 import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableException;
@@ -212,6 +213,19 @@ public class SchemaService implements SchemaProviderService {
         } catch (AvroRuntimeException e) {
             throw new SchemaValidationException("failed to parse avro schema " + e.getMessage());
         }
+    }
+
+    public EventTypeSchema getEffectiveEventTypeSchema(final EventTypeBase eventType,
+                                     final EventTypeSchema eventTypeSchema) throws NoEffectiveSchemaException {
+        if (!eventTypeSchema.getType().equals(EventTypeSchemaBase.Type.JSON_SCHEMA)) {
+            throw new NoEffectiveSchemaException("effective schema is only supported for JSON schema");
+        }
+        final JSONObject effectiveSchemaAsJson = jsonSchemaEnrichment.effectiveSchema(eventType,
+                eventTypeSchema.getSchema());
+        final EventTypeSchema effectiveEventTypeSchema = new EventTypeSchema(eventTypeSchema,
+                eventTypeSchema.getVersion(), eventTypeSchema.getCreatedAt());
+        effectiveEventTypeSchema.setSchema(effectiveSchemaAsJson.toString());
+        return effectiveEventTypeSchema;
     }
 
     private void validateJsonTypeSchema(final EventTypeBase eventType, final String eventTypeSchema,

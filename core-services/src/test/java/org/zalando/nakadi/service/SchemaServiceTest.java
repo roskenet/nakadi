@@ -20,6 +20,7 @@ import org.zalando.nakadi.domain.EventTypeSchemaBase;
 import org.zalando.nakadi.domain.PaginationWrapper;
 import org.zalando.nakadi.domain.Version;
 import org.zalando.nakadi.exceptions.runtime.InvalidLimitException;
+import org.zalando.nakadi.exceptions.runtime.NoEffectiveSchemaException;
 import org.zalando.nakadi.exceptions.runtime.NoSuchSchemaException;
 import org.zalando.nakadi.exceptions.runtime.SchemaEvolutionException;
 import org.zalando.nakadi.exceptions.runtime.SchemaValidationException;
@@ -419,5 +420,22 @@ public class SchemaServiceTest {
                 new EventOwnerSelector(EventOwnerSelector.Type.PATH, "selector_name", "info.retailer_id"));
 
         assertDoesNotThrow(() -> schemaService.validateSchema(eventType, false));
+    }
+
+    @Test
+    public void testGetEffectiveSchemaSuccess() throws Exception {
+        eventType.getSchema().setType(EventTypeSchemaBase.Type.JSON_SCHEMA);
+
+        final EventTypeSchema effectiveSchema = schemaService.getEffectiveEventTypeSchema(
+                eventType, eventType.getSchema());
+        Assertions.assertNotNull(effectiveSchema);
+    }
+
+    @Test
+    public void testGetEffectiveSchemaThrowsNoEffectiveSchemaExceptionForNonJsonSchema() {
+        eventType.getSchema().setType(EventTypeSchemaBase.Type.AVRO_SCHEMA);
+
+        assertThrows(NoEffectiveSchemaException.class, () -> 
+            schemaService.getEffectiveEventTypeSchema(eventType, eventType.getSchema()));
     }
 }

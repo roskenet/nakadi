@@ -22,6 +22,7 @@ import org.zalando.nakadi.exceptions.runtime.InvalidLimitException;
 import org.zalando.nakadi.exceptions.runtime.InvalidVersionNumberException;
 import org.zalando.nakadi.exceptions.runtime.NakadiBaseException;
 import org.zalando.nakadi.exceptions.runtime.NakadiRuntimeException;
+import org.zalando.nakadi.exceptions.runtime.NoEffectiveSchemaException;
 import org.zalando.nakadi.exceptions.runtime.NoSuchEventTypeException;
 import org.zalando.nakadi.exceptions.runtime.NoSuchSchemaException;
 import org.zalando.nakadi.exceptions.runtime.NoSuchSubscriptionException;
@@ -120,7 +121,8 @@ public class NakadiProblemExceptionHandler implements ProblemHandling {
         return create(Problem.valueOf(INTERNAL_SERVER_ERROR, exception.getMessage()), request);
     }
 
-    @ExceptionHandler({InvalidLimitException.class, InvalidVersionNumberException.class})
+    @ExceptionHandler({InvalidLimitException.class, InvalidVersionNumberException.class,
+            NoEffectiveSchemaException.class})
     public ResponseEntity<Problem> handleBadRequestResponses(final NakadiBaseException exception,
                                                              final NativeWebRequest request) {
         LOG.debug(exception.getMessage());

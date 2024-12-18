@@ -1,9 +1,17 @@
 package org.zalando.nakadi.webservice;
 
 import com.jayway.restassured.RestAssured;
+import com.jayway.restassured.path.json.JsonPath;
+import com.jayway.restassured.response.Response;
+
+import java.util.Arrays;
+
 import org.apache.http.HttpStatus;
+import org.hamcrest.MatcherAssert;
 import org.hamcrest.Matchers;
 import org.junit.Test;
+import org.zalando.nakadi.domain.EnrichmentStrategyDescriptor;
+import org.zalando.nakadi.domain.EventCategory;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.EventTypeSchema;
 import org.zalando.nakadi.utils.EventTypeTestBuilder;
@@ -105,6 +113,31 @@ public class SchemaControllerAT extends BaseAT {
                 .body("created_at", Matchers.notNullValue());
     }
 
+    @Test
+    public void whenGetSchemaVersionWithEffectiveSchemaThen200() throws Exception {
+        final EventType eventType =
+                EventTypeTestBuilder.builder()
+                        .category(EventCategory.BUSINESS)
+                        .enrichmentStrategies(Arrays.asList(EnrichmentStrategyDescriptor.METADATA_ENRICHMENT))
+                        .schema("{ \"properties\": { \"order_number\": { \"type\": \"string\" }}}")
+                        .name("et_business_test_name")
+                        .build();
+        NakadiTestUtils.createEventTypeInNakadi(eventType);
+
+        final Response response = RestAssured.given()
+                .when()
+                .get("/event-types/et_business_test_name/schemas/latest?use_effective_schema=true")
+                .then()
+                .statusCode(HttpStatus.SC_OK)
+                .extract()
+                .response();
+        
+        final JsonPath jsonPath = response.jsonPath();
+        final String schemaString = jsonPath.getString("schema");
+        final JsonPath schemaJson = new JsonPath(schemaString);
+
+        MatcherAssert.assertThat(schemaJson.get("properties.metadata"), Matchers.notNullValue());
+    }
 
     private void createEventType() throws Exception {
         EventType eventType =

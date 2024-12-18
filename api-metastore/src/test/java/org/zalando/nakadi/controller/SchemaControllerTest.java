@@ -79,7 +79,7 @@ public class SchemaControllerTest {
         Mockito.when(eventTypeService.get(eventType.getName())).thenReturn(eventType);
 
         final ResponseEntity<?> result = schemaController
-                .getSchemaVersion(eventType.getName(), "latest", nativeWebRequest);
+                .getSchemaVersion(eventType.getName(), "latest", false, nativeWebRequest);
 
         Assert.assertEquals(HttpStatus.OK, result.getStatusCode());
         Assert.assertEquals(eventType.getSchema().toString(), result.getBody().toString());
@@ -91,7 +91,7 @@ public class SchemaControllerTest {
         Mockito.when(eventTypeService.get("et_wrong_event"))
                 .thenThrow(new NoSuchEventTypeException("no event type"));
 
-        schemaController.getSchemaVersion("et_wrong_event", "latest", nativeWebRequest);
+        schemaController.getSchemaVersion("et_wrong_event", "latest", false, nativeWebRequest);
     }
 
     @Test
@@ -102,11 +102,32 @@ public class SchemaControllerTest {
 
         final ResponseEntity<?> result =
                 schemaController.getSchemaVersion(eventType.getName(),
-                        eventType.getSchema().getVersion().toString(), nativeWebRequest);
+                        eventType.getSchema().getVersion().toString(), false, nativeWebRequest);
 
         Assert.assertEquals(HttpStatus.OK, result.getStatusCode());
         Assert.assertEquals(eventType.getSchema().toString(), result.getBody().toString());
     }
+
+    @Test
+public void testGetSchemaVersionWithEffectiveSchema() {
+    final EventType eventType = buildDefaultEventType();
+    final EventTypeSchema eventTypeSchema = eventType.getSchema();
+    final EventTypeSchema effectiveEventTypeSchema = new EventTypeSchema(
+            new EventTypeSchemaBase(EventTypeSchemaBase.Type.JSON_SCHEMA, "{\"metadata\":\"foo\"}"),
+            eventTypeSchema.getVersion(), eventTypeSchema.getCreatedAt());
+
+    Mockito.when(eventTypeService.get(eventType.getName())).thenReturn(eventType);
+    Mockito.when(schemaService.getSchemaVersion(eventType.getName(), eventTypeSchema.getVersion().toString()))
+            .thenReturn(eventTypeSchema);
+    Mockito.when(schemaService.getEffectiveEventTypeSchema(eventType, eventTypeSchema))
+            .thenReturn(effectiveEventTypeSchema);
+
+    final ResponseEntity<?> result = schemaController.getSchemaVersion(
+            eventType.getName(), eventTypeSchema.getVersion().toString(), true, nativeWebRequest);
+
+    Assert.assertEquals(HttpStatus.OK, result.getStatusCode());
+    Assert.assertEquals(effectiveEventTypeSchema.toString(), result.getBody().toString());
+}
 
     @Test
     public void testCheckCompatibilityForValidEvolution() {

@@ -678,6 +678,14 @@ paths:
           description: EventType schema version
           type: string
           required: true
+        - name: use_effective_schema
+          in: query
+          description: |
+            If set to true, the request returns the effective schema. This includes the `metadata` field and for 
+            event types in the data category it wraps all fields in a `data` field. This is only supported for 
+            event types with JSON schema.
+          type: boolean
+          required: false
       responses:
         '200':
           schema:
