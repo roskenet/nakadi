@@ -25,7 +25,7 @@ dependencies {
     compile "io.netty:netty-tcnative-boringssl-static:2.0.40.Final"
     // To have same version as Nakadi
     compile "org.slf4j:slf4j-api:1.7.30"
-    compile 'com.google.guava:guava:30.1-jre' // this is to upgrade lightstep deps
+    compile "com.google.guava:guava:$googleGuavaVersion" // this is to upgrade lightstep deps
 }
 
 task fatJar(type: Jar) {

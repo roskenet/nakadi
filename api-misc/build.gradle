@@ -48,8 +48,8 @@ dependencies {
         exclude module: "logback-classic"
     }
 
-    compile 'com.google.guava:guava:30.1-jre'
-    compile 'org.apache.commons:commons-lang3:3.8.1'
+    compile "com.google.guava:guava:$googleGuavaVersion"
+    compile "org.apache.commons:commons-lang3:$apacheCommonsLangVersion"
 
     compile "org.springframework.boot:spring-boot-starter-json"
     compile 'org.zalando:jackson-datatype-problem:0.22.0'
