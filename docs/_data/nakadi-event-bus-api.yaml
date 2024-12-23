@@ -1570,9 +1570,12 @@ paths:
               stream_limit:
                 description: |
                   Maximum number of `Event`s in this stream (over all partitions being streamed in this
-                  connection).
+                  connection). This is mostly meant for special consumers who don't want to continuously
+                  stream events, but just get a certain number of events and then stop.
+                  (It is also handy for testing how your consumer handles Nakadi closing the connection.)
 
-                  * If 0 or undefined, will stream batches indefinitely.
+                  * If 0 or undefined, will stream batches indefinitely. This is recommended for most
+                    consumers who want to continously stream events.
 
                   * Stream initialization will fail if `stream_limit` is lower than `batch_limit`.
                 type: integer
@@ -3628,9 +3631,12 @@ parameters:
     in: query
     description: |
       Maximum number of `Event`s in this stream (over all partitions being streamed in this
-      connection).
+      connection). This is mostly meant for special consumers who don't want to continuously
+      stream events, but just get a certain number of events and then stop.
+      (It is also handy for testing how your consumer handles Nakadi closing the connection.)
 
-      * If 0 or undefined, will stream batches indefinitely.
+      * If 0 or undefined, will stream batches indefinitely. This is recommended for most
+        consumers who want to continously stream events.
 
       * Stream initialization will fail if `stream_limit` is lower than `batch_limit`.
     type: integer
