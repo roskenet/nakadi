@@ -17,14 +17,18 @@ pipeline:
 
       - desc: Test
         cmd: |
-          ./gradlew test --stacktrace
-
+          cdp-wrap-cmd "./gradlew test --stacktrace" "
+            for dir in api-consumption api-cursors api-metastore api-misc api-publishing app core-common core-services plugins/authz; do
+              rm -rf \${dir}/build/test-results/test/binary
+              test_name=\$(echo \$dir | sed 's/\//-/g')
+              cdp-upload-test-results --name \$test_name -t junit \${dir}/build/test-results/test
+            done
+            "
       - desc: Acceptance Test
         cmd: |
           apt-get install -y docker-compose-plugin
-
-          ./gradlew fullAcceptanceTest --stacktrace
-
+          cdp-wrap-cmd "./gradlew  fullAcceptanceTest --stacktrace" "rm -rf acceptance-test/build/test-results/acceptanceTest/binary;
+            cdp-upload-test-results --name acceptance-test -t junit acceptance-test/build/test-results/acceptanceTest;"
       - desc: Build and push
         cmd: |
           # clean-build actually happens indirectly as part of running
