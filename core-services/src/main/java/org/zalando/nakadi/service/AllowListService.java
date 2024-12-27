@@ -1,5 +1,6 @@
 package org.zalando.nakadi.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.TreeCache;
@@ -21,12 +22,12 @@ import org.zalando.nakadi.service.publishing.NakadiAuditLogPublisher;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
-import java.util.Collections;
+
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -47,7 +48,7 @@ public class AllowListService {
     private static final Logger LOG = LoggerFactory.getLogger(AllowListService.class);
     private static final String PATH_ALLOWLIST = "/nakadi/lola/allowlist/applications";
     private static final String PATH_NODES = "/nakadi/lola/nodes";
-    private static final int CONNS_PER_APPLICATION = 100;
+    private static final int DEFAULT_MAX_TOTAL_CONNECTIONS = 100;
     private final ZooKeeperHolder zooKeeperHolder;
     private final NakadiAuditLogPublisher auditLogPublisher;
     private TreeCache allowListCache;
@@ -56,25 +57,27 @@ public class AllowListService {
     private final Map<String, Integer> clientConnections;
     private final FeatureToggleService featureToggleService;
     private final NakadiSettings nakadiSettings;
+    private final ObjectMapper objectMapper;
 
     @Autowired
     public AllowListService(final ZooKeeperHolder zooKeeperHolder,
                             final NakadiAuditLogPublisher auditLogPublisher,
                             final FeatureToggleService featureToggleService,
-                            final NakadiSettings nakadiSettings) {
+                            final NakadiSettings nakadiSettings,
+                            final ObjectMapper objectMapper) {
         this.zooKeeperHolder = zooKeeperHolder;
         this.auditLogPublisher = auditLogPublisher;
         this.nodeId = UUID.randomUUID().toString();
         this.clientConnections = new ConcurrentHashMap<>();
         this.featureToggleService = featureToggleService;
         this.nakadiSettings = nakadiSettings;
+        this.objectMapper = objectMapper;
     }
 
     @PostConstruct
     public void initIt() {
         try {
-            this.allowListCache = TreeCache.newBuilder(
-                    zooKeeperHolder.get(), PATH_ALLOWLIST).setCacheData(false).build();
+            this.allowListCache = TreeCache.newBuilder(zooKeeperHolder.get(), PATH_ALLOWLIST).build();
             this.allowListCache.start();
 
             if (nakadiSettings.isLimitLoLaConnections()) {
@@ -189,9 +192,8 @@ public class AllowListService {
         }
 
         try {
-            final ChildData currentData = allowListCache.getCurrentData(
-                    PATH_ALLOWLIST + "/" + client.getClientId());
-            if (currentData == null) {
+            final String application = client.getClientId();
+            if (allowListCache.getCurrentData(makeApplicationPath(application)) == null) {
                 return false;
             }
         } catch (final Exception e) {
@@ -205,18 +207,24 @@ public class AllowListService {
         if (!featureToggleService.isFeatureEnabled(Feature.LIMIT_LOLA_CONNECTIONS)) {
             return true;
         }
-
         try {
-            // -1, do not count root (PATH_NODES) itself, only child nodes
-            // count at least one node, as we know this pod is definitely alive
-            final Integer nodes = Math.max(1, nodesCache.size() - 1);
-            final Integer currentConns = clientConnections.getOrDefault(client.getClientId(), 0);
-            final Integer currentApproxConnects = nodes * currentConns;
+            final String application = client.getClientId();
+            //
+            // 1. -1, do not count root (PATH_NODES) itself, only child nodes
+            // 2. count at least one node, as we know this pod is definitely alive
+            //
+            final int nodes = Math.max(1, nodesCache.size() - 1);
+            final int thisNodeConnections = clientConnections.getOrDefault(application, 0);
+            final int approxTotalConnections = nodes * thisNodeConnections;
 
-            LOG.debug("Client: {}, connections: {}, nodes: {}, limit: {}",
-                    client.getClientId(), currentConns, nodes, CONNS_PER_APPLICATION);
+            final int maxTotalConnections = getCachedApplicationConfig(application)
+                    .map(ApplicationConfig::getMaxTotalConnections)
+                    .orElse(DEFAULT_MAX_TOTAL_CONNECTIONS);
 
-            if (currentApproxConnects > CONNS_PER_APPLICATION) {
+            LOG.debug("Application: {}, this node conns: {}, nodes: {}, approx. total conns: {}, max total conns: {}",
+                    application, thisNodeConnections, nodes, approxTotalConnections, maxTotalConnections);
+
+            if (approxTotalConnections > maxTotalConnections) {
                 return false;
             }
 
@@ -226,65 +234,160 @@ public class AllowListService {
         }
     }
 
-    public void trackConnectionsCount(final Client client, final Integer increment) {
+    public void trackConnectionsCount(final Client client, final int increment) {
         clientConnections.compute(client.getClientId(),
                 (app, conns) -> Math.max(0, (conns == null ? 0 : conns) + increment));
     }
 
-    public void add(final String application) throws RuntimeException {
+    //
+    // In the set/remove/list methods below we shouldn't be using the cache but work with ZK directly instead.  These
+    // methods are rarely called (only by interacting with the settings API) and cache effects can be confusing there.
+    //
+    public void set(final String application, final Optional<ApplicationConfig> appConfig) {
+        final CuratorFramework curator = zooKeeperHolder.get();
+        final String applicationPath = makeApplicationPath(application);
+        AuditLogEntry oldEntry = null;
+        final AuditLogEntry newEntry = new AuditLogEntry(application, appConfig);
         try {
-            final CuratorFramework curator = zooKeeperHolder.get();
-            curator.create().creatingParentsIfNeeded().forPath(
-                    String.format("%s/%s", PATH_ALLOWLIST, application),
-                    null
-            );
+            final byte[] configBytes = appConfig
+                    .map(this::makeBytesFromApplicationConfig)
+                    .orElse(null);
+            try {
+                curator.create()
+                        .creatingParentsIfNeeded()
+                        .forPath(applicationPath, configBytes);
+            } catch (final KeeperException.NodeExistsException e) {
+                // fetch old config before overwriting it
+                final byte[] oldConfigBytes = curator.getData()
+                        .forPath(applicationPath);
+                final Optional<ApplicationConfig> oldConfig = makeApplicationConfigFromBytes(oldConfigBytes);
+                oldEntry = new AuditLogEntry(application, oldConfig);
 
+                // set new config
+                curator.setData()
+                        .forPath(applicationPath, configBytes);
+            }
+        } catch (final Exception e) {
+            throw new NakadiRuntimeException("Issue occurred while creating node in zk: " + applicationPath, e);
+        }
+
+        auditLogPublisher.publish(
+                Optional.ofNullable(oldEntry),
+                Optional.of(newEntry),
+                NakadiAuditLogPublisher.ResourceType.BLACKLIST_ENTRY,
+                oldEntry == null
+                    ? NakadiAuditLogPublisher.ActionType.CREATED
+                    : NakadiAuditLogPublisher.ActionType.UPDATED,
+                application);
+    }
+
+    public void remove(final String application) {
+        final CuratorFramework curator = zooKeeperHolder.get();
+        final String applicationPath = makeApplicationPath(application);
+        try {
+            final byte[] oldConfigBytes = curator.getData()
+                    .forPath(applicationPath);
+            final Optional<ApplicationConfig> appConfig = makeApplicationConfigFromBytes(oldConfigBytes);
+
+            curator.delete()
+                    .forPath(applicationPath);
+
+            // danger to lose the audit event fixme
             auditLogPublisher.publish(
+                    Optional.of(new AuditLogEntry(application, appConfig)),
                     Optional.empty(),
-                    Optional.of(application),
-                    NakadiAuditLogPublisher.ResourceType.BLACKLIST_ENTRY,
-                    NakadiAuditLogPublisher.ActionType.CREATED,
+                    NakadiAuditLogPublisher.ResourceType.BLACKLIST_ENTRY, // WTF BlackList?
+                    NakadiAuditLogPublisher.ActionType.DELETED,
                     application);
-        } catch (final KeeperException.NodeExistsException e) {
-            // skipping the node is already in place
-        } catch (final Exception e) {
-            throw new RuntimeException("Issue occurred while creating node in zk", e);
-        }
-    }
 
-    public void remove(final String application) throws RuntimeException {
-        try {
-            final CuratorFramework curator = zooKeeperHolder.get();
-            final String applicationPath = String.format("%s/%s", PATH_ALLOWLIST, application);
-            final ChildData currentData = allowListCache.getCurrentData(applicationPath);
-            if (currentData != null) {
-                curator.delete().forPath(applicationPath);
-
-                // danger to lose the audit event fixme
-                auditLogPublisher.publish(
-                        Optional.of(application),
-                        Optional.empty(),
-                        NakadiAuditLogPublisher.ResourceType.BLACKLIST_ENTRY,
-                        NakadiAuditLogPublisher.ActionType.DELETED,
-                        application);
-            }
         } catch (final KeeperException.NoNodeException e) {
-            // skipping the node was deleted or did not exist
+            LOG.info("Node already deleted or didn't exist in zk: {}", applicationPath);
         } catch (final Exception e) {
-            throw new RuntimeException("Issue occurred while deleting node from zk", e);
+            throw new NakadiRuntimeException("Issue occurred while deleting node from zk: " + applicationPath, e);
         }
     }
 
-    public Set<String> list() throws RuntimeException {
+    public Map<String, Optional<ApplicationConfig>> list() {
+        final CuratorFramework curator = zooKeeperHolder.get();
         try {
-            final Map<String, ChildData> appsData = allowListCache
-                    .getCurrentChildren(PATH_ALLOWLIST);
-            if (appsData == null) {
-                return Collections.emptySet();
-            }
-            return appsData.keySet();
+            return curator.getChildren()
+                    .forPath(PATH_ALLOWLIST)
+                    .stream()
+                    .collect(Collectors.toMap(
+                                    Function.identity(),
+                                    application -> fetchApplicationConfig(curator, application)));
         } catch (final Exception e) {
-            throw new RuntimeException("Issue occurred while deleting node from zk", e);
+            throw new NakadiRuntimeException("Issue occurred while listing nodes from zk: " + PATH_ALLOWLIST, e);
+        }
+    }
+
+    private String makeApplicationPath(final String application) {
+        return String.format("%s/%s", PATH_ALLOWLIST, application);
+    }
+
+    private Optional<ApplicationConfig> fetchApplicationConfig(
+            final CuratorFramework curator, final String application) {
+
+        final String applicationPath = makeApplicationPath(application);
+        try {
+            return makeApplicationConfigFromBytes(
+                    curator.getData().forPath(applicationPath));
+        } catch (final Exception e) {
+            throw new NakadiRuntimeException("Issue occurred while fetching node from zk: " + applicationPath, e);
+        }
+    }
+
+    private Optional<ApplicationConfig> getCachedApplicationConfig(final String application) {
+        return Optional.ofNullable(
+                allowListCache.getCurrentData(
+                        makeApplicationPath(application)))
+                .map(ChildData::getData)
+                .flatMap(this::makeApplicationConfigFromBytes);
+    }
+
+    private Optional<ApplicationConfig> makeApplicationConfigFromBytes(final byte[] bytes) {
+        if (bytes == null || bytes.length == 0) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(objectMapper.readValue(bytes, ApplicationConfig.class));
+        } catch (final Exception e) {
+            LOG.warn("Failed to parse application configuration from: {}", bytes, e);
+            return Optional.empty();
+        }
+    }
+
+    private byte[] makeBytesFromApplicationConfig(final ApplicationConfig appConfig) {
+        try {
+            return objectMapper.writeValueAsBytes(appConfig);
+        } catch (final Exception e) {
+            throw new NakadiRuntimeException("Failed to serialze: " + appConfig, e);
+        }
+    }
+
+    public static class ApplicationConfig {
+        private int maxTotalConnections;
+
+        public ApplicationConfig() {
+            this.maxTotalConnections = 0;
+        }
+
+        public int getMaxTotalConnections() {
+            return maxTotalConnections;
+        }
+
+        public void setMaxTotalConnections(final int maxTotalConnections) {
+            this.maxTotalConnections = maxTotalConnections;
+        }
+    }
+
+    public static class AuditLogEntry {
+        public final String application;
+        public final Optional<ApplicationConfig> configuration;
+
+        private AuditLogEntry(final String application, final Optional<ApplicationConfig> configuration) {
+            this.application = application;
+            this.configuration = configuration;
         }
     }
 }

@@ -24,7 +24,7 @@ import org.zalando.nakadi.service.publishing.NakadiAuditLogPublisher;
 
 import javax.validation.Valid;
 import java.util.Optional;
-import java.util.TreeSet;
+import java.util.TreeMap;
 
 import static org.zalando.nakadi.domain.ResourceImpl.ADMIN_RESOURCE;
 
@@ -84,13 +84,16 @@ public class SettingsController {
     }
 
     @RequestMapping(value = "/lola/allowlist/applications/{application}", method = RequestMethod.PUT)
-    public ResponseEntity addToAllowlist(@PathVariable("application") final String application)
+    public ResponseEntity addToAllowlist(
+            @PathVariable("application") final String application,
+            @RequestBody final Optional<AllowListService.ApplicationConfig> appConfig)
             throws ForbiddenOperationException {
+
         if (!adminService.isAdmin(AuthorizationService.Operation.WRITE)) {
             throw new ForbiddenOperationException("Admin privileges are required to perform this operation");
         }
 
-        allowListService.add(application);
+        allowListService.set(application, appConfig);
         return ResponseEntity.ok().build();
     }
 
@@ -110,8 +113,8 @@ public class SettingsController {
         if (!adminService.isAdmin(AuthorizationService.Operation.READ)) {
             throw new ForbiddenOperationException("Admin privileges are required to perform this operation");
         }
-        // using a sorted set to order the returned items alphabetically
-        return ResponseEntity.ok(ImmutableMap.of("items", new TreeSet(allowListService.list())));
+        // using a sorted map to order the returned items alphabetically
+        return ResponseEntity.ok(ImmutableMap.of("items", new TreeMap(allowListService.list())));
     }
 
     @RequestMapping(path = "/features", method = RequestMethod.GET)

@@ -94,7 +94,7 @@ public class NakadiAuditLogPublisher {
         try {
             return objectMapper.writeValueAsString(state);
         } catch (JsonProcessingException e) {
-            LOG.error("failed to publish audit log", e);
+            LOG.warn("failed to serialize object state", e);
             return null;
         }
     }
