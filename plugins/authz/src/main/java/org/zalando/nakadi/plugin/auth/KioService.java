@@ -20,7 +20,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.zalando.nakadi.plugin.api.exceptions.PluginException;
 
-import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -73,7 +72,7 @@ public class KioService {
             }
         } catch (final JsonProcessingException jpe) {
             throw new PluginException("Failed to parse response for " + owningApplication + " from " + kioUrl, jpe);
-        } catch (final IOException ex) {
+        } catch (final Exception ex) {
             throw new PluginException(
                     "Failed to fetch " + owningApplication + " from the endpoint " + kioUrl, ex);
         } finally {
