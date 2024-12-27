@@ -49,7 +49,7 @@ public class ZalandoTeamService {
         this.objectMapper = objectMapper;
     }
 
-    public boolean isValidTeam(final String team) throws PluginException {
+    public boolean isValidTeam(final String team) {
 
         if (!TEAM_PATTERN.matcher(team).matches()) {
             return false;
@@ -60,14 +60,15 @@ public class ZalandoTeamService {
                 .orElse(false);
     }
 
-    public List<String> getTeamMembers(final String team) throws PluginException {
+    public List<String> getTeamMembers(final String team) {
         return fetchTeamInfo(team)
-                .map(teamInfo -> Objects.isNull(teamInfo.members)?
-                        Collections.<String>emptyList(): Collections.unmodifiableList(teamInfo.members))
+                .map(teamInfo -> Objects.isNull(teamInfo.members)
+                        ? Collections.<String>emptyList()
+                        : Collections.unmodifiableList(teamInfo.members))
                 .orElse(Collections.emptyList());
     }
 
-    public Optional<String> getOfficialTeamId(final String team) throws PluginException {
+    public Optional<String> getOfficialTeamId(final String team) {
         return fetchTeamInfo(team)
                 .map(teamInfo -> teamInfo.teamId);
     }

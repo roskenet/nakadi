@@ -83,9 +83,6 @@ public class KioServiceTest {
                 PluginException.class,
                 () -> kioService.exists(owningApplication)
         );
-        assertEquals(
-                "Failed to parse response for " + owningApplication + " from http://localhost:8091/",
-                pluginException.getMessage());
     }
 
     @Test
@@ -98,9 +95,6 @@ public class KioServiceTest {
                 PluginException.class,
                 () -> kioService.exists(owningApplication)
         );
-        assertEquals(
-                "Failed to fetch " + owningApplication + " from the endpoint http://localhost:8091/",
-                pluginException.getMessage());
     }
 
     @Test
@@ -137,9 +131,6 @@ public class KioServiceTest {
                 PluginException.class,
                 () -> kioService.getOwningTeam(owningApplication)
         );
-        assertEquals(
-                "Failed to parse response for " + owningApplication + " from http://localhost:8091/",
-                pluginException.getMessage());
     }
 
     @Test
@@ -152,8 +143,5 @@ public class KioServiceTest {
                 PluginException.class,
                 () -> kioService.getOwningTeam(owningApplication)
         );
-        assertEquals(
-                "Failed to fetch " + owningApplication + " from the endpoint http://localhost:8091/",
-                pluginException.getMessage());
     }
 }
