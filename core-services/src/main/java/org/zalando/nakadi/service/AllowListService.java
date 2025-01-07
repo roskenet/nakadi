@@ -11,6 +11,7 @@ import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.zalando.nakadi.config.NakadiSettings;
@@ -25,7 +26,6 @@ import javax.annotation.PreDestroy;
 
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -64,13 +64,14 @@ public class AllowListService {
                             final NakadiAuditLogPublisher auditLogPublisher,
                             final FeatureToggleService featureToggleService,
                             final NakadiSettings nakadiSettings,
+                            @Value("${hostname:}") final String nodeId,
                             final ObjectMapper objectMapper) {
         this.zooKeeperHolder = zooKeeperHolder;
         this.auditLogPublisher = auditLogPublisher;
-        this.nodeId = UUID.randomUUID().toString();
         this.clientConnections = new ConcurrentHashMap<>();
         this.featureToggleService = featureToggleService;
         this.nakadiSettings = nakadiSettings;
+        this.nodeId = nodeId;
         this.objectMapper = objectMapper;
     }
 
