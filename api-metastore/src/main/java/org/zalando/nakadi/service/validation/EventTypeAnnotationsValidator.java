@@ -11,6 +11,7 @@ import org.zalando.nakadi.exceptions.runtime.InvalidEventTypeException;
 import org.zalando.nakadi.plugin.api.ApplicationService;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.Subject;
+import org.zalando.nakadi.plugin.api.exceptions.PluginException;
 import org.zalando.nakadi.service.FeatureToggleService;
 
 import javax.validation.constraints.NotNull;
@@ -95,11 +96,15 @@ public class EventTypeAnnotationsValidator {
             final Map<String, String> oldAnnotations,
             final String owningApplication) {
         if (oldAnnotations == null) { // Triggered when a new event type is created
-            return owningApplication != null &&
-                    (applicationService
-                            .getOwningTeamId(owningApplication)
-                            .filter(teamId -> optInTeamsConfig.getOptInTeams().contains(teamId))
-                            .isPresent());
+            try {
+                return owningApplication != null &&
+                        (applicationService
+                                .getOwningTeamId(owningApplication)
+                                .filter(teamId -> optInTeamsConfig.getOptInTeams().contains(teamId))
+                                .isPresent());
+            } catch (final PluginException e) {
+                throw new InvalidEventTypeException(e);
+            }
         } else {
             return oldAnnotations.containsKey(DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
         }
