@@ -16,7 +16,6 @@ import org.zalando.nakadi.domain.Timeline;
 import org.zalando.nakadi.domain.storage.Storage;
 import org.zalando.nakadi.exceptions.runtime.InternalNakadiException;
 import org.zalando.nakadi.exceptions.runtime.InvalidCursorException;
-import org.zalando.nakadi.exceptions.runtime.NakadiRuntimeException;
 import org.zalando.nakadi.exceptions.runtime.NoSuchEventTypeException;
 import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableException;
 import org.zalando.nakadi.repository.TopicRepository;
@@ -179,10 +178,9 @@ public class StreamingStateTest {
         when(stats.getBeforeFirst()).thenReturn(beforeFirstCursor);
         when(topicRepository.loadTopicStatistics(any())).thenReturn(Lists.newArrayList(stats));
 
-        // enter state and expect InvalidCursorException
         state.onEnter();
         assertThrows(
-                NakadiRuntimeException.class,
+                InvalidCursorException.class,
                 () -> state.refreshTopologyUnlocked(new ZkSubscriptionClient.Topology(partitions, 0)));
     }
 

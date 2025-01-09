@@ -8,7 +8,6 @@ import org.zalando.nakadi.domain.KafkaHeaderTagSerde;
 import org.zalando.nakadi.domain.EventOwnerHeader;
 import org.zalando.nakadi.domain.NakadiCursor;
 import org.zalando.nakadi.domain.TestProjectIdHeader;
-import org.zalando.nakadi.exceptions.runtime.InvalidCursorException;
 import org.zalando.nakadi.repository.LowLevelConsumer;
 
 import java.util.ArrayList;
@@ -18,8 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import static java.util.stream.Collectors.toList;
 
 public class NakadiKafkaConsumer implements LowLevelConsumer {
 
@@ -34,18 +31,6 @@ public class NakadiKafkaConsumer implements LowLevelConsumer {
         // define topic/partitions to consume from
     }
 
-    private void assign(final Collection<KafkaCursor> kafkaCursors) {
-        final Map<TopicPartition, KafkaCursor> topicCursors = kafkaCursors.stream().collect(
-                Collectors.toMap(
-                        cursor -> new TopicPartition(cursor.getTopic(), cursor.getPartition()),
-                        cursor -> cursor,
-                        (cursor1, cursor2) -> cursor2
-                ));
-
-        kafkaConsumer.assign(new ArrayList<>(topicCursors.keySet()));
-        topicCursors.forEach((topicPartition, cursor) -> kafkaConsumer.seek(topicPartition, cursor.getOffset()));
-    }
-
     @Override
     public Set<org.zalando.nakadi.domain.TopicPartition> getAssignment() {
         return kafkaConsumer.assignment().stream()
@@ -55,16 +40,19 @@ public class NakadiKafkaConsumer implements LowLevelConsumer {
                 .collect(Collectors.toSet());
     }
 
-    @Override
-    public void reassign(final Collection<NakadiCursor> cursors)
-            throws InvalidCursorException {
-        kafkaConsumer.assign(Collections.emptyList());
-
-        assign(cursors.stream()
+    public void reassign(final Collection<NakadiCursor> cursors) {
+        final Map<TopicPartition, KafkaCursor> topicCursors = cursors.stream()
                 .map(NakadiCursor::asKafkaCursor)
-                // because Nakadi `BEGIN` offset is -1
-                .map(kafkaCursor -> kafkaCursor.addOffset(1))
-                .collect(toList()));
+                .map(kafkaCursor -> kafkaCursor.addOffset(1)) // because Nakadi `BEGIN` offset is -1
+                .collect(Collectors.toMap(
+                                cursor -> new TopicPartition(cursor.getTopic(), cursor.getPartition()),
+                                cursor -> cursor,
+                                (cursor1, cursor2) -> cursor2));
+
+        kafkaConsumer.assign(Collections.emptyList()); // clear current assignment, if any
+        kafkaConsumer.assign(new ArrayList<>(topicCursors.keySet()));
+
+        topicCursors.forEach((topicPartition, cursor) -> kafkaConsumer.seek(topicPartition, cursor.getOffset()));
     }
 
     @Override

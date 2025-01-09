@@ -12,13 +12,13 @@ import org.zalando.nakadi.domain.Timeline;
 import org.zalando.nakadi.domain.TopicPartition;
 import org.zalando.nakadi.exceptions.runtime.CannotAddPartitionToTopicException;
 import org.zalando.nakadi.exceptions.runtime.EventPublishingException;
-import org.zalando.nakadi.exceptions.runtime.InvalidCursorException;
 import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableException;
 import org.zalando.nakadi.exceptions.runtime.TopicConfigException;
 import org.zalando.nakadi.exceptions.runtime.TopicCreationException;
 import org.zalando.nakadi.exceptions.runtime.TopicDeletionException;
 import org.zalando.nakadi.exceptions.runtime.TopicRepositoryException;
 
+import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -89,14 +89,11 @@ public interface TopicRepository {
      */
     Map<TopicPartition, Long> getSizeStats();
 
-    LowLevelConsumer createEventConsumer(
-            String clientId,
-            List<NakadiCursor> positions) throws InvalidCursorException;
+    LowLevelConsumer createEventConsumer(@Nullable String clientId);
 
-    void validateReadCursors(List<NakadiCursor> cursors) throws InvalidCursorException,
-            ServiceTemporarilyUnavailableException;
-
-    void updateTopicConfig(String topic, Long retentionMs, CleanupPolicy cleanupPolicy) throws TopicConfigException;
+    void validateReadCursors(List<NakadiCursor> cursors);
 
     void reassign(LowLevelConsumer consumer, List<NakadiCursor> cursors);
+
+    void updateTopicConfig(String topic, Long retentionMs, CleanupPolicy cleanupPolicy) throws TopicConfigException;
 }

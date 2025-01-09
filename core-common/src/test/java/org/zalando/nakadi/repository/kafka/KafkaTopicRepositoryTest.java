@@ -287,60 +287,45 @@ public class KafkaTopicRepositoryTest {
 
     @Test
     @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
-    public void validateValidCursors() throws InvalidCursorException {
+    public void testValidCursors() throws InvalidCursorException {
         // validate each individual valid cursor
         for (final Cursor cursor : MY_TOPIC_VALID_CURSORS) {
-            kafkaTopicRepository.createEventConsumer(
-                    KAFKA_CLIENT_ID,
-                    asTopicPosition(MY_TOPIC, asList(cursor)));
+            kafkaTopicRepository.validateReadCursors(asTopicPosition(MY_TOPIC, asList(cursor)));
         }
         // validate all valid cursors
-        kafkaTopicRepository.createEventConsumer(
-                KAFKA_CLIENT_ID,
-                asTopicPosition(MY_TOPIC, MY_TOPIC_VALID_CURSORS));
+        kafkaTopicRepository.validateReadCursors(asTopicPosition(MY_TOPIC, MY_TOPIC_VALID_CURSORS));
 
         // validate each individual valid cursor
         for (final Cursor cursor : ANOTHER_TOPIC_VALID_CURSORS) {
-            kafkaTopicRepository.createEventConsumer(
-                    KAFKA_CLIENT_ID,
-                    asTopicPosition(ANOTHER_TOPIC, asList(cursor)));
+            kafkaTopicRepository.validateReadCursors(asTopicPosition(ANOTHER_TOPIC, asList(cursor)));
         }
         // validate all valid cursors
-        kafkaTopicRepository.createEventConsumer(
-                KAFKA_CLIENT_ID,
-                asTopicPosition(ANOTHER_TOPIC, ANOTHER_TOPIC_VALID_CURSORS));
+        kafkaTopicRepository.validateReadCursors(asTopicPosition(ANOTHER_TOPIC, ANOTHER_TOPIC_VALID_CURSORS));
     }
 
     @Test
     @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
-    public void invalidateInvalidCursors() {
+    public void testInvalidCursors() {
         final Cursor outOfBoundOffset = cursor("0", "38");
         try {
-            kafkaTopicRepository.createEventConsumer(
-                    KAFKA_CLIENT_ID,
-                    asTopicPosition(MY_TOPIC, asList(outOfBoundOffset)));
+            kafkaTopicRepository.validateReadCursors(asTopicPosition(MY_TOPIC, asList(outOfBoundOffset)));
         } catch (final InvalidCursorException e) {
             assertThat(e.getError(), equalTo(CursorError.UNAVAILABLE));
         }
 
         final Cursor nonExistingPartition = cursor("99", "100");
         try {
-            kafkaTopicRepository.createEventConsumer(
-                    KAFKA_CLIENT_ID,
-                    asTopicPosition(MY_TOPIC, asList(nonExistingPartition)));
+            kafkaTopicRepository.validateReadCursors(asTopicPosition(MY_TOPIC, asList(nonExistingPartition)));
         } catch (final InvalidCursorException e) {
             assertThat(e.getError(), equalTo(CursorError.PARTITION_NOT_FOUND));
         }
 
         final Cursor wrongOffset = cursor("0", "blah");
         try {
-            kafkaTopicRepository.createEventConsumer(
-                    KAFKA_CLIENT_ID,
-                    asTopicPosition(MY_TOPIC, asList(wrongOffset)));
+            kafkaTopicRepository.validateReadCursors(asTopicPosition(MY_TOPIC, asList(wrongOffset)));
         } catch (final InvalidCursorException e) {
             assertThat(e.getError(), equalTo(CursorError.INVALID_FORMAT));
         }
-
     }
 
     @Test

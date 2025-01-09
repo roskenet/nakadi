@@ -105,7 +105,9 @@ public class DlqRedriveEventTypeAttachmentJob {
                 .map(c -> cursorConverter.convert(dlqRedriveEventTypeName, c))
                 .collect(Collectors.toList());
 
-        try (HighLevelConsumer consumer = timelineService.createEventConsumer(JOB_NAME + "-job", beginCursors)) {
+        try (HighLevelConsumer consumer = timelineService.createEventConsumer(JOB_NAME + "-job")) {
+            consumer.reassign(beginCursors);
+
             while (true) {
                 final List<ConsumedEvent> events = consumer.readEvents();
                 if (events.isEmpty()) {
