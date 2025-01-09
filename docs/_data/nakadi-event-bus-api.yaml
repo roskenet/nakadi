@@ -3410,7 +3410,7 @@ definitions:
     description: |
       An attribute for authorization. This object includes a data type, which represents the type of the attribute
       attribute (which data types are allowed depends on which authorization plugin is deployed, and how it is
-      configured), and a value. A wildcard can be represented with data type '*', and value '*'. It means that all
+      configured), and a value. A wildcard can be represented with data type `*`, and value `*`. It means that all
       authenticated users are allowed to perform an operation.
     properties:
       data_type:
