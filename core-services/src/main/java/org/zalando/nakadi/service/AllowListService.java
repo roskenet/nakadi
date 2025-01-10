@@ -4,8 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.cache.ChildData;
 import org.apache.curator.framework.recipes.cache.TreeCache;
-import org.apache.curator.framework.recipes.cache.TreeCacheListener;
-import org.apache.curator.framework.state.ConnectionStateListener;
+import org.apache.curator.framework.recipes.nodes.PersistentNode;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
@@ -23,7 +22,7 @@ import org.zalando.nakadi.service.publishing.NakadiAuditLogPublisher;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
-
+import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -53,6 +52,7 @@ public class AllowListService {
     private final NakadiAuditLogPublisher auditLogPublisher;
     private TreeCache allowListCache;
     private TreeCache nodesCache;
+    private PersistentNode persistentNode;
     private final String nodeId;
     private final Map<String, Integer> clientConnections;
     private final FeatureToggleService featureToggleService;
@@ -87,97 +87,30 @@ public class AllowListService {
                                 .newBuilder(zooKeeperHolder.get(), PATH_NODES)
                                 .setCacheData(false)
                                 .build();
-                this.nodesCache
-                        .getListenable()
-                        .addListener(nodeCacheListener());
                 this.nodesCache.start();
 
                 final String nodePath = PATH_NODES + "/" + nodeId;
-                this.zooKeeperHolder
-                        .get()
-                        .create()
-                        .creatingParentsIfNeeded()
-                        .withMode(CreateMode.EPHEMERAL)
-                        .forPath(nodePath);
-
-                this.zooKeeperHolder
-                        .get()
-                        .getConnectionStateListenable()
-                        .addListener(curatorListener(nodePath));
+                this.persistentNode = new PersistentNode(
+                        this.zooKeeperHolder.get(),
+                        CreateMode.EPHEMERAL,
+                        false,
+                        nodePath,
+                        new byte[0],
+                        true
+                );
+                this.persistentNode.start();
             }
         } catch (final Exception e) {
             throw new NakadiRuntimeException(e);
         }
     }
 
-    private TreeCacheListener nodeCacheListener() {
-        return (client, event) -> {
-            switch (event.getType()) {
-                case INITIALIZED:
-                    LOG.debug("Node cache initialized. Current cache data: {}", nodeCacheData());
-                    break;
-                case CONNECTION_LOST:
-                    LOG.debug("Node cache connection lost. Current cache data: {}", nodeCacheData());
-                    break;
-                case CONNECTION_SUSPENDED:
-                    LOG.debug("Node cache connection suspended. Current cache data: {}", nodeCacheData());
-                    break;
-                case CONNECTION_RECONNECTED:
-                    LOG.debug("Node cache connection reconnected. Current cache data: {}", nodeCacheData());
-                    break;
-                case NODE_ADDED:
-                    LOG.debug("Data added in node cache. Current cache data: {}", nodeCacheData());
-                    break;
-                case NODE_REMOVED:
-                    LOG.debug("Data removed from node cache. Current cache data: {}", nodeCacheData());
-                    break;
-                case NODE_UPDATED:
-                    LOG.debug("Data updated in node cache. Current cache data: {}", nodeCacheData());
-                    break;
-                default:
-                    LOG.debug("Node Cache event: {}, . Current cache data: {}", event, nodeCacheData());
-            }
-        };
-    }
-
-    private String nodeCacheData() {
-        return nodesCache
-                .getCurrentChildren(PATH_NODES)
-                .entrySet()
-                .stream()
-                .map(entry -> "Key:" + entry.getKey() + ",value:" + entry.getValue())
-                .collect(Collectors.joining(","));
-    }
-
-    private static ConnectionStateListener curatorListener(final String nodePath) {
-        return (client, newState) -> {
-            switch (newState) {
-                case LOST:
-                    // Indicates ZooKeeper session has expired.
-                    LOG.debug("Zookeeper session expired for nodePath: {}", nodePath);
-                    break;
-                case CONNECTED:
-                    LOG.debug("Zookeeper connected to the server for nodePath: {}", nodePath);
-                    break;
-                case SUSPENDED:
-                    // There has been a loss of connection. Leaders, locks, etc.
-                    // should suspend until the connection is re-established.
-                    LOG.debug("Zookeeper connection suspended for nodePath: {}", nodePath);
-                    break;
-                case RECONNECTED:
-                    //A suspended, lost, or read-only connection has been re-established
-                    LOG.debug("Zookeeper connection has been re-established for nodePath: {}", nodePath);
-                    // TODO: rebuild NodeCache
-                    break;
-                default:
-                    LOG.debug("Zookeeper state: {}", newState);
-            }
-        };
-    }
-
     @PreDestroy
-    public void cleanUp() {
+    public void cleanUp() throws IOException {
         this.allowListCache.close();
+        if (persistentNode != null) {
+            persistentNode.close();
+        }
         if (nodesCache != null) {
             this.nodesCache.close();
         }
