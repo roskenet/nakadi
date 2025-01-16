@@ -16,12 +16,14 @@ import org.zalando.nakadi.service.auth.AuthorizationResourceMapping;
 
 import javax.annotation.Nullable;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -64,9 +66,8 @@ public class EventTypeAnnotationsValidatorTest {
     public void testValidDataComplianceAnnotations(
             @Nullable final String annotationValue,
             @Nullable final String owningApplication) {
-        final Map<String, String> annotations = annotationValue != null ?
-                Map.of(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, annotationValue) :
-                Collections.emptyMap();
+        final Map<String, String> annotations =
+                Map.of(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, annotationValue);
         validator.validateDataComplianceAnnotations(null, annotations, owningApplication);
     }
 
@@ -77,8 +78,7 @@ public class EventTypeAnnotationsValidatorTest {
                 Arguments.of("mcf-aspd", OWNING_APPLICATION_1),
                 Arguments.of("none", null),
                 Arguments.of("aspd", null),
-                Arguments.of("mcf-aspd", null),
-                Arguments.of(null, OWNING_APPLICATION_2)
+                Arguments.of("mcf-aspd", null)
         );
     }
 
@@ -106,6 +106,26 @@ public class EventTypeAnnotationsValidatorTest {
                 Arguments.of("MCF-ASPD", null),
                 Arguments.of("mcf_aspd", OWNING_APPLICATION_2),
                 Arguments.of(null, OWNING_APPLICATION_1)
+        );
+    }
+
+    @Test
+    public void testNullValueForDataComplianceAnnotationsWhenOldAnnotationNull() {
+        final Map<String, String> annotations = new HashMap<>();
+        annotations.put(AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION, null);
+
+        final var exception = assertThrows(
+                InvalidEventTypeException.class,
+                () -> validator.validateDataComplianceAnnotations(null, annotations, OWNING_APPLICATION_2));
+        Assertions.assertThat(exception.getMessage())
+                .isEqualTo("Annotation compliance.zalando.org/aspd-classification cannot have null value");
+    }
+
+    @Test
+    public void testEmptyDataComplianceAnnotations() {
+        final Map<String, String> annotations = Map.of();
+        assertDoesNotThrow(
+                () -> validator.validateDataComplianceAnnotations(null, annotations, OWNING_APPLICATION_2)
         );
     }
 

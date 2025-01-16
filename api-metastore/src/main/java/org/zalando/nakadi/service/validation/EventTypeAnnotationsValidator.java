@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import static org.zalando.nakadi.service.auth.AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION;
@@ -73,15 +74,23 @@ public class EventTypeAnnotationsValidator {
             @NotNull final Map<String, String> annotations,
             final String owningApplication) {
 
+        final Set<String> allowedValues = Set.of("none", "aspd", "mcf-aspd");
         final var aspdClassification = annotations.get(DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION);
-        if (aspdClassification != null) {
-            if (!List.of("none", "aspd", "mcf-aspd").contains(aspdClassification)) {
-                throw new InvalidEventTypeException(
-                        "Annotation " + DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION
-                        + " is not valid. Provided value: \""
-                        + aspdClassification
-                        + "\". Possible values are: \"none\" or \"aspd\" or \"mcf-aspd\".");
-            }
+
+        if (annotations.containsKey(DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION)
+                && aspdClassification == null) {
+            throw new InvalidEventTypeException(
+                    String.format("Annotation %s cannot have null value",
+                            DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION)
+            );
+        }
+
+        if (aspdClassification != null && !allowedValues.contains(aspdClassification)) {
+            throw new InvalidEventTypeException(
+                    "Annotation " + DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION
+                            + " is not valid. Provided value: \""
+                            + aspdClassification
+                            + "\". The allowed values are: \"none\", \"aspd\" or \"mcf-aspd\".");
         }
 
         if (isDataComplianceAnnotationRequired(oldAnnotations, owningApplication)) {

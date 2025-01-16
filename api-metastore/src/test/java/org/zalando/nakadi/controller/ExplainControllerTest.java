@@ -92,7 +92,7 @@ public class ExplainControllerTest {
                                 "{\"error\": {\"message\": \"" +
                                 "Annotation compliance.zalando.org/aspd-classification is not valid. " +
                                 "Provided value: \\\"invalid\\\". " +
-                                "Possible values are: \\\"none\\\" or \\\"aspd\\\" or \\\"mcf-aspd\\\"." +
+                                "The allowed values are: \\\"none\\\", \\\"aspd\\\" or \\\"mcf-aspd\\\"." +
                                 "\"}}"
                         ));
     }
