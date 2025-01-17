@@ -2,11 +2,14 @@ package org.zalando.nakadi.repository;
 
 import org.zalando.nakadi.domain.EventOwnerHeader;
 import org.zalando.nakadi.domain.HeaderTag;
+import org.zalando.nakadi.domain.NakadiCursor;
 import org.zalando.nakadi.domain.TestProjectIdHeader;
 import org.zalando.nakadi.domain.TopicPartition;
+import org.zalando.nakadi.exceptions.runtime.InvalidCursorException;
 
 import java.io.Closeable;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -18,6 +21,8 @@ public interface LowLevelConsumer extends Closeable {
     Set<TopicPartition> getAssignment();
 
     List<Event> readEvents();
+
+    void reassign(Collection<NakadiCursor> cursors) throws InvalidCursorException;
 
     class Event {
         private final byte[] data;

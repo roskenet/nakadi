@@ -692,14 +692,22 @@ public class KafkaTopicRepository implements TopicRepository {
     }
 
     @Override
-    public LowLevelConsumer createEventConsumer(@Nullable final String clientId) {
-        return new NakadiKafkaConsumer(
+    public LowLevelConsumer createEventConsumer(
+            @Nullable final String clientId,
+            final List<NakadiCursor> cursors)
+            throws ServiceTemporarilyUnavailableException, InvalidCursorException {
+        validateReadCursors(cursors);
+        final NakadiKafkaConsumer nakadiKafkaConsumer = new NakadiKafkaConsumer(
                 kafkaFactory.getConsumer(clientId),
                 nakadiSettings.getKafkaPollTimeoutMs());
+        nakadiKafkaConsumer.reassign(cursors);
+        return nakadiKafkaConsumer;
+
     }
 
     @Override
-    public void validateReadCursors(final List<NakadiCursor> cursors) {
+    public void validateReadCursors(final List<NakadiCursor> cursors)
+            throws InvalidCursorException, ServiceTemporarilyUnavailableException {
         final List<Timeline> timelines = cursors.stream().map(NakadiCursor::getTimeline).distinct().collect(toList());
         final List<PartitionStatistics> statistics = loadTopicStatistics(timelines);
 
@@ -730,7 +738,7 @@ public class KafkaTopicRepository implements TopicRepository {
     @Override
     public void reassign(final LowLevelConsumer consumer, final List<NakadiCursor> cursors) {
         validateReadCursors(cursors);
-        ((NakadiKafkaConsumer) consumer).reassign(cursors);
+        consumer.reassign(cursors);
     }
 
     @Override

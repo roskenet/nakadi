@@ -58,8 +58,6 @@ public class EventStream {
 
     public void streamEvents(final Runnable checkAuthorization) {
         try {
-            eventConsumer.reassign(config.getCursors());
-
             int messagesRead = 0;
             final Map<String, Integer> keepAliveInARow = createMapWithPartitionKeys(partition -> 0);
 

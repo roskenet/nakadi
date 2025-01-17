@@ -159,9 +159,9 @@ public class SubscriptionTimeLagService {
 
             final String clientId = String.format("time-lag-checker-%s-%s",
                     cursor.getEventType(), cursor.getPartition());
-
-            try (HighLevelConsumer consumer = timelineService.createEventConsumer(clientId)) {
-                consumer.reassign(ImmutableList.of(cursor));
+            try (HighLevelConsumer consumer = timelineService.createEventConsumer(
+                    clientId, ImmutableList.of(cursor))) {
+                LOG.trace("client:{}, reading events for lag calculation", clientId);
 
                 final List<ConsumedEvent> events = consumer.readEvents();
                 if (events.isEmpty()) {
@@ -172,6 +172,8 @@ public class SubscriptionTimeLagService {
                 }
             } catch (final Exception e) {
                 throw new ErrorGettingCursorTimeLagException(cursor, lastCursor, e);
+            } finally {
+                LOG.trace("client:{}, finished reading events for lag calculation", clientId);
             }
         }
     }

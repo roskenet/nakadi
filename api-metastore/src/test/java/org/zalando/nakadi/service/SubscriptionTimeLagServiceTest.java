@@ -55,7 +55,7 @@ public class SubscriptionTimeLagServiceTest {
                                         new byte[0], NakadiCursor.of(timeline, "", ""),
                                         FAKE_EVENT_TIMESTAMP, null, null, Optional.empty())));
 
-        when(timelineService.createEventConsumer(any())).thenReturn(eventConsumer);
+        when(timelineService.createEventConsumer(any(), any())).thenReturn(eventConsumer);
 
         final Timeline et1Timeline = new Timeline("et1", 0, new Storage("", Storage.Type.KAFKA), "t1", null);
 
@@ -114,7 +114,7 @@ public class SubscriptionTimeLagServiceTest {
         when(eventConsumer.readEvents())
                 .thenAnswer(invocation -> ImmutableList.of());
 
-        when(timelineService.createEventConsumer(any())).thenReturn(eventConsumer);
+        when(timelineService.createEventConsumer(any(), any())).thenReturn(eventConsumer);
 
         final Timeline et1Timeline = new Timeline("et1", 0, new Storage("", Storage.Type.KAFKA), "t1", null);
 
@@ -139,7 +139,7 @@ public class SubscriptionTimeLagServiceTest {
 
     @Test
     public void whenNoSubscriptionThenReturnSizeZeroMap() {
-        when(timelineService.createEventConsumer(any())).thenReturn(null);
+        when(timelineService.createEventConsumer(any(), any())).thenReturn(null);
         final Timeline et1Timeline = new Timeline("et1", 0, new Storage("", Storage.Type.KAFKA), "t1", null);
         final NakadiCursor committedCursor1 = NakadiCursor.of(et1Timeline, "p1", "o1");
 

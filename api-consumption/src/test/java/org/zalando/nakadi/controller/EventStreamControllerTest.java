@@ -141,7 +141,8 @@ public class EventStreamControllerTest {
         metricRegistry = new MetricRegistry();
         streamMetrics = new MetricRegistry();
         final LowLevelConsumer eventConsumerMock = mock(LowLevelConsumer.class);
-        when(topicRepositoryMock.createEventConsumer(eq(KAFKA_CLIENT_ID))).thenReturn(eventConsumerMock);
+        when(topicRepositoryMock.createEventConsumer(eq(KAFKA_CLIENT_ID), any()))
+                .thenReturn(eventConsumerMock);
 
         eventStreamChecks = Mockito.mock(EventStreamChecks.class);
         Mockito.when(eventStreamChecks.isConsumptionBlocked(any(), any())).thenReturn(false);
@@ -193,7 +194,8 @@ public class EventStreamControllerTest {
         final ArgumentCaptor<EventStreamConfig> configCaptor = ArgumentCaptor.forClass(EventStreamConfig.class);
 
         final LowLevelConsumer eventConsumerMock = mock(LowLevelConsumer.class);
-        when(topicRepositoryMock.createEventConsumer(any())).thenReturn(eventConsumerMock);
+        when(topicRepositoryMock.createEventConsumer(any(), any()))
+                .thenReturn(eventConsumerMock);
 
         final EventStream eventStreamMock = mock(EventStream.class);
         when(eventStreamFactoryMock.createEventStream(any(), any(), configCaptor.capture(), any()))
@@ -279,7 +281,7 @@ public class EventStreamControllerTest {
     public void whenInvalidCursorsThenPreconditionFailed() throws Exception {
         final NakadiCursor cursor = NakadiCursor.of(timeline, "0", "000000000000000000");
         when(eventTypeCache.getEventType(TEST_EVENT_TYPE_NAME)).thenReturn(EVENT_TYPE);
-        when(timelineService.createEventConsumer(eq(KAFKA_CLIENT_ID)))
+        when(timelineService.createEventConsumer(eq(KAFKA_CLIENT_ID), any()))
                 .thenThrow(new InvalidCursorException(CursorError.UNAVAILABLE, cursor));
 
         final StreamingResponseBody responseBody = createStreamingResponseBody(1, 0, 0, 0, 0,
@@ -320,7 +322,9 @@ public class EventStreamControllerTest {
     public void whenNormalCaseThenParametersArePassedToConfigAndStreamStarted() throws Exception {
         final HighLevelConsumer eventConsumerMock = mock(HighLevelConsumer.class);
         when(eventTypeCache.getEventType(TEST_EVENT_TYPE_NAME)).thenReturn(EVENT_TYPE);
-        when(timelineService.createEventConsumer(eq(KAFKA_CLIENT_ID))).thenReturn(eventConsumerMock);
+        when(timelineService.createEventConsumer(
+                eq(KAFKA_CLIENT_ID), eq(ImmutableList.of(NakadiCursor.of(timeline, "0", "000000000000000000")))))
+                .thenReturn(eventConsumerMock);
         when(timelineService.getActiveTimeline(eq(EVENT_TYPE))).thenReturn(timeline);
 
         final ArgumentCaptor<Integer> statusCaptor = getStatusCaptor();
@@ -354,7 +358,8 @@ public class EventStreamControllerTest {
         assertThat(statusCaptor.getValue(), equalTo(HttpStatus.OK.value()));
         assertThat(contentTypeCaptor.getValue(), equalTo("application/x-json-stream"));
 
-        verify(timelineService, times(1)).createEventConsumer(eq(KAFKA_CLIENT_ID));
+        verify(timelineService, times(1)).createEventConsumer(eq(KAFKA_CLIENT_ID),
+                eq(ImmutableList.of(NakadiCursor.of(timeline, "0", "000000000000000000"))));
         verify(eventStreamFactoryMock, times(1)).createEventStream(eq(outputStream),
                 eq(eventConsumerMock), eq(streamConfig), any());
         verify(eventStreamMock, times(1)).streamEvents(any());
@@ -501,7 +506,9 @@ public class EventStreamControllerTest {
     private void prepareScopeRead() throws InvalidCursorException {
         final LowLevelConsumer eventConsumerMock = mock(LowLevelConsumer.class);
         when(eventTypeCache.getEventType(TEST_EVENT_TYPE_NAME)).thenReturn(EVENT_TYPE);
-        when(topicRepositoryMock.createEventConsumer(eq(KAFKA_CLIENT_ID))).thenReturn(eventConsumerMock);
+        when(topicRepositoryMock.createEventConsumer(
+                eq(KAFKA_CLIENT_ID), eq(ImmutableList.of(NakadiCursor.of(timeline, "0", "0")))))
+                .thenReturn(eventConsumerMock);
     }
 
     protected String responseToString(final StreamingResponseBody responseBody) throws IOException {
