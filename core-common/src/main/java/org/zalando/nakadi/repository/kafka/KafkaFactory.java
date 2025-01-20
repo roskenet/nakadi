@@ -2,6 +2,7 @@ package org.zalando.nakadi.repository.kafka;
 
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.Timer;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -30,6 +31,8 @@ public class KafkaFactory {
     private final Meter consumerCreateMeter;
     private final Meter consumerPoolTakeMeter;
     private final Meter consumerPoolReturnMeter;
+    private final Timer consumerPoolWaitTimer;
+    private final Timer consumerPoolHoldTimer;
 
     public KafkaFactory(final KafkaLocationManager kafkaLocationManager,
                         final MetricRegistry metricsRegistry,
@@ -59,6 +62,8 @@ public class KafkaFactory {
         this.consumerCreateMeter = metricsRegistry.meter("nakadi.kafka.consumer.created");
         this.consumerPoolTakeMeter = metricsRegistry.meter("nakadi.kafka.consumer.taken");
         this.consumerPoolReturnMeter = metricsRegistry.meter("nakadi.kafka.consumer.returned");
+        this.consumerPoolWaitTimer = metricsRegistry.timer("nakadi.kafka.consumer.wait.time");
+        this.consumerPoolHoldTimer = metricsRegistry.timer("nakadi.kafka.consumer.hold.time");
     }
 
     public Producer<byte[], byte[]> takeProducer(final String topic) {
@@ -91,10 +96,11 @@ public class KafkaFactory {
     }
 
     private Consumer<byte[], byte[]> takeConsumer() {
-        final Consumer<byte[], byte[]> consumer;
+        final KafkaConsumerProxy consumer;
 
         LOG.trace("Taking a consumer from the pool");
-        try {
+        try (Timer.Context unused = consumerPoolWaitTimer.time()) {
+            // TODO: expose the timeout as a parameter
             consumer = consumerPool.poll(30, TimeUnit.SECONDS);
         } catch (final InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -105,6 +111,7 @@ public class KafkaFactory {
         }
 
         consumerPoolTakeMeter.mark();
+        consumer.markTaken();
 
         return consumer;
     }
@@ -114,6 +121,8 @@ public class KafkaFactory {
 
         consumer.assign(Collections.emptyList());
 
+        consumerPoolHoldTimer.update(
+                System.currentTimeMillis() - consumer.getTakenSystemTimeMillis(), TimeUnit.MILLISECONDS);
         consumerPoolReturnMeter.mark();
 
         try {
@@ -135,8 +144,18 @@ public class KafkaFactory {
 
     public class KafkaConsumerProxy extends KafkaConsumer<byte[], byte[]> {
 
-        public KafkaConsumerProxy(final Properties properties) {
+        private long takenSystemTimeMillis = -1;
+
+        KafkaConsumerProxy(final Properties properties) {
             super(properties);
+        }
+
+        void markTaken() {
+            takenSystemTimeMillis = System.currentTimeMillis();
+        }
+
+        long getTakenSystemTimeMillis() {
+            return takenSystemTimeMillis;
         }
 
         @Override
