@@ -18,6 +18,7 @@ import org.zalando.nakadi.domain.Timeline;
 import org.zalando.nakadi.repository.LowLevelConsumer;
 import org.zalando.nakadi.utils.TestUtils;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -191,7 +192,7 @@ public class NakadiKafkaConsumerTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    public void whenCloseThenKafkaConsumerIsClosed() {
+    public void whenCloseThenKafkaConsumerIsClosed() throws IOException {
         // ARRANGE //
         final KafkaConsumer<byte[], byte[]> kafkaConsumerMock = mock(KafkaConsumer.class);
         final NakadiKafkaConsumer nakadiKafkaConsumer = new NakadiKafkaConsumer(kafkaConsumerMock, POLL_TIMEOUT);

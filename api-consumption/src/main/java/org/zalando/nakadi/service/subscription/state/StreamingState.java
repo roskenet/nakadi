@@ -17,7 +17,6 @@ import org.zalando.nakadi.domain.Timeline;
 import org.zalando.nakadi.domain.UnprocessableEventPolicy;
 import org.zalando.nakadi.exceptions.runtime.DeadLetterQueueStoreException;
 import org.zalando.nakadi.exceptions.runtime.InternalNakadiException;
-import org.zalando.nakadi.exceptions.runtime.InvalidCursorException;
 import org.zalando.nakadi.exceptions.runtime.NakadiRuntimeException;
 import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableException;
 import org.zalando.nakadi.metrics.MetricUtils;
@@ -225,6 +224,7 @@ class StreamingState extends State {
             scheduleTask(this::pollDataFromKafka, getKafkaPollTimeout(), TimeUnit.MILLISECONDS);
             return;
         }
+
         final List<ConsumedEvent> events = eventConsumer.readEvents();
         events.forEach(this::rememberEvent);
         if (!events.isEmpty()) {
@@ -747,11 +747,7 @@ class StreamingState extends State {
             // Force seek means that user committed somewhere not within [commitOffset, sentOffset], and one
             // should fully reconsume all the information from underlying storage. In order to do that, we are
             // removing all the current assignments for real consumer.
-            try {
-                eventConsumer.reassign(Collections.emptyList());
-            } catch (final InvalidCursorException ex) {
-                throw new NakadiRuntimeException(ex);
-            }
+            eventConsumer.reassign(Collections.emptyList());
         }
         final Set<EventTypePartition> currentAssignment = eventConsumer.getAssignment();
 
@@ -760,22 +756,19 @@ class StreamingState extends State {
                 Arrays.deepToString(newAssignment.toArray()));
 
         if (!currentAssignment.equals(newAssignment)) {
-            try {
-                final Map<EventTypePartition, NakadiCursor> beforeFirst = getBeforeFirstCursors(newAssignment);
-                final List<NakadiCursor> cursors = newAssignment.stream()
-                        .map(pk -> {
-                            final NakadiCursor beforeFirstAvailable = beforeFirst.get(pk);
+            final Map<EventTypePartition, NakadiCursor> beforeFirst = getBeforeFirstCursors(newAssignment);
+            final List<NakadiCursor> cursors = newAssignment.stream()
+                    .map(pk -> {
+                        final NakadiCursor beforeFirstAvailable = beforeFirst.get(pk);
 
-                            // Checks that current cursor is still available in storage. Otherwise reset to oldest
-                            // available offset for the partition
-                            offsets.get(pk).ensureDataAvailable(beforeFirstAvailable);
-                            return offsets.get(pk).getSentOffset();
-                        })
-                        .collect(Collectors.toList());
-                eventConsumer.reassign(cursors);
-            } catch (InvalidCursorException ex) {
-                throw new NakadiRuntimeException(ex);
-            }
+                        // Checks that current cursor is still available in storage. Otherwise reset to oldest
+                        // available offset for the partition
+                        offsets.get(pk).ensureDataAvailable(beforeFirstAvailable);
+                        return offsets.get(pk).getSentOffset();
+                    })
+                    .collect(Collectors.toList());
+
+            eventConsumer.reassign(cursors);
         }
     }
 

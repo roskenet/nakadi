@@ -217,6 +217,7 @@ public class EventStreamController {
 
                 Counter consumerCounter = null;
                 Counter appConnectionsCounter = null;
+                HighLevelConsumer eventConsumer = null;
                 EventStream eventStream = null;
                 final AtomicBoolean needCheckAuthorization = new AtomicBoolean(false);
 
@@ -265,14 +266,14 @@ public class EventStreamController {
                     response.setHeader("Warning", "299 - nakadi - the Low-level API is deprecated and will "
                             + "be removed from a future release. Please consider migrating to the Subscriptions API.");
                     response.setContentType("application/x-json-stream");
-                    final HighLevelConsumer eventConsumer = timelineService.createEventConsumer(
-                            kafkaQuotaClientId, streamConfig.getCursors());
 
                     final String bytesFlushedMetricName = MetricUtils.metricNameForLoLAStream(
                             client.getClientId(),
                             eventTypeName);
 
                     final Meter bytesFlushedMeter = this.streamMetrics.meter(bytesFlushedMetricName);
+
+                    eventConsumer = timelineService.createEventConsumer(kafkaQuotaClientId);
 
                     eventStream = eventStreamFactory.createEventStream(
                             outputStream, eventConsumer, streamConfig, bytesFlushedMeter);
@@ -319,6 +320,9 @@ public class EventStreamController {
                     }
                     if (eventStream != null) {
                         eventStream.close();
+                    }
+                    if (eventConsumer != null) {
+                        eventConsumer.close();
                     }
                     try {
                         outputStream.flush();

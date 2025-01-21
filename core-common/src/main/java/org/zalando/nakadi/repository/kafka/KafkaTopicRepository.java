@@ -692,22 +692,28 @@ public class KafkaTopicRepository implements TopicRepository {
     }
 
     @Override
-    public LowLevelConsumer createEventConsumer(
-            @Nullable final String clientId,
-            final List<NakadiCursor> cursors)
-            throws ServiceTemporarilyUnavailableException, InvalidCursorException {
+    public LowLevelConsumer createEventConsumer(@Nullable final String clientId, final List<NakadiCursor> cursors) {
+        // NB: to avoid blocking a consumer -- validate first, which may exit early by exception
         validateReadCursors(cursors);
-        final NakadiKafkaConsumer nakadiKafkaConsumer = new NakadiKafkaConsumer(
+
+        final NakadiKafkaConsumer consumer = new NakadiKafkaConsumer(
                 kafkaFactory.getConsumer(clientId),
                 nakadiSettings.getKafkaPollTimeoutMs());
-        nakadiKafkaConsumer.reassign(cursors);
-        return nakadiKafkaConsumer;
-
+        try {
+            consumer.reassign(cursors);
+            return consumer;
+        } catch (final Exception e) {
+            try {
+                consumer.close();
+            } catch (final IOException ioe) {
+                LOG.warn("Failed to close low-level consumer!", ioe);
+            }
+            throw e;
+        }
     }
 
     @Override
-    public void validateReadCursors(final List<NakadiCursor> cursors)
-            throws InvalidCursorException, ServiceTemporarilyUnavailableException {
+    public void validateReadCursors(final List<NakadiCursor> cursors) {
         final List<Timeline> timelines = cursors.stream().map(NakadiCursor::getTimeline).distinct().collect(toList());
         final List<PartitionStatistics> statistics = loadTopicStatistics(timelines);
 
@@ -738,7 +744,7 @@ public class KafkaTopicRepository implements TopicRepository {
     @Override
     public void reassign(final LowLevelConsumer consumer, final List<NakadiCursor> cursors) {
         validateReadCursors(cursors);
-        consumer.reassign(cursors);
+        ((NakadiKafkaConsumer) consumer).reassign(cursors);
     }
 
     @Override

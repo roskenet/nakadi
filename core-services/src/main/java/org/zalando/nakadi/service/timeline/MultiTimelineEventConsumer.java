@@ -8,8 +8,6 @@ import org.zalando.nakadi.domain.NakadiCursor;
 import org.zalando.nakadi.domain.PartitionStatistics;
 import org.zalando.nakadi.domain.Timeline;
 import org.zalando.nakadi.domain.TopicPartition;
-import org.zalando.nakadi.exceptions.runtime.InvalidCursorException;
-import org.zalando.nakadi.exceptions.runtime.NakadiRuntimeException;
 import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableException;
 import org.zalando.nakadi.repository.LowLevelConsumer;
 import org.zalando.nakadi.repository.TopicRepository;
@@ -84,11 +82,7 @@ public class MultiTimelineEventConsumer implements HighLevelConsumer {
     @Override
     public List<ConsumedEvent> readEvents() {
         if (timelinesChanged.compareAndSet(true, false)) {
-            try {
-                onTimelinesChanged();
-            } catch (final InvalidCursorException ex) {
-                throw new NakadiRuntimeException(ex);
-            }
+            onTimelinesChanged();
         }
         final List<ConsumedEvent> result;
         try {
@@ -212,11 +206,13 @@ public class MultiTimelineEventConsumer implements HighLevelConsumer {
                                 " and partition " + partition + ", but it wasn't found")).getBeforeFirst();
     }
 
-    private void electTopicRepositories() throws InvalidCursorException {
+    private void electTopicRepositories() {
         final Map<TopicRepository, List<NakadiCursor>> newAssignment = new HashMap<>();
         borderOffsets.clear();
+
         // Purpose of this collection is to hold tr that definitely changed their positions and should be recreated.
         final Set<TopicPartition> actualReadPositionChanged = new HashSet<>();
+
         // load new topic repositories and possibly replace cursors to newer timelines.
         for (final NakadiCursor cursor : latestOffsets.values()) {
             final AtomicReference<NakadiCursor> cursorReplacement = new AtomicReference<>();
@@ -235,36 +231,37 @@ public class MultiTimelineEventConsumer implements HighLevelConsumer {
                 newAssignment.get(topicRepository).add(cursor);
             }
         }
+
         final Set<TopicRepository> removedTopicRepositories = eventConsumers.keySet().stream()
                 .filter(tr -> !newAssignment.containsKey(tr))
                 .collect(Collectors.toSet());
+
         // Stop and remove event consumers that are not needed anymore
         for (final TopicRepository toRemove : removedTopicRepositories) {
             stopAndRemoveConsumer(toRemove);
         }
-        // Stop and remove event consumers with changed configuration
+
+        // Reassign cursors for existing event consumers with changed configuration, or start new consumers.
         for (final Map.Entry<TopicRepository, List<NakadiCursor>> entry : newAssignment.entrySet()) {
-            final LowLevelConsumer existingEventConsumer = eventConsumers.get(entry.getKey());
+            final TopicRepository repo = entry.getKey();
+            final List<NakadiCursor> cursors = entry.getValue();
+
+            final LowLevelConsumer existingEventConsumer = eventConsumers.get(repo);
             if (null != existingEventConsumer) {
-                final Set<TopicPartition> newTopicPartitions = entry.getValue().stream()
+                final Set<TopicPartition> newTopicPartitions = cursors.stream()
                         .map(NakadiCursor::getTopicPartition)
                         .collect(Collectors.toSet());
+
                 final Set<TopicPartition> oldAssignment = existingEventConsumer.getAssignment();
                 if (!oldAssignment.equals(newTopicPartitions)
                         || oldAssignment.stream().anyMatch(actualReadPositionChanged::contains)) {
-                    entry.getKey().reassign(existingEventConsumer, entry.getValue());
+                    repo.reassign(existingEventConsumer, cursors);
                 }
-            }
-        }
-        // Start new consumers with changed configuration.
-        for (final Map.Entry<TopicRepository, List<NakadiCursor>> entry : newAssignment.entrySet()) {
-            if (!eventConsumers.containsKey(entry.getKey())) {
-                final TopicRepository repo = entry.getKey();
+            } else {
                 LOG.trace("client:{}, creating underlying consumer, cursors {}",
-                        clientId, Arrays.deepToString(entry.getValue().toArray()));
+                        clientId, Arrays.deepToString(cursors.toArray()));
 
-                final LowLevelConsumer consumer = repo.createEventConsumer(clientId, entry.getValue());
-                eventConsumers.put(repo, consumer);
+                eventConsumers.put(repo, repo.createEventConsumer(clientId, cursors));
             }
         }
     }
@@ -280,8 +277,7 @@ public class MultiTimelineEventConsumer implements HighLevelConsumer {
         }
     }
 
-
-    private void onTimelinesChanged() throws InvalidCursorException {
+    private void onTimelinesChanged() {
         final Set<String> eventTypes = latestOffsets.values().stream()
                 .map(NakadiCursor::getEventType)
                 .collect(Collectors.toSet());
@@ -308,7 +304,7 @@ public class MultiTimelineEventConsumer implements HighLevelConsumer {
     }
 
     @Override
-    public void reassign(final Collection<NakadiCursor> newValues) throws InvalidCursorException {
+    public void reassign(final Collection<NakadiCursor> newValues) {
         final Map<EventTypePartition, NakadiCursor> newCursorMap = newValues.stream()
                 .collect(Collectors.toMap(NakadiCursor::getEventTypePartition, Function.identity()));
 
@@ -352,8 +348,25 @@ public class MultiTimelineEventConsumer implements HighLevelConsumer {
         LOG.trace("client:{}, closing consumers", clientId);
         try {
             reassign(Collections.emptySet());
-        } catch (final InvalidCursorException e) {
-            throw new IOException(e);
+        } finally {
+            // in case there's still something left unclosed
+            timelineRefreshListeners.values().forEach(reg -> {
+                        try {
+                            reg.cancel();
+                        } catch (final Exception e) {
+                            LOG.warn("Failed to cancel timeline sync listener registration!", e);
+                        }
+                    });
+            timelineRefreshListeners.clear();
+
+            eventConsumers.values().forEach(consumer -> {
+                        try {
+                            consumer.close();
+                        } catch (final Exception e) {
+                            LOG.warn("Failed to close low-level consumer!", e);
+                        }
+                    });
+            eventConsumers.clear();
         }
     }
 }
