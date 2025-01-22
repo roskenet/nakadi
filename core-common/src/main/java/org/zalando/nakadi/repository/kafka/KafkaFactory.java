@@ -29,8 +29,6 @@ public class KafkaFactory {
 
     private final BlockingQueue<KafkaConsumerProxy> consumerPool;
     private final Meter consumerCreateMeter;
-    private final Meter consumerPoolTakeMeter;
-    private final Meter consumerPoolReturnMeter;
     private final Timer consumerPoolWaitTimer;
     private final Timer consumerPoolHoldTimer;
 
@@ -60,8 +58,6 @@ public class KafkaFactory {
         }
 
         this.consumerCreateMeter = metricsRegistry.meter("nakadi.kafka.consumer.created");
-        this.consumerPoolTakeMeter = metricsRegistry.meter("nakadi.kafka.consumer.taken");
-        this.consumerPoolReturnMeter = metricsRegistry.meter("nakadi.kafka.consumer.returned");
         this.consumerPoolWaitTimer = metricsRegistry.timer("nakadi.kafka.consumer.wait.time");
         this.consumerPoolHoldTimer = metricsRegistry.timer("nakadi.kafka.consumer.hold.time");
     }
@@ -110,7 +106,6 @@ public class KafkaFactory {
             throw new RuntimeException("timed out while waiting for a consumer from the pool");
         }
 
-        consumerPoolTakeMeter.mark();
         consumer.markTaken();
 
         return consumer;
@@ -123,7 +118,6 @@ public class KafkaFactory {
 
         consumerPoolHoldTimer.update(
                 System.currentTimeMillis() - consumer.getTakenSystemTimeMillis(), TimeUnit.MILLISECONDS);
-        consumerPoolReturnMeter.mark();
 
         try {
             consumerPool.put(consumer);
