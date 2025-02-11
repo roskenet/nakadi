@@ -15,6 +15,7 @@ import org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult;
 import org.zalando.nakadi.plugin.api.authz.ExplainResourceResult;
 import org.zalando.nakadi.plugin.api.authz.MatchingEventDiscriminator;
 import org.zalando.nakadi.plugin.api.authz.Resource;
+import org.zalando.nakadi.plugin.api.authz.ResourceType;
 import org.zalando.nakadi.plugin.api.exceptions.AuthorizationInvalidException;
 import org.zalando.nakadi.plugin.api.exceptions.OperationOnResourceNotPermittedException;
 import org.zalando.nakadi.plugin.auth.attribute.SimpleAuthorizationAttribute;
@@ -23,7 +24,6 @@ import org.zalando.nakadi.plugin.auth.subject.Principal;
 import org.zalando.nakadi.plugin.auth.utils.ResourceBuilder;
 import org.zalando.nakadi.plugin.auth.utils.SimpleEventResource;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -81,12 +81,13 @@ public class TokenAuthorizationServiceTest {
         when(authentication.getPrincipal()).thenReturn(principal);
 
         authzService = new TokenAuthorizationService(
+                true,
                 USERS_TYPE, userRegistry,
                 SERVICES_TYPE, kioService,
                 BUSINESS_PARTNER_TYPE, merchantRegistry,
                 teamService,
                 opaClient,
-                Arrays.asList("stups_merchant-uid"));
+                List.of("stups_merchant-uid"));
 
         SecurityContextHolder.getContext().setAuthentication(new OAuth2Authentication(null, authentication));
     }
@@ -160,7 +161,7 @@ public class TokenAuthorizationServiceTest {
                 principal.isAuthorized(
                         eq("event-type"),
                         eq(AuthorizationService.Operation.READ),
-                        eq(Optional.of(Arrays.asList(new SimpleAuthorizationAttribute(USERS_TYPE, "user1")))),
+                        eq(Optional.of(List.of(new SimpleAuthorizationAttribute(USERS_TYPE, "user1")))),
                         anyListOf(AuthorizationProperty.class)
                         ))
                 .thenReturn(true);
@@ -177,12 +178,28 @@ public class TokenAuthorizationServiceTest {
                 principal.isAuthorized(
                         eq("event-type"),
                         eq(AuthorizationService.Operation.READ),
-                        eq(Optional.of(Arrays.asList(new SimpleAuthorizationAttribute(USERS_TYPE, "user1")))),
+                        eq(Optional.of(List.of(new SimpleAuthorizationAttribute(USERS_TYPE, "user1")))),
                         anyListOf(AuthorizationProperty.class)
                 ))
                 .thenReturn(false);
 
         assertFalse(authzService.isAuthorized(AuthorizationService.Operation.READ, r));
+    }
+
+    @Test
+    public void unauthorizedWhenUserAdminOperationIsDenied() {
+        final var principal = new EmployeeSubject("auser", Collections::emptySet, "users", teamService);
+        when(authentication.getPrincipal())
+                .thenReturn(principal);
+
+        final Resource r = rb("myResource1", ResourceType.ADMIN_RESOURCE)
+                .add(AuthorizationService.Operation.ADMIN, "users", principal.getName())
+                .add(AuthorizationService.Operation.WRITE, "users", principal.getName())
+                .build();
+
+        assertFalse(authzService.isAuthorized(AuthorizationService.Operation.ADMIN, r));
+        assertFalse(authzService.isAuthorized(AuthorizationService.Operation.WRITE, r));
+        assertTrue(authzService.isAuthorized(AuthorizationService.Operation.READ, r));
     }
 
     @Test

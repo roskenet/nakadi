@@ -18,6 +18,8 @@ public class TokenAuthorizationServiceFactory implements AuthorizationServiceFac
     @Override
     public AuthorizationService init(final SystemProperties properties) {
         final ServiceFactory serviceFactory = new ServiceFactory(properties);
+        final boolean denyUserAdminOperations = serviceFactory.getOrDefaultProperty(
+                "nakadi.plugins.authz.deny-user-admin-operations", Boolean::valueOf, true);
         final String usersType = serviceFactory.getProperty("nakadi.plugins.authz.users-type");
         final String servicesType = serviceFactory.getProperty("nakadi.plugins.authz.services-type");
         final String businessPartnersType = serviceFactory.getProperty("nakadi.plugins.authz.business-partners-type");
@@ -27,6 +29,7 @@ public class TokenAuthorizationServiceFactory implements AuthorizationServiceFac
 
         try {
             return new TokenAuthorizationService(
+                    denyUserAdminOperations,
                     usersType, serviceFactory.getOrCreateUserRegistry(),
                     servicesType, serviceFactory.getOrCreateKioService(),
                     businessPartnersType, serviceFactory.getOrCreateMerchantRegistry(),
