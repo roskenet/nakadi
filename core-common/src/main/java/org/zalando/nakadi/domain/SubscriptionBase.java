@@ -7,6 +7,7 @@ import org.zalando.nakadi.annotations.validation.DeadLetterValidAnnotations;
 import org.zalando.nakadi.annotations.validation.LabelKey;
 import org.zalando.nakadi.annotations.validation.LabelValue;
 import org.zalando.nakadi.plugin.api.authz.Resource;
+import org.zalando.nakadi.plugin.api.authz.ResourceType;
 import org.zalando.nakadi.view.SubscriptionCursorWithoutToken;
 
 import javax.annotation.Nullable;
@@ -169,6 +170,6 @@ public class SubscriptionBase {
     }
 
     public Resource<SubscriptionBase> asBaseResource(final String id) {
-        return new ResourceImpl<>(id, ResourceImpl.SUBSCRIPTION_RESOURCE, getAuthorization(), this);
+        return new ResourceImpl<>(id, ResourceType.SUBSCRIPTION_RESOURCE, getAuthorization(), this);
     }
 }

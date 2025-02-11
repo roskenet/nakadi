@@ -7,6 +7,7 @@ import org.zalando.nakadi.domain.ResourceImpl;
 import org.zalando.nakadi.domain.Subscription;
 import org.zalando.nakadi.exceptions.runtime.AccessDeniedException;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
+import org.zalando.nakadi.plugin.api.authz.ResourceType;
 import org.zalando.nakadi.repository.db.SubscriptionDbRepository;
 
 import java.util.Collections;
@@ -30,7 +31,7 @@ public class CursorsServiceTest {
     @Test(expected = AccessDeniedException.class)
     public void whenResetCursorsThenAdminAccessChecked() {
         doThrow(new AccessDeniedException(AuthorizationService.Operation.ADMIN,
-                new ResourceImpl<Subscription>("", ResourceImpl.SUBSCRIPTION_RESOURCE, null, null)))
+                new ResourceImpl<Subscription>("", ResourceType.SUBSCRIPTION_RESOURCE, null, null)))
                 .when(authorizationValidator).authorizeSubscriptionAdmin(any());
         service.resetCursors("test", Collections.emptyList());
     }
@@ -38,7 +39,7 @@ public class CursorsServiceTest {
     @Test(expected = AccessDeniedException.class)
     public void whenCommitCursorsAccessDenied() {
         doThrow(new AccessDeniedException(AuthorizationService.Operation.ADMIN,
-                new ResourceImpl<Subscription>("", ResourceImpl.SUBSCRIPTION_RESOURCE, null, null)))
+                new ResourceImpl<Subscription>("", ResourceType.SUBSCRIPTION_RESOURCE, null, null)))
                 .when(authorizationValidator).authorizeSubscriptionCommit(any());
         service.commitCursors("test", "test", Collections.emptyList());
     }

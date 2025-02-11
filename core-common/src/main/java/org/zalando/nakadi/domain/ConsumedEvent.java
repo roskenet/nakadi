@@ -3,6 +3,7 @@ package org.zalando.nakadi.domain;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.Resource;
+import org.zalando.nakadi.plugin.api.authz.ResourceType;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.Immutable;
@@ -75,7 +76,7 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
 
     @Override
     public String getType() {
-        return ResourceImpl.EVENT_RESOURCE;
+        return ResourceType.EVENT_RESOURCE;
     }
 
     @Override

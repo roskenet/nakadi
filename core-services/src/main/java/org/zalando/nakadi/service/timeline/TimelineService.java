@@ -39,6 +39,7 @@ import org.zalando.nakadi.exceptions.runtime.TopicRepositoryException;
 import org.zalando.nakadi.exceptions.runtime.UnableProcessException;
 import org.zalando.nakadi.mapper.NakadiRecordMapper;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
+import org.zalando.nakadi.plugin.api.authz.ResourceType;
 import org.zalando.nakadi.repository.NakadiTopicConfig;
 import org.zalando.nakadi.repository.TopicRepository;
 import org.zalando.nakadi.repository.TopicRepositoryHolder;
@@ -371,7 +372,7 @@ public class TimelineService {
             throws AccessDeniedException, UnableProcessException, TimelineException, NotFoundException {
         if (!adminService.isAdmin(AuthorizationService.Operation.READ)) {
             throw new AccessDeniedException(AuthorizationService.Operation.ADMIN,
-                    new ResourceImpl<EventType>(eventTypeName, ResourceImpl.EVENT_TYPE_RESOURCE, null, null));
+                    new ResourceImpl<EventType>(eventTypeName, ResourceType.EVENT_TYPE_RESOURCE, null, null));
         }
 
         try {

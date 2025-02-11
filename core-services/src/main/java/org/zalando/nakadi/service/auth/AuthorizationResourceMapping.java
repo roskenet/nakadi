@@ -6,6 +6,7 @@ import org.zalando.nakadi.domain.ResourceImpl;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationProperty;
 import org.zalando.nakadi.plugin.api.authz.EventTypeAuthz;
 import org.zalando.nakadi.plugin.api.authz.Resource;
+import org.zalando.nakadi.plugin.api.authz.ResourceType;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -19,7 +20,7 @@ public class AuthorizationResourceMapping {
     public static Resource<EventTypeAuthz> mapToResource(final EventTypeBase eventType) {
         return new ResourceImpl<>(
                 eventType.getName(),
-                ResourceImpl.EVENT_TYPE_RESOURCE,
+                ResourceType.EVENT_TYPE_RESOURCE,
                 eventType.getAuthorization(),
                 eventType,
                 getProperties(eventType));

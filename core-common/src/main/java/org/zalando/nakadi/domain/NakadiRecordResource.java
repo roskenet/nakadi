@@ -3,6 +3,7 @@ package org.zalando.nakadi.domain;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.Resource;
+import org.zalando.nakadi.plugin.api.authz.ResourceType;
 
 import java.util.Collections;
 import java.util.List;
@@ -23,7 +24,7 @@ public class NakadiRecordResource implements Resource<NakadiRecord> {
 
     @Override
     public String getType() {
-        return ResourceImpl.EVENT_RESOURCE;
+        return ResourceType.EVENT_RESOURCE;
     }
 
     @Override

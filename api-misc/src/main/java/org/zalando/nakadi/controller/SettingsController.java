@@ -26,7 +26,7 @@ import javax.validation.Valid;
 import java.util.Optional;
 import java.util.TreeMap;
 
-import static org.zalando.nakadi.domain.ResourceImpl.ADMIN_RESOURCE;
+import static org.zalando.nakadi.plugin.api.authz.ResourceType.ADMIN_RESOURCE;
 
 @RestController
 @RequestMapping(value = "/settings")

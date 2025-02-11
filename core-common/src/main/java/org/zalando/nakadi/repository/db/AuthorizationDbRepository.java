@@ -15,8 +15,8 @@ import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 
 import java.util.List;
 
-import static org.zalando.nakadi.domain.ResourceImpl.ADMIN_RESOURCE;
-import static org.zalando.nakadi.domain.ResourceImpl.ALL_DATA_ACCESS_RESOURCE;
+import static org.zalando.nakadi.plugin.api.authz.ResourceType.ADMIN_RESOURCE;
+import static org.zalando.nakadi.plugin.api.authz.ResourceType.ALL_DATA_ACCESS_RESOURCE;
 
 @DB
 @Repository
