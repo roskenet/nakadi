@@ -15,7 +15,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 
-import static org.zalando.nakadi.plugin.auth.ResourceType.EVENT_TYPE_RESOURCE;
+import static org.zalando.nakadi.plugin.api.authz.ResourceType.EVENT_TYPE_RESOURCE;
 
 public abstract class Principal implements Subject {
     private final String uid;

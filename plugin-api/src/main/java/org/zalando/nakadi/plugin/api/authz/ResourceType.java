@@ -1,4 +1,4 @@
-package org.zalando.nakadi.plugin.auth;
+package org.zalando.nakadi.plugin.api.authz;
 
 public class ResourceType {
     public static final String EVENT_TYPE_RESOURCE = "event-type";

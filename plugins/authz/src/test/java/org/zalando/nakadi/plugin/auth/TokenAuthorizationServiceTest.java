@@ -47,7 +47,7 @@ import static org.zalando.nakadi.plugin.api.authz.AccessLevel.FULL_ACCESS;
 import static org.zalando.nakadi.plugin.api.authz.AccessLevel.NO_ACCESS;
 import static org.zalando.nakadi.plugin.api.authz.AccessLevel.RESTRICTED_ACCESS;
 import static org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult.AccessRestrictionType.MATCHING_EVENT_DISCRIMINATORS;
-import static org.zalando.nakadi.plugin.auth.ResourceType.ALL_DATA_ACCESS_RESOURCE;
+import static org.zalando.nakadi.plugin.api.authz.ResourceType.ALL_DATA_ACCESS_RESOURCE;
 import static org.zalando.nakadi.plugin.auth.utils.ResourceBuilder.rb;
 
 @RunWith(MockitoJUnitRunner.class)

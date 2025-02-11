@@ -36,10 +36,10 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static org.zalando.nakadi.plugin.auth.ResourceType.ALL_DATA_ACCESS_RESOURCE;
-import static org.zalando.nakadi.plugin.auth.ResourceType.EVENT_TYPE_RESOURCE;
-import static org.zalando.nakadi.plugin.auth.ResourceType.PERMISSION_RESOURCE;
-import static org.zalando.nakadi.plugin.auth.ResourceType.SUBSCRIPTION_RESOURCE;
+import static org.zalando.nakadi.plugin.api.authz.ResourceType.ALL_DATA_ACCESS_RESOURCE;
+import static org.zalando.nakadi.plugin.api.authz.ResourceType.EVENT_TYPE_RESOURCE;
+import static org.zalando.nakadi.plugin.api.authz.ResourceType.PERMISSION_RESOURCE;
+import static org.zalando.nakadi.plugin.api.authz.ResourceType.SUBSCRIPTION_RESOURCE;
 import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.AUTH_SERVICE;
 import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.AUTH_TEAM;
 import static org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType.AUTH_USER;

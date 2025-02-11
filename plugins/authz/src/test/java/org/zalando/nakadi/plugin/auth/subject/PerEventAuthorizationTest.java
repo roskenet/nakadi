@@ -14,7 +14,7 @@ import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 
-import static org.zalando.nakadi.plugin.auth.ResourceType.EVENT_RESOURCE;
+import static org.zalando.nakadi.plugin.api.authz.ResourceType.EVENT_RESOURCE;
 
 @RunWith(Parameterized.class)
 public class PerEventAuthorizationTest {
