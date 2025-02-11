@@ -29,10 +29,7 @@ import org.zalando.nakadi.repository.db.StorageDbRepository;
 import org.zalando.nakadi.repository.db.TimelineDbRepository;
 import org.zalando.nakadi.service.AdminService;
 import org.zalando.nakadi.service.FeatureToggleService;
-import org.zalando.nakadi.service.LocalSchemaRegistry;
-import org.zalando.nakadi.service.TestSchemaProviderService;
 import org.zalando.nakadi.utils.EventTypeTestBuilder;
-import org.zalando.nakadi.utils.TestUtils;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -63,8 +60,6 @@ public class TimelineServiceTest {
     private TopicRepositoryHolder topicRepositoryHolder;
     @Mock
     private FeatureToggleService featureToggleService;
-    @Mock
-    private LocalSchemaRegistry localSchemaRegistry;
     private TimelineService timelineService;
 
     @Before
@@ -72,9 +67,7 @@ public class TimelineServiceTest {
         timelineService = new TimelineService(eventTypeCache,
                 storageDbRepository, mock(TimelineSync.class), mock(NakadiSettings.class), timelineDbRepository,
                 topicRepositoryHolder, new TransactionTemplate(mock(PlatformTransactionManager.class)),
-                adminService, featureToggleService, "compacted-storage",
-                new TestSchemaProviderService(localSchemaRegistry), localSchemaRegistry,
-                TestUtils.getNakadiRecordMapper());
+                adminService, featureToggleService, "compacted-storage");
     }
 
     @Test(expected = NotFoundException.class)

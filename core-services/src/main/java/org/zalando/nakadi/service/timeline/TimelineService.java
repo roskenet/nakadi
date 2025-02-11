@@ -37,7 +37,6 @@ import org.zalando.nakadi.exceptions.runtime.TopicCreationException;
 import org.zalando.nakadi.exceptions.runtime.TopicDeletionException;
 import org.zalando.nakadi.exceptions.runtime.TopicRepositoryException;
 import org.zalando.nakadi.exceptions.runtime.UnableProcessException;
-import org.zalando.nakadi.mapper.NakadiRecordMapper;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.ResourceType;
 import org.zalando.nakadi.repository.NakadiTopicConfig;
@@ -47,9 +46,7 @@ import org.zalando.nakadi.repository.db.StorageDbRepository;
 import org.zalando.nakadi.repository.db.TimelineDbRepository;
 import org.zalando.nakadi.service.AdminService;
 import org.zalando.nakadi.service.FeatureToggleService;
-import org.zalando.nakadi.service.LocalSchemaRegistry;
 import org.zalando.nakadi.service.NakadiCursorComparator;
-import org.zalando.nakadi.service.SchemaProviderService;
 import org.zalando.nakadi.service.StaticStorageWorkerFactory;
 
 import javax.annotation.Nullable;
@@ -77,10 +74,6 @@ public class TimelineService {
     private final AdminService adminService;
     private final FeatureToggleService featureToggleService;
     private final String compactedStorageName;
-    // one man said, it is fine to add 11th argument
-    private final SchemaProviderService schemaService;
-    private final LocalSchemaRegistry localSchemaRegistry;
-    private final NakadiRecordMapper nakadiRecordMapper;
 
     @Autowired
     public TimelineService(final EventTypeCache eventTypeCache,
@@ -92,10 +85,7 @@ public class TimelineService {
                            final TransactionTemplate transactionTemplate,
                            final AdminService adminService,
                            final FeatureToggleService featureToggleService,
-                           @Value("${nakadi.timelines.storage.compacted}") final String compactedStorageName,
-                           final SchemaProviderService schemaService,
-                           final LocalSchemaRegistry localSchemaRegistry,
-                           final NakadiRecordMapper nakadiRecordMapper) {
+                           @Value("${nakadi.timelines.storage.compacted}") final String compactedStorageName) {
         this.eventTypeCache = eventTypeCache;
         this.storageDbRepository = storageDbRepository;
         this.timelineSync = timelineSync;
@@ -106,9 +96,6 @@ public class TimelineService {
         this.adminService = adminService;
         this.featureToggleService = featureToggleService;
         this.compactedStorageName = compactedStorageName;
-        this.schemaService = schemaService;
-        this.localSchemaRegistry = localSchemaRegistry;
-        this.nakadiRecordMapper = nakadiRecordMapper;
     }
 
     public Timeline createTimeline(final String eventTypeName, final String storageId)
