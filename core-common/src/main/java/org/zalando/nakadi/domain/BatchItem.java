@@ -4,6 +4,7 @@ import org.json.JSONObject;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.Resource;
+import org.zalando.nakadi.plugin.api.authz.ResourceType;
 
 import javax.annotation.Nullable;
 import java.nio.charset.StandardCharsets;
@@ -157,7 +158,7 @@ public class BatchItem implements Resource<BatchItem> {
 
     @Override
     public String getType() {
-        return ResourceImpl.EVENT_RESOURCE;
+        return ResourceType.EVENT_RESOURCE;
     }
 
     @Override

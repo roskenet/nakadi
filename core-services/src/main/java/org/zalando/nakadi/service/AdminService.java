@@ -26,9 +26,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import static org.zalando.nakadi.domain.ResourceImpl.ADMIN_RESOURCE;
-import static org.zalando.nakadi.domain.ResourceImpl.ALL_DATA_ACCESS_RESOURCE;
-import static org.zalando.nakadi.domain.ResourceImpl.PERMISSION_RESOURCE;
+import static org.zalando.nakadi.plugin.api.authz.ResourceType.ADMIN_RESOURCE;
+import static org.zalando.nakadi.plugin.api.authz.ResourceType.ALL_DATA_ACCESS_RESOURCE;
+import static org.zalando.nakadi.plugin.api.authz.ResourceType.PERMISSION_RESOURCE;
 
 @Service
 public class AdminService {

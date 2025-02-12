@@ -7,8 +7,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationProperty;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
+import org.zalando.nakadi.plugin.api.authz.ResourceType;
 import org.zalando.nakadi.plugin.api.exceptions.PluginException;
-import org.zalando.nakadi.plugin.auth.ResourceType;
 import org.zalando.nakadi.plugin.auth.attribute.AuthorizationAttributeType;
 import org.zalando.nakadi.plugin.auth.property.AuthorizationPropertyType;
 

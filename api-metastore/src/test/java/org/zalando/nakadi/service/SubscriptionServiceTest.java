@@ -21,6 +21,7 @@ import org.zalando.nakadi.exceptions.runtime.NoSuchSubscriptionException;
 import org.zalando.nakadi.exceptions.runtime.UnableProcessException;
 import org.zalando.nakadi.kpi.event.NakadiSubscriptionLog;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
+import org.zalando.nakadi.plugin.api.authz.ResourceType;
 import org.zalando.nakadi.repository.db.EventTypeRepository;
 import org.zalando.nakadi.repository.db.SubscriptionDbRepository;
 import org.zalando.nakadi.service.publishing.NakadiAuditLogPublisher;
@@ -151,7 +152,7 @@ public class SubscriptionServiceTest {
     @Test(expected = AccessDeniedException.class)
     public void whenSubscriptionModifiedAuthorizationIsValidated() throws NoSuchSubscriptionException {
         Mockito.doThrow(new AccessDeniedException(AuthorizationService.Operation.ADMIN,
-                new ResourceImpl<Subscription>("", ResourceImpl.SUBSCRIPTION_RESOURCE, null, null)))
+                new ResourceImpl<Subscription>("", ResourceType.SUBSCRIPTION_RESOURCE, null, null)))
                 .when(authorizationValidator).authorizeSubscriptionAdmin(any());
 
         final SubscriptionBase subscriptionBase = RandomSubscriptionBuilder.builder()
@@ -163,7 +164,7 @@ public class SubscriptionServiceTest {
     @Test(expected = AccessDeniedException.class)
     public void whenSubscriptionDeletedAuthorizationIsValidated() {
         Mockito.doThrow(new AccessDeniedException(AuthorizationService.Operation.ADMIN,
-                new ResourceImpl<Subscription>("", ResourceImpl.SUBSCRIPTION_RESOURCE, null, null)))
+                new ResourceImpl<Subscription>("", ResourceType.SUBSCRIPTION_RESOURCE, null, null)))
                 .when(authorizationValidator).authorizeSubscriptionAdmin(any());
 
         subscriptionService.deleteSubscription("test");

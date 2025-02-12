@@ -1,6 +1,7 @@
-package org.zalando.nakadi.plugin.auth;
+package org.zalando.nakadi.plugin.api.authz;
 
 public class ResourceType {
+    public static final String ADMIN_RESOURCE = "nakadi";
     public static final String EVENT_TYPE_RESOURCE = "event-type";
     public static final String SUBSCRIPTION_RESOURCE = "subscription";
     public static final String ALL_DATA_ACCESS_RESOURCE = "all_data_access";
