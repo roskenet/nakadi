@@ -25,6 +25,8 @@ import static org.zalando.nakadi.plugin.auth.MerchantGatewayService.loadPublicKe
 @Configuration
 public class FilterConfig {
 
+    @Value("${nakadi.plugins.authz.deny-user-admin-operations:true}")
+    private boolean denyUserAdminOperations;
     @Value("${nakadi.plugins.authz.merchant.url}")
     private String merchantUrl;
     @Value("${nakadi.plugins.authz.merchant.uids}")
@@ -135,7 +137,14 @@ public class FilterConfig {
 
     @Bean
     public PrincipalFactory subjectFactory(final OPAClient opaClient, final ZalandoTeamService teamService) {
-        return new PrincipalFactory(usersRealm, usersType, servicesRealm, servicesType, opaClient, teamService);
+        return new PrincipalFactory(
+                denyUserAdminOperations,
+                usersRealm,
+                usersType,
+                servicesRealm,
+                servicesType,
+                opaClient,
+                teamService);
     }
 
     @Bean

@@ -29,6 +29,7 @@ public class PrincipalFactoryTest {
     @Before
     public void setupPrincipalFactory() {
         principalFactory = new PrincipalFactory(
+                true,
                 "/employees",
                 "users",
                 "/services",

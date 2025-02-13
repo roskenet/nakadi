@@ -61,8 +61,6 @@ public class TokenAuthorizationServiceTest {
     @Mock
     private Authentication authentication;
     @Mock
-    private TokenProvider tokenProvider;
-    @Mock
     private ValueRegistry userRegistry;
     @Mock
     private KioService kioService;
@@ -81,7 +79,6 @@ public class TokenAuthorizationServiceTest {
         when(authentication.getPrincipal()).thenReturn(principal);
 
         authzService = new TokenAuthorizationService(
-                true,
                 USERS_TYPE, userRegistry,
                 SERVICES_TYPE, kioService,
                 BUSINESS_PARTNER_TYPE, merchantRegistry,
@@ -188,7 +185,7 @@ public class TokenAuthorizationServiceTest {
 
     @Test
     public void unauthorizedWhenUserAdminOperationIsDenied() {
-        final var principal = new EmployeeSubject("auser", Collections::emptySet, "users", teamService);
+        final var principal = new EmployeeSubject(true, "auser", Collections::emptySet, "users", teamService);
         when(authentication.getPrincipal())
                 .thenReturn(principal);
 
@@ -396,12 +393,12 @@ public class TokenAuthorizationServiceTest {
                 .thenReturn(Collections.singletonList("auser"));
 
         when(authentication.getPrincipal())
-                .thenReturn(new EmployeeSubject("jdoe", Collections::emptySet, "users", teamService));
+                .thenReturn(new EmployeeSubject(false, "jdoe", Collections::emptySet, "users", teamService));
         assertFalse("jdoe should not be authorized",
                 authzService.isAuthorized(AuthorizationService.Operation.WRITE, r));
 
         when(authentication.getPrincipal())
-                .thenReturn(new EmployeeSubject("auser", Collections::emptySet, "users", teamService));
+                .thenReturn(new EmployeeSubject(true, "auser", Collections::emptySet, "users", teamService));
         assertTrue("auser should be authorized",
                 authzService.isAuthorized(AuthorizationService.Operation.WRITE, r));
     }
@@ -427,7 +424,7 @@ public class TokenAuthorizationServiceTest {
                 .thenReturn(Collections.emptyList());
 
         when(authentication.getPrincipal())
-                .thenReturn(new EmployeeSubject("jdoe", Collections::emptySet, "users", teamService));
+                .thenReturn(new EmployeeSubject(false, "jdoe", Collections::emptySet, "users", teamService));
         assertFalse("jdoe should not be authorized",
                 authzService.isAuthorized(AuthorizationService.Operation.WRITE, r));
     }
