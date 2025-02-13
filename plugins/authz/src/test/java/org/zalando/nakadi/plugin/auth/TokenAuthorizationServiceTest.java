@@ -15,6 +15,7 @@ import org.zalando.nakadi.plugin.api.authz.ExplainAttributeResult;
 import org.zalando.nakadi.plugin.api.authz.ExplainResourceResult;
 import org.zalando.nakadi.plugin.api.authz.MatchingEventDiscriminator;
 import org.zalando.nakadi.plugin.api.authz.Resource;
+import org.zalando.nakadi.plugin.api.authz.ResourceType;
 import org.zalando.nakadi.plugin.api.exceptions.AuthorizationInvalidException;
 import org.zalando.nakadi.plugin.api.exceptions.OperationOnResourceNotPermittedException;
 import org.zalando.nakadi.plugin.auth.attribute.SimpleAuthorizationAttribute;
@@ -23,7 +24,6 @@ import org.zalando.nakadi.plugin.auth.subject.Principal;
 import org.zalando.nakadi.plugin.auth.utils.ResourceBuilder;
 import org.zalando.nakadi.plugin.auth.utils.SimpleEventResource;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -61,8 +61,6 @@ public class TokenAuthorizationServiceTest {
     @Mock
     private Authentication authentication;
     @Mock
-    private TokenProvider tokenProvider;
-    @Mock
     private ValueRegistry userRegistry;
     @Mock
     private KioService kioService;
@@ -86,7 +84,7 @@ public class TokenAuthorizationServiceTest {
                 BUSINESS_PARTNER_TYPE, merchantRegistry,
                 teamService,
                 opaClient,
-                Arrays.asList("stups_merchant-uid"));
+                List.of("stups_merchant-uid"));
 
         SecurityContextHolder.getContext().setAuthentication(new OAuth2Authentication(null, authentication));
     }
@@ -160,7 +158,7 @@ public class TokenAuthorizationServiceTest {
                 principal.isAuthorized(
                         eq("event-type"),
                         eq(AuthorizationService.Operation.READ),
-                        eq(Optional.of(Arrays.asList(new SimpleAuthorizationAttribute(USERS_TYPE, "user1")))),
+                        eq(Optional.of(List.of(new SimpleAuthorizationAttribute(USERS_TYPE, "user1")))),
                         anyListOf(AuthorizationProperty.class)
                         ))
                 .thenReturn(true);
@@ -177,12 +175,28 @@ public class TokenAuthorizationServiceTest {
                 principal.isAuthorized(
                         eq("event-type"),
                         eq(AuthorizationService.Operation.READ),
-                        eq(Optional.of(Arrays.asList(new SimpleAuthorizationAttribute(USERS_TYPE, "user1")))),
+                        eq(Optional.of(List.of(new SimpleAuthorizationAttribute(USERS_TYPE, "user1")))),
                         anyListOf(AuthorizationProperty.class)
                 ))
                 .thenReturn(false);
 
         assertFalse(authzService.isAuthorized(AuthorizationService.Operation.READ, r));
+    }
+
+    @Test
+    public void unauthorizedWhenUserAdminOperationIsDenied() {
+        final var principal = new EmployeeSubject(true, "auser", Collections::emptySet, "users", teamService);
+        when(authentication.getPrincipal())
+                .thenReturn(principal);
+
+        final Resource r = rb("myResource1", ResourceType.ADMIN_RESOURCE)
+                .add(AuthorizationService.Operation.ADMIN, "users", principal.getName())
+                .add(AuthorizationService.Operation.WRITE, "users", principal.getName())
+                .build();
+
+        assertFalse(authzService.isAuthorized(AuthorizationService.Operation.ADMIN, r));
+        assertFalse(authzService.isAuthorized(AuthorizationService.Operation.WRITE, r));
+        assertTrue(authzService.isAuthorized(AuthorizationService.Operation.READ, r));
     }
 
     @Test
@@ -379,12 +393,12 @@ public class TokenAuthorizationServiceTest {
                 .thenReturn(Collections.singletonList("auser"));
 
         when(authentication.getPrincipal())
-                .thenReturn(new EmployeeSubject("jdoe", Collections::emptySet, "users", teamService));
+                .thenReturn(new EmployeeSubject(false, "jdoe", Collections::emptySet, "users", teamService));
         assertFalse("jdoe should not be authorized",
                 authzService.isAuthorized(AuthorizationService.Operation.WRITE, r));
 
         when(authentication.getPrincipal())
-                .thenReturn(new EmployeeSubject("auser", Collections::emptySet, "users", teamService));
+                .thenReturn(new EmployeeSubject(true, "auser", Collections::emptySet, "users", teamService));
         assertTrue("auser should be authorized",
                 authzService.isAuthorized(AuthorizationService.Operation.WRITE, r));
     }
@@ -410,7 +424,7 @@ public class TokenAuthorizationServiceTest {
                 .thenReturn(Collections.emptyList());
 
         when(authentication.getPrincipal())
-                .thenReturn(new EmployeeSubject("jdoe", Collections::emptySet, "users", teamService));
+                .thenReturn(new EmployeeSubject(false, "jdoe", Collections::emptySet, "users", teamService));
         assertFalse("jdoe should not be authorized",
                 authzService.isAuthorized(AuthorizationService.Operation.WRITE, r));
     }

@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 
 public class PrincipalFactory {
 
+    private final boolean denyUserAdminOperations;
     private final String employeesRealm;
     private final String usersType;
     private final String servicesRealm;
@@ -23,12 +24,14 @@ public class PrincipalFactory {
     private final ZalandoTeamService teamService;
 
     public PrincipalFactory(
+            final boolean denyUserAdminOperations,
             final String employeesRealm,
             final String usersType,
             final String servicesRealm,
             final String servicesType,
             final OPAClient opaClient,
             final ZalandoTeamService teamService) {
+        this.denyUserAdminOperations = denyUserAdminOperations;
         this.employeesRealm = employeesRealm;
         this.usersType = usersType;
         this.servicesRealm = servicesRealm;
@@ -59,7 +62,7 @@ public class PrincipalFactory {
             }
         } else {
             if (usersType.equals(type)) {
-                return new EmployeeSubject(uid, retailerIdsSupplier, type, teamService);
+                return new EmployeeSubject(denyUserAdminOperations, uid, retailerIdsSupplier, type, teamService);
             } else {
                 return new UidSubject(uid, retailerIdsSupplier, type);
             }

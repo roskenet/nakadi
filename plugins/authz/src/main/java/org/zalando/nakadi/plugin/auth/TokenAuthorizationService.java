@@ -23,10 +23,8 @@ import org.zalando.nakadi.plugin.auth.attribute.TeamAuthorizationAttribute;
 import org.zalando.nakadi.plugin.auth.subject.Principal;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -53,17 +51,15 @@ public class TokenAuthorizationService implements AuthorizationService {
     private static final Pattern UUID_PATTERN =
             Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
 
+    private static final Map<String, List<String>> BUSINESS_PARTNER_ALLOWED_OPERATIONS = Map.of(
+            SUBSCRIPTION_RESOURCE, List.of(Operation.READ.toString(), Operation.ADMIN.toString()),
+            EVENT_TYPE_RESOURCE, List.of(Operation.READ.toString())
+    );
+
     private final String usersType;
     private final String servicesType;
     private final String businessPartnersType;
-
     private final List<String> merchantUids;
-
-    private static final Map<String, List<String>> BUSINESS_PARTNER_ALLOWED_OPERATION = new HashMap<>() {{
-        put(SUBSCRIPTION_RESOURCE, Arrays.asList(Operation.READ.toString(), Operation.ADMIN.toString()));
-        put(EVENT_TYPE_RESOURCE, Arrays.asList(Operation.READ.toString()));
-    }};
-
     private final KioService kioService;
     private final ValueRegistry merchantRegistry;
     private final ValueRegistry userRegistry;
@@ -71,15 +67,16 @@ public class TokenAuthorizationService implements AuthorizationService {
 
     private final OPAClient opaClient;
 
-    public TokenAuthorizationService(final String usersType,
-                                     final ValueRegistry userRegistry,
-                                     final String servicesType,
-                                     final KioService kioService,
-                                     final String businessPartnersType,
-                                     final ValueRegistry merchantRegistry,
-                                     final ZalandoTeamService teamService,
-                                     final OPAClient opaClient,
-                                     final List<String> merchantUids) {
+    public TokenAuthorizationService(
+            final String usersType,
+            final ValueRegistry userRegistry,
+            final String servicesType,
+            final KioService kioService,
+            final String businessPartnersType,
+            final ValueRegistry merchantRegistry,
+            final ZalandoTeamService teamService,
+            final OPAClient opaClient,
+            final List<String> merchantUids) {
         this.usersType = usersType;
         this.servicesType = servicesType;
         this.businessPartnersType = businessPartnersType;
@@ -94,12 +91,12 @@ public class TokenAuthorizationService implements AuthorizationService {
     @Override
     public boolean isAuthorized(final Operation operation, final Resource resource)
             throws PluginException {
-        return getPrincipal(true)
-                .isAuthorized(
-                        resource.getType(),
-                        operation,
-                        resource.getAttributesForOperation(operation),
-                        resource.getProperties());
+        final var principal = getPrincipal(true);
+        return principal.isAuthorized(
+                resource.getType(),
+                operation,
+                resource.getAttributesForOperation(operation),
+                resource.getProperties());
     }
 
     private Principal getPrincipal(final boolean throwOnError) {
@@ -303,7 +300,7 @@ public class TokenAuthorizationService implements AuthorizationService {
                                                 final Map<String,
                                                         List<AuthorizationAttribute>> authorizationAttributes) {
 
-        if (!BUSINESS_PARTNER_ALLOWED_OPERATION.containsKey(resourceType)) {
+        if (!BUSINESS_PARTNER_ALLOWED_OPERATIONS.containsKey(resourceType)) {
             return false;
         }
 
@@ -311,7 +308,7 @@ public class TokenAuthorizationService implements AuthorizationService {
                 .filter(k -> k.getValue().stream().map(AuthorizationAttribute::getDataType)
                         .anyMatch(a -> a.equals(businessPartnersType)))
                 .map(Map.Entry::getKey)
-                .allMatch(operation -> BUSINESS_PARTNER_ALLOWED_OPERATION.get(resourceType)
+                .allMatch(operation -> BUSINESS_PARTNER_ALLOWED_OPERATIONS.get(resourceType)
                         .contains(operation));
 
     }
