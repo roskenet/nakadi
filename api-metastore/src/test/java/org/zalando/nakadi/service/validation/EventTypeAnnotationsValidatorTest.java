@@ -218,7 +218,7 @@ public class EventTypeAnnotationsValidatorTest {
                 Arguments.of(
                         // Retention period without retention reason
                         Map.of(
-                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION, "1 day"
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION, "7 days"
                         ),
                         new String[] {
                                 EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_REASON_ANNOTATION,
@@ -226,13 +226,98 @@ public class EventTypeAnnotationsValidatorTest {
                         }
                 ),
                 Arguments.of(
-                        // Wrong retention period value
+                        // Wrong retention period unit
                         Map.of(
                                 EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION, "1 airplane",
                                 EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_REASON_ANNOTATION, "I need my data"
                         ),
                         new String[] {
                                 EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION,
+                                "does not comply with regex",
+                                "https://docs.google.com/document/d/1-SwwpwUqauc_pXu-743YA1gO8l5_R_Gf4nbYml1ySiI",
+                        }
+                ),
+                Arguments.of(
+                        // Missing space before spelled period unit
+                        Map.of(
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION, "1month",
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_REASON_ANNOTATION, "I need my data"
+                        ),
+                        new String[] {
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION,
+                                "does not comply with regex",
+                                "https://docs.google.com/document/d/1-SwwpwUqauc_pXu-743YA1gO8l5_R_Gf4nbYml1ySiI",
+                        }
+                ),
+                Arguments.of(
+                        // Unexpected space before single-letter period unit
+                        Map.of(
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION, "1 m",
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_REASON_ANNOTATION, "I need my data"
+                        ),
+                        new String[] {
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION,
+                                "does not comply with regex",
+                                "https://docs.google.com/document/d/1-SwwpwUqauc_pXu-743YA1gO8l5_R_Gf4nbYml1ySiI",
+                        }
+                ),
+                Arguments.of(
+                        // Too short retention period
+                        Map.of(
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION, "1 day",
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_REASON_ANNOTATION, "I need my data"
+                        ),
+                        new String[] {
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION,
+                                "value is too short (min: 7 days)",
+                                "https://docs.google.com/document/d/1-SwwpwUqauc_pXu-743YA1gO8l5_R_Gf4nbYml1ySiI",
+                        }
+                ),
+                Arguments.of(
+                        // Too long retention period
+                        Map.of(
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION, "3651 day",
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_REASON_ANNOTATION, "I need my data"
+                        ),
+                        new String[] {
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION,
+                                "value is too long (max: 10 years)",
+                                "https://docs.google.com/document/d/1-SwwpwUqauc_pXu-743YA1gO8l5_R_Gf4nbYml1ySiI",
+                        }
+                ),
+                Arguments.of(
+                        // Too long retention period
+                        Map.of(
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION, "600 weeks",
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_REASON_ANNOTATION, "I need my data"
+                        ),
+                        new String[] {
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION,
+                                "value is too long (max: 10 years)",
+                                "https://docs.google.com/document/d/1-SwwpwUqauc_pXu-743YA1gO8l5_R_Gf4nbYml1ySiI",
+                        }
+                ),
+                Arguments.of(
+                        // Too long retention period
+                        Map.of(
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION, "200 months",
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_REASON_ANNOTATION, "I need my data"
+                        ),
+                        new String[] {
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION,
+                                "value is too long (max: 10 years)",
+                                "https://docs.google.com/document/d/1-SwwpwUqauc_pXu-743YA1gO8l5_R_Gf4nbYml1ySiI",
+                        }
+                ),
+                Arguments.of(
+                        // Too long retention period
+                        Map.of(
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION, "30 years",
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_REASON_ANNOTATION, "I need my data"
+                        ),
+                        new String[] {
+                                EventTypeAnnotationsValidator.DATA_LAKE_RETENTION_PERIOD_ANNOTATION,
+                                "value is too long (max: 10 years)",
                                 "https://docs.google.com/document/d/1-SwwpwUqauc_pXu-743YA1gO8l5_R_Gf4nbYml1ySiI",
                         }
                 )

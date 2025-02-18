@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.zalando.nakadi.service.auth.AuthorizationResourceMapping.DATA_COMPLIANCE_ASPD_CLASSIFICATION_ANNOTATION;
@@ -27,12 +28,15 @@ import static org.zalando.nakadi.service.auth.AuthorizationResourceMapping.DATA_
 @Component
 public class EventTypeAnnotationsValidator {
     private static final Pattern DATA_LAKE_ANNOTATIONS_PERIOD_PATTERN = Pattern.compile(
-            "^(unlimited|(([7-9]|[1-9]\\d{1,2}|[1-2]\\d{3}|3[0-5]\\d{2}|36[0-4]\\d|3650)((\\sdays?)|(d)))" +
-                    "|(([1-9][0-9]?|[1-4][0-9]{2}|5([0-1][0-9]|2[0-1]))((\\sweeks?)|(w)))|" +
-                    "(([1-9]|[1-9]\\d|[1][01]\\d|120)((\\smonths?)|(m)))|(([1-9]|(10))((\\syears?)|(y))))$");
+            "^(([1-9][0-9]*)((d|w|m|y)|(\\s(day|week|month|year)s?)))|(unlimited)$");
+
     static final String DATA_LAKE_RETENTION_PERIOD_ANNOTATION = "datalake.zalando.org/retention-period";
     static final String DATA_LAKE_RETENTION_REASON_ANNOTATION = "datalake.zalando.org/retention-period-reason";
     static final String DATA_LAKE_MATERIALIZE_EVENTS_ANNOTATION = "datalake.zalando.org/materialize-events";
+
+    static final String DATA_LAKE_ANNOTATIONS_DOCUMENT_URL =
+            "https://docs.google.com/document/d/1-SwwpwUqauc_pXu-743YA1gO8l5_R_Gf4nbYml1ySiI"
+            + "/edit#heading=h.kmvigbxbn1dj";
 
     private final FeatureToggleService featureToggleService;
     private final AuthorizationService authorizationService;
@@ -151,12 +155,33 @@ public class EventTypeAnnotationsValidator {
                                 + DATA_LAKE_RETENTION_PERIOD_ANNOTATION + " is specified.");
             }
 
-            if (!DATA_LAKE_ANNOTATIONS_PERIOD_PATTERN.matcher(retentionPeriod).find()) {
+            final Matcher matcher = DATA_LAKE_ANNOTATIONS_PERIOD_PATTERN.matcher(retentionPeriod);
+            if (!matcher.matches()) {
                 throw new InvalidEventTypeException(
                         "Annotation " + DATA_LAKE_RETENTION_PERIOD_ANNOTATION
-                        + " does not comply with regex. See documentation "
-                        + "(https://docs.google.com/document/d/1-SwwpwUqauc_pXu-743YA1gO8l5_R_Gf4nbYml1ySiI"
-                        + "/edit#heading=h.kmvigbxbn1dj) for more details.");
+                        + " does not comply with regex: " + DATA_LAKE_ANNOTATIONS_PERIOD_PATTERN + ". "
+                        + "For more details see documentation: " + DATA_LAKE_ANNOTATIONS_DOCUMENT_URL);
+            }
+            final String num = matcher.group(2);
+            final String unit = matcher.group(3);
+            if (num != null && unit != null) {
+                final char u = unit.startsWith(" ") ? unit.charAt(1) : unit.charAt(0);
+                final int n = Integer.parseInt(num);
+                if (u == 'd' && n < 7) {
+                    throw new InvalidEventTypeException(
+                            "Annotation " + DATA_LAKE_RETENTION_PERIOD_ANNOTATION
+                            + " value is too short (min: 7 days). "
+                            + "For more details see documentation: " + DATA_LAKE_ANNOTATIONS_DOCUMENT_URL);
+                }
+                if (u == 'd' && n > 3650
+                        || u == 'w' && n > 521
+                        || u == 'm' && n > 120
+                        || u == 'y' && n > 10) {
+                    throw new InvalidEventTypeException(
+                            "Annotation " + DATA_LAKE_RETENTION_PERIOD_ANNOTATION
+                            + " value is too long (max: 10 years). "
+                            + "For more details see documentation: " + DATA_LAKE_ANNOTATIONS_DOCUMENT_URL);
+                }
             }
         }
 
