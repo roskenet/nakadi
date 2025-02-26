@@ -48,8 +48,7 @@ import static org.zalando.nakadi.domain.Version.Level.PATCH;
 public class SchemaEvolutionService {
 
     private final List<SchemaEvolutionConstraint> schemaEvolutionConstraints;
-    private final Schema compatbileModeMetaSchema;
-    private final Schema nonCompatibleModeMetaSchema;
+    private final Schema jsonMetaschema;
     private final SchemaDiff schemaDiff;
     private final Map<SchemaChange.Type, String> errorMessages;
     private static final List<SchemaChange.Type> FORWARD_TO_COMPATIBLE_ALLOWED_CHANGES = Lists.newArrayList(
@@ -58,47 +57,37 @@ public class SchemaEvolutionService {
     private final BiFunction<SchemaChange.Type, CompatibilityMode, Version.Level> levelResolver;
     private final AvroSchemaCompatibility avroSchemaCompatibility;
 
-    public SchemaEvolutionService(final Schema compatbileModeMetaSchema,
-                                  final Schema nonCompatibleModeMetaSchema,
+    public SchemaEvolutionService(final Schema jsonMetaschema,
                                   final List<SchemaEvolutionConstraint> schemaEvolutionConstraints,
                                   final SchemaDiff schemaDiff,
                                   final BiFunction<SchemaChange.Type, CompatibilityMode, Version.Level> levelResolver,
                                   final Map<SchemaChange.Type, String> errorMessages,
                                   final AvroSchemaCompatibility avroSchemaCompatibility) {
-        this.compatbileModeMetaSchema = compatbileModeMetaSchema;
-        this.nonCompatibleModeMetaSchema = nonCompatibleModeMetaSchema;
+        this.jsonMetaschema = jsonMetaschema;
         this.schemaEvolutionConstraints = schemaEvolutionConstraints;
         this.schemaDiff = schemaDiff;
         this.levelResolver = levelResolver;
         this.errorMessages = errorMessages;
         this.avroSchemaCompatibility = avroSchemaCompatibility;
-        }
+    }
 
-    public SchemaEvolutionService(final Schema compatibleModeMetaSchema,
-                                  final Schema nonCompatibleModeMetaSchema,
+    public SchemaEvolutionService(final Schema jsonMetaschema,
                                   final List<SchemaEvolutionConstraint> schemaEvolutionConstraints,
                                   final SchemaDiff schemaDiff,
                                   final Map<SchemaChange.Type, String> errorMessages,
                                   final AvroSchemaCompatibility avroSchemaCompatibility) {
-        this(compatibleModeMetaSchema, nonCompatibleModeMetaSchema,
-                schemaEvolutionConstraints, schemaDiff, SchemaChange.Type::getLevel, errorMessages,
+        this(jsonMetaschema, schemaEvolutionConstraints, schemaDiff, SchemaChange.Type::getLevel, errorMessages,
                 avroSchemaCompatibility);
     }
 
     public List<SchemaIncompatibility> collectMetaSchemaIncompatibilities(final JSONObject schemaJson,
                                                                           final CompatibilityMode mode) {
         final List<SchemaIncompatibility> incompatibilities = new ArrayList<>();
-
         try {
-            if (mode == CompatibilityMode.COMPATIBLE) {
-                compatbileModeMetaSchema.validate(schemaJson);
-            } else {
-                nonCompatibleModeMetaSchema.validate(schemaJson);
-            }
+            jsonMetaschema.validate(schemaJson);
         } catch (final ValidationException e) {
             collectErrorMessages(e, incompatibilities);
         }
-
         return incompatibilities;
     }
 

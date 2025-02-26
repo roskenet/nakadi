@@ -60,8 +60,9 @@ public class SchemaValidatorConfig {
 
     @Bean
     public SchemaEvolutionService schemaEvolutionService() throws IOException {
-        final Schema compatibleModeSchema = loadJsonSchema("schema_compatible.json");
-        final Schema nonCompatibleModeSchema = loadJsonSchema("schema_non_compatible.json");
+
+        final Schema jsonMetaschema = SchemaLoader.load(
+                new JSONObject(Resources.toString(Resources.getResource("json_metaschema.json"), Charsets.UTF_8)));
 
         final List<SchemaEvolutionConstraint> schemaEvolutionConstraints = Lists.newArrayList(
                 new CategoryChangeConstraint(),
@@ -92,14 +93,7 @@ public class SchemaValidatorConfig {
 
         final SchemaDiff diff = new SchemaDiff();
 
-        return new SchemaEvolutionService(compatibleModeSchema, nonCompatibleModeSchema,
-                schemaEvolutionConstraints, diff, errorMessage,
+        return new SchemaEvolutionService(jsonMetaschema, schemaEvolutionConstraints, diff, errorMessage,
                 avroSchemaCompatibility);
-    }
-
-    private Schema loadJsonSchema(final String jsonSchemaFileName) throws IOException {
-        final JSONObject metaSchemaJson = new JSONObject(Resources.toString(Resources.getResource(jsonSchemaFileName),
-                Charsets.UTF_8));
-        return SchemaLoader.load(metaSchemaJson);
     }
 }

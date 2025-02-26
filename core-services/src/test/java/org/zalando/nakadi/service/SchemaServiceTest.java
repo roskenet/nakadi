@@ -79,8 +79,7 @@ public class SchemaServiceTest {
     private SchemaEvolutionService createSchemaEvolutionServiceSpy() throws IOException {
         final List<SchemaEvolutionConstraint> evolutionConstraints =
                 Lists.newArrayList(Mockito.mock(SchemaEvolutionConstraint.class));
-        return Mockito.spy(new SchemaEvolutionService(JsonUtils.loadJsonSchema("schema_compatible.json"),
-                JsonUtils.loadJsonSchema("schema_non_compatible.json"),
+        return Mockito.spy(new SchemaEvolutionService(JsonUtils.loadJsonSchema("json_metaschema.json"),
                 evolutionConstraints,
                 Mockito.mock(SchemaDiff.class), Mockito.mock(BiFunction.class),
                 new HashMap<>(), Mockito.mock(AvroSchemaCompatibility.class)));
@@ -181,42 +180,6 @@ public class SchemaServiceTest {
         eventType.getSchema().setSchema(jsonSchemaString);
         eventType.setCompatibilityMode(mode);
         assertDoesNotThrow(() -> schemaService.validateSchema(eventType, true));
-    }
-
-    @EnumSource(value = CompatibilityMode.class, names = {"NONE", "FORWARD"})
-    @ParameterizedTest
-    public void whenNewNonCompatibleEventTypeAndExtensibleEnumThenDontThrow(final CompatibilityMode mode)
-            throws Exception {
-        final String jsonSchemaString = Resources.toString(
-                Resources.getResource("sample-extensible-enum.json"),
-                Charsets.UTF_8);
-        eventType.getSchema().setSchema(jsonSchemaString);
-        eventType.setCompatibilityMode(mode);
-        assertDoesNotThrow(() -> schemaService.validateSchema(eventType, false));
-    }
-
-    @EnumSource(value = CompatibilityMode.class, names = {"NONE", "FORWARD"})
-    @ParameterizedTest
-    public void whenNewNonCompatibleEventTypeAndInvalidExtensibleEnumThenThrows(final CompatibilityMode mode)
-            throws Exception {
-        final String jsonSchemaString = Resources.toString(
-                Resources.getResource("sample-invalid-extensible-enum.json"),
-                Charsets.UTF_8);
-        eventType.getSchema().setSchema(jsonSchemaString);
-        eventType.setCompatibilityMode(mode);
-        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType, false));
-    }
-
-    @Test
-    public void whenCompatibleEventTypeWithExtensibleEnumThenThrows()
-            throws Exception {
-        final String jsonSchemaString = Resources.toString(
-                Resources.getResource("sample-extensible-enum.json"),
-                Charsets.UTF_8);
-        eventType.getSchema().setSchema(jsonSchemaString);
-        eventType.setCompatibilityMode(CompatibilityMode.COMPATIBLE);
-        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType, false));
-        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType, true));
     }
 
     @Test

@@ -11,8 +11,7 @@ import java.io.IOException;
 public class JsonUtils {
 
     public static Schema loadJsonSchema(final String jsonSchemaFileName) throws IOException {
-        final JSONObject metaSchemaJson = new JSONObject(Resources.toString(Resources.getResource(jsonSchemaFileName),
-                Charsets.UTF_8));
-        return SchemaLoader.load(metaSchemaJson);
+        return SchemaLoader.load(
+                new JSONObject(Resources.toString(Resources.getResource(jsonSchemaFileName), Charsets.UTF_8)));
     }
 }

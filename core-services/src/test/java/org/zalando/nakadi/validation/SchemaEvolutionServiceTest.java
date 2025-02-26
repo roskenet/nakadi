@@ -70,8 +70,8 @@ public class SchemaEvolutionServiceTest {
     @Before
     public void setUp() throws IOException {
         final List<SchemaEvolutionConstraint> evolutionConstraints = Lists.newArrayList(evolutionConstraint);
-        this.service = new SchemaEvolutionService(JsonUtils.loadJsonSchema("schema_compatible.json"),
-                JsonUtils.loadJsonSchema("schema_non_compatible.json"), evolutionConstraints, schemaDiff, levelResolver,
+        this.service = new SchemaEvolutionService(JsonUtils.loadJsonSchema("json_metaschema.json"),
+                evolutionConstraints, schemaDiff, levelResolver,
                 errorMessages, avroSchemaCompatibility);
 
         Mockito.doReturn("error").when(errorMessages).get(any());
