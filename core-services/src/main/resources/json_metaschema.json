@@ -1,6 +1,6 @@
 {
     "$schema": "http://json-schema.org/draft-04/schema#",
-    "description": "Core schema meta-schema (with some cherry-picked draft-06 features, but no support for 'not' keyword, and, critically, not allowing additional properties in the schema itself)",
+    "description": "Core schema meta-schema (with some cherry-picked draft-06 features, e.g. 'examples', but no support for 'not' keyword, and, critically, not allowing additional properties in the schema itself)",
     "definitions": {
         "schemaArray": {
             "type": "array",
@@ -44,6 +44,10 @@
             "type": "string"
         },
         "default": {},
+        "examples": {
+            "type": "array",
+            "items": {}
+        },
         "multipleOf": {
             "type": "number",
             "minimum": 0,

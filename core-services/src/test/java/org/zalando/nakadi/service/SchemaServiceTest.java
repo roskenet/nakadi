@@ -347,6 +347,18 @@ public class SchemaServiceTest {
     }
 
     @Test
+    public void testExamplesKeywordInSchemaIsAccepted() throws Exception {
+        final String jsonSchemaString = Resources.toString(
+                Resources.getResource("schema-with-examples-keyword.json"),
+                Charsets.UTF_8);
+
+        eventType.getSchema().setSchema(jsonSchemaString);
+        eventType.setCategory(BUSINESS);
+        eventType.setCompatibilityMode(CompatibilityMode.COMPATIBLE);
+        assertDoesNotThrow(() -> schemaService.validateSchema(eventType));
+    }
+
+    @Test
     public void whenEventOwnerSelectorFieldMissingInSchemaThenThrows() {
         eventType.getSchema().setSchema("{}");
         eventType.setEventOwnerSelector(
