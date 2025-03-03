@@ -474,8 +474,7 @@ public class EventTypeService {
 
             if (featureToggleService.isFeatureEnabled(Feature.FORCE_EVENT_TYPE_UPDATE_SCHEMA_VALIDATION)
                     || eventTypeBase.getCompatibilityMode() == CompatibilityMode.COMPATIBLE
-                    // order is important here to narrow to EventTypeSchemaBase :(
-                    || !eventTypeBase.getSchema().equals(original.getSchema())) {
+                    || isValidSchemaBeforeUpdate(original)) {
                 try {
                     schemaService.validateSchema(eventTypeBase);
                 } catch (final SchemaValidationException e) {
@@ -531,6 +530,15 @@ public class EventTypeService {
         nakadiAuditLogPublisher.publish(Optional.of(original), Optional.of(eventType),
                 NakadiAuditLogPublisher.ResourceType.EVENT_TYPE, NakadiAuditLogPublisher.ActionType.UPDATED,
                 eventType.getName());
+    }
+
+    private boolean isValidSchemaBeforeUpdate(final EventType original) {
+        try {
+            schemaService.validateSchema(original);
+            return true;
+        } catch (final SchemaValidationException e) {
+            return false;
+        }
     }
 
     private void updateRetentionTime(final EventType original, final EventType eventType) {
