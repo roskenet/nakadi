@@ -8,7 +8,7 @@ import static org.junit.Assert.assertEquals;
 
 public class UUIDValidatorTest {
 
-    private final UUIDValidator uuidValidator = new UUIDValidator("test-event-type", "uuid");
+    private final UUIDValidator uuidValidator = new UUIDValidator("uuid");
 
     @Test
     public void testValidUUID() {
@@ -20,7 +20,7 @@ public class UUIDValidatorTest {
     @Test
     public void testInvalidUUID() {
         assertEquals(
-                Optional.empty(),
-                uuidValidator.validate("invalid-uuid"));
+                Optional.of("[123e4567-xyz1-klmn-a456-426614174000] is not a valid uuid"),
+                uuidValidator.validate("123e4567-xyz1-klmn-a456-426614174000"));
     }
 }

@@ -1,5 +1,6 @@
 package org.zalando.nakadi.validation;
 
+import org.everit.json.schema.FormatValidator;
 import org.everit.json.schema.Schema;
 import org.everit.json.schema.ValidationException;
 import org.everit.json.schema.loader.SchemaLoader;
@@ -16,8 +17,18 @@ import java.util.Optional;
 @Component
 public class EventValidatorBuilder {
 
-    private final JsonSchemaEnrichment loader;
+    // NOTE: org.everit.json also adds additional format validators that are not listed here explicitly!
+    private static final FormatValidator[] ASSERTED_FORMAT_VALIDATORS = {
+            new RFC3339DateTimeValidator(),
+            new ISO4217CurrencyCodeValidator(),
+            new ISO4217CurrencyCodeValidator("ISO-4217"),
+    };
+    private static final FormatValidator[] PROSPECTIVE_FORMAT_VALIDATORS = {
+            new UUIDValidator("uuid"),
+            new UUIDValidator("UUID"),
+    };
     private static final JsonSchemaValidator METADATA_VALIDATOR = new MetadataValidator();
+    private final JsonSchemaEnrichment loader;
 
     @Autowired
     public EventValidatorBuilder(final JsonSchemaEnrichment loader) {
@@ -26,17 +37,13 @@ public class EventValidatorBuilder {
 
     public JsonSchemaValidator build(final EventType eventType) {
         final Optional<EventTypeSchema> jsonSchema = eventType.getLatestSchemaByType(EventTypeSchema.Type.JSON_SCHEMA);
-        if (!jsonSchema.isPresent()) {
+        if (jsonSchema.isEmpty()) {
             throw new NoSuchSchemaException("No json_schema found for event type: " + eventType.getName());
         }
 
-        final Schema schema = SchemaLoader.builder()
-                .schemaJson(loader.effectiveSchema(eventType, jsonSchema.get().getSchema()))
-                .addFormatValidator(new RFC3339DateTimeValidator())
-                .addFormatValidator(new ISO4217CurrencyCodeValidator())
-                .addFormatValidator(new ISO4217CurrencyCodeValidator("ISO-4217"))
-                .addFormatValidator(new UUIDValidator(eventType.getName(), "uuid"))
-                .addFormatValidator(new UUIDValidator(eventType.getName(), "UUID"))
+        final SchemaLoader.SchemaLoaderBuilder builder = SchemaLoader.builder()
+                .schemaJson(loader.effectiveSchema(eventType, jsonSchema.get().getSchema()));
+        final Schema schema = addFormatValidators(builder, eventType.getName())
                 .build()
                 .load()
                 .build();
@@ -46,6 +53,17 @@ public class EventValidatorBuilder {
         return eventType.getCategory() == EventCategory.DATA || eventType.getCategory() == EventCategory.BUSINESS
                 ? new ChainingValidator(baseValidator, METADATA_VALIDATOR)
                 : baseValidator;
+    }
+
+    private SchemaLoader.SchemaLoaderBuilder addFormatValidators(
+            final SchemaLoader.SchemaLoaderBuilder builder, final String eventTypeName) {
+        for (final var validator: ASSERTED_FORMAT_VALIDATORS) {
+            builder.addFormatValidator(validator);
+        }
+        for (final var validator: PROSPECTIVE_FORMAT_VALIDATORS) {
+            builder.addFormatValidator(new LoggingFormatChecker(validator, eventTypeName));
+        }
+        return builder;
     }
 
     private static class ChainingValidator implements JsonSchemaValidator {
