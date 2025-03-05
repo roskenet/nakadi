@@ -26,6 +26,7 @@ import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.EventTypeBase;
 import org.zalando.nakadi.domain.EventTypeSchema;
 import org.zalando.nakadi.domain.EventTypeSchemaBase;
+import org.zalando.nakadi.domain.Feature;
 import org.zalando.nakadi.domain.PaginationWrapper;
 import org.zalando.nakadi.domain.StrictJsonParser;
 import org.zalando.nakadi.exceptions.runtime.EventTypeUnavailableException;
@@ -70,6 +71,8 @@ public class SchemaService implements SchemaProviderService {
     private final EventTypeCache eventTypeCache;
     private final TimelineSync timelineSync;
     private final NakadiSettings nakadiSettings;
+    private final FeatureToggleService featureToggleService;
+
     private final LoadingCache<SchemaId, EventTypeSchema> schemasCache;
     private final Map<SchemaId, org.apache.avro.Schema> avroSchemasCache;
     private final Map<NameSchema, String> schemaVersionCache;
@@ -82,7 +85,8 @@ public class SchemaService implements SchemaProviderService {
                          final EventTypeRepository eventTypeRepository,
                          final EventTypeCache eventTypeCache,
                          final TimelineSync timelineSync,
-                         final NakadiSettings nakadiSettings) {
+                         final NakadiSettings nakadiSettings,
+                         final FeatureToggleService featureToggleService) {
         this.schemaRepository = schemaRepository;
         this.paginationService = paginationService;
         this.jsonSchemaEnrichment = jsonSchemaEnrichment;
@@ -91,6 +95,8 @@ public class SchemaService implements SchemaProviderService {
         this.eventTypeCache = eventTypeCache;
         this.timelineSync = timelineSync;
         this.nakadiSettings = nakadiSettings;
+        this.featureToggleService = featureToggleService;
+
         this.schemasCache = CacheBuilder.newBuilder()
                 .build(new CacheLoader<>() {
                     @Override
@@ -139,9 +145,39 @@ public class SchemaService implements SchemaProviderService {
         }
     }
 
-    public EventType getValidEvolvedEventType(final EventType originalEventType, final EventTypeBase updatedEventType) {
-        validateSchema(updatedEventType);
-        return schemaEvolutionService.evolve(originalEventType, updatedEventType);
+    public void validateSchemaForCreate(final EventTypeBase eventType) throws SchemaValidationException {
+        final boolean strictMetaschemaValidation =
+                eventType.getCompatibilityMode() == CompatibilityMode.COMPATIBLE
+                || featureToggleService.isFeatureEnabled(Feature.FORCE_EVENT_TYPE_CREATE_SCHEMA_VALIDATION);
+
+        validateSchema(eventType, strictMetaschemaValidation);
+    }
+
+    public void validateSchemaForUpdate(final EventType original, final EventTypeBase updated)
+            throws SchemaValidationException {
+
+        final boolean strictMetaschemaValidation =
+                updated.getCompatibilityMode() == CompatibilityMode.COMPATIBLE
+                || featureToggleService.isFeatureEnabled(Feature.FORCE_EVENT_TYPE_UPDATE_SCHEMA_VALIDATION)
+                || isStrictlyValidSchema(original);
+
+        validateSchema(updated, strictMetaschemaValidation);
+    }
+
+    private boolean isStrictlyValidSchema(final EventType eventType) {
+        try {
+            validateSchema(eventType, true);
+            return true;
+        } catch (final SchemaValidationException e) {
+            return false;
+        }
+    }
+
+    public EventType getValidEvolvedEventType(final EventType original, final EventTypeBase updated)
+            throws SchemaValidationException {
+
+        validateSchemaForUpdate(original, updated);
+        return schemaEvolutionService.evolve(original, updated);
     }
 
     public PaginationWrapper getSchemas(final String name, final int offset, final int limit)
@@ -183,13 +219,14 @@ public class SchemaService implements SchemaProviderService {
         return schemaRepository.getLatestSchemaByType(name, schemaType);
     }
 
-    public void validateSchema(final EventTypeBase eventType) throws SchemaValidationException {
+    public void validateSchema(final EventTypeBase eventType, final boolean strictMetaschemaValidation)
+            throws SchemaValidationException {
         try {
             final String eventTypeSchema = eventType.getSchema().getSchema();
             final EventTypeSchemaBase.Type schemaType = eventType.getSchema().getType();
 
             if (schemaType.equals(EventTypeSchemaBase.Type.JSON_SCHEMA)) {
-                validateJsonTypeSchema(eventType, eventTypeSchema);
+                validateJsonTypeSchema(eventType, eventTypeSchema, strictMetaschemaValidation);
             } else if (schemaType.equals(EventTypeSchemaBase.Type.AVRO_SCHEMA)) {
                 validateAvroTypeSchema(eventTypeSchema);
             } else {
@@ -227,7 +264,10 @@ public class SchemaService implements SchemaProviderService {
         return effectiveEventTypeSchema;
     }
 
-    private void validateJsonTypeSchema(final EventTypeBase eventType, final String eventTypeSchema) {
+    private void validateJsonTypeSchema(final EventTypeBase eventType, final String eventTypeSchema,
+            final boolean strictMetaschemaValidation)
+            throws SchemaValidationException {
+
         final JSONObject schemaAsJson = parseJsonSchema(eventTypeSchema);
 
         if (schemaAsJson.has("type") && !Objects.equals("object", schemaAsJson.getString("type"))) {
@@ -271,7 +311,17 @@ public class SchemaService implements SchemaProviderService {
         validateFieldsInSchema("ordering_key_fields", orderingKeyFields, effectiveSchema);
         validateFieldsInSchema("ordering_instance_ids", orderingInstanceIds, effectiveSchema);
 
-        validateJsonSchemaConstraints(schemaAsJson, eventType.getCompatibilityMode());
+        try {
+            validateJsonSchemaConstraints(schemaAsJson, eventType.getCompatibilityMode());
+        } catch (final SchemaValidationException e) {
+            // TODO: refactor this!!!
+            if (strictMetaschemaValidation) {
+                throw e;
+            } else {
+                LOG.warn("event type {} with compatibility mode {} has invalid json schema: {}",
+                        eventType.getName(), eventType.getCompatibilityMode(), e.toString());
+            }
+        }
     }
 
     private void validateJsonSchemaConstraints(final JSONObject schema,

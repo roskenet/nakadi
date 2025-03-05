@@ -14,10 +14,12 @@ import org.joda.time.DateTime;
 import org.json.JSONObject;
 import org.junit.Assert;
 import org.junit.Test;
+import org.zalando.nakadi.domain.CompatibilityMode;
 import org.zalando.nakadi.domain.CleanupPolicy;
 import org.zalando.nakadi.domain.EnrichmentStrategyDescriptor;
 import org.zalando.nakadi.domain.EventCategory;
 import org.zalando.nakadi.domain.EventType;
+import org.zalando.nakadi.domain.Feature;
 import org.zalando.nakadi.domain.ResourceAuthorization;
 import org.zalando.nakadi.domain.ResourceAuthorizationAttribute;
 import org.zalando.nakadi.domain.Timeline;
@@ -123,7 +125,7 @@ public class EventTypeAT extends BaseAT {
         final String body = MAPPER.writer().writeValueAsString(eventType);
 
         given().body(body).header("accept", "application/json").contentType(JSON).when().post(ENDPOINT).then()
-                .body(equalTo("")).statusCode(HttpStatus.SC_CREATED);
+                .statusCode(HttpStatus.SC_CREATED);
     }
 
     @Test
@@ -141,7 +143,7 @@ public class EventTypeAT extends BaseAT {
         final String body = MAPPER.writer().writeValueAsString(eventType);
 
         given().body(body).header("accept", "application/json").contentType(JSON).post(ENDPOINT).then()
-                .body(equalTo("")).statusCode(HttpStatus.SC_CREATED);
+                .statusCode(HttpStatus.SC_CREATED);
 
         final EventType retrievedEventType = MAPPER.readValue(given()
                         .header("accept", "application/json").get(ENDPOINT + "/" + eventType.getName())
@@ -156,7 +158,6 @@ public class EventTypeAT extends BaseAT {
                 .when()
                 .put(ENDPOINT + "/" + eventType.getName())
                 .then()
-                .body(equalTo(""))
                 .statusCode(HttpStatus.SC_OK);
     }
 
@@ -169,7 +170,7 @@ public class EventTypeAT extends BaseAT {
                 .header("accept", "application/json")
                 .contentType(JSON).post(ENDPOINT)
                 .then()
-                .body(equalTo("")).statusCode(HttpStatus.SC_CREATED);
+                .statusCode(HttpStatus.SC_CREATED);
 
         final EventType retrievedEventType = MAPPER.readValue(given()
                         .header("accept", "application/json").get(ENDPOINT + "/" + eventType.getName())
@@ -199,7 +200,7 @@ public class EventTypeAT extends BaseAT {
                 .header("accept", "application/json")
                 .contentType(JSON).post(ENDPOINT)
                 .then()
-                .body(equalTo("")).statusCode(HttpStatus.SC_CREATED);
+                .statusCode(HttpStatus.SC_CREATED);
 
         final EventType retrievedEventType = MAPPER.readValue(given()
                         .header("accept", "application/json").get(ENDPOINT + "/" + eventType.getName())
@@ -216,7 +217,6 @@ public class EventTypeAT extends BaseAT {
                 .when()
                 .put(ENDPOINT + "/" + eventType.getName())
                 .then()
-                .body(equalTo(""))
                 .statusCode(HttpStatus.SC_OK);
 
         final EventType updatedEventType = MAPPER.readValue(given()
@@ -323,7 +323,6 @@ public class EventTypeAT extends BaseAT {
                 .contentType(JSON)
                 .put(ENDPOINT + "/" + eventType.getName())
                 .then()
-                .body(equalTo(""))
                 .statusCode(HttpStatus.SC_OK);
 
         timelines = NakadiTestUtils.listTimelines(eventType.getName());
@@ -370,7 +369,6 @@ public class EventTypeAT extends BaseAT {
                 .contentType(JSON)
                 .put(ENDPOINT + "/" + eventType.getName())
                 .then()
-                .body(equalTo(""))
                 .statusCode(HttpStatus.SC_OK);
 
         // get event type and check that properties are set correctly (database)
@@ -466,7 +464,6 @@ public class EventTypeAT extends BaseAT {
                 .contentType(JSON)
                 .put(ENDPOINT + "/" + eventType.getName())
                 .then()
-                .body(equalTo(""))
                 .statusCode(HttpStatus.SC_OK);
 
         final EventType eventType1 = NakadiTestUtils.getEventType(eventType.getName());
@@ -545,7 +542,7 @@ public class EventTypeAT extends BaseAT {
 
         given().body(body).header("accept", "application/json")
                 .contentType(JSON).when().post(ENDPOINT).then()
-                .body(equalTo("")).statusCode(HttpStatus.SC_CREATED);
+                .statusCode(HttpStatus.SC_CREATED);
 
 
         given()
@@ -569,7 +566,7 @@ public class EventTypeAT extends BaseAT {
         given().body(objectMapper.writer().writeValueAsString(eventType))
                 .header("accept", "application/json").contentType(JSON)
                 .when().post(ENDPOINT).then()
-                .body(equalTo("")).statusCode(HttpStatus.SC_CREATED);
+                .statusCode(HttpStatus.SC_CREATED);
 
         given().header("accept", "application/json").contentType(JSON)
                 .get(ENDPOINT + "/" + eventType.getName()).then()
@@ -584,7 +581,7 @@ public class EventTypeAT extends BaseAT {
         given().body(objectMapper.writer().writeValueAsString(eventType))
                 .header("accept", "application/json")
                 .contentType(JSON).when().put(ENDPOINT + "/" + eventType.getName()).then()
-                .body(equalTo("")).statusCode(HttpStatus.SC_OK);
+                .statusCode(HttpStatus.SC_OK);
 
         given().header("accept", "application/json").contentType(JSON)
                 .get(ENDPOINT + "/" + eventType.getName()).then()
@@ -601,7 +598,7 @@ public class EventTypeAT extends BaseAT {
         given().body(objectMapper.writer().writeValueAsString(eventType))
                 .header("accept", "application/json")
                 .contentType(JSON).when().put(ENDPOINT + "/" + eventType.getName()).then()
-                .body(equalTo("")).statusCode(HttpStatus.SC_OK);
+                .statusCode(HttpStatus.SC_OK);
 
         given().header("accept", "application/json").contentType(JSON)
                 .get(ENDPOINT + "/" + eventType.getName()).then()
@@ -639,6 +636,163 @@ public class EventTypeAT extends BaseAT {
                 .body(containsString("Field \\\"labels[]\\\" Key name should start and end " +
                         "with a letter or a digit"))
                 .statusCode(HttpStatus.SC_UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
+    public void whenPOSTEventTypeWithForwardModeAndInvalidSchemaJsonThenUnprocessable() throws JsonProcessingException {
+        final EventType eventType = EventTypeTestBuilder.builder()
+                .compatibilityMode(CompatibilityMode.FORWARD)
+                .schema("{")
+                .build();
+
+        given().body(MAPPER.writer().writeValueAsString(eventType))
+                .header("accept", "application/json")
+                .contentType(JSON).when().post(ENDPOINT).then()
+                .statusCode(HttpStatus.SC_UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
+    public void whenPOSTEventTypeWithForwardModeAndInvalidJsonSchemaThenUnprocessable() throws JsonProcessingException {
+        final EventType eventType = EventTypeTestBuilder.builder()
+                .compatibilityMode(CompatibilityMode.FORWARD)
+                .schema("{\"type\": \"xxx\"}")
+                .build();
+
+        given().body(MAPPER.writer().writeValueAsString(eventType))
+                .header("accept", "application/json")
+                .contentType(JSON).when().post(ENDPOINT).then()
+                .statusCode(HttpStatus.SC_UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
+    public void whenPOSTWithForwardModeAndInvalidSchemaAndValidationNotEnforcedThenCreated()
+            throws JsonProcessingException {
+
+        final EventType eventType = EventTypeTestBuilder.builder()
+                .compatibilityMode(CompatibilityMode.FORWARD)
+                .schema("{\"something\": \"something\"}")
+                .build();
+
+        NakadiTestUtils.switchFeature(Feature.FORCE_EVENT_TYPE_CREATE_SCHEMA_VALIDATION, false);
+
+        given().body(MAPPER.writer().writeValueAsString(eventType))
+                .contentType(JSON)
+                .when().post(ENDPOINT)
+                .then().statusCode(HttpStatus.SC_CREATED);
+    }
+
+    @Test
+    public void whenPOSTWithForwardModeAndInvalidSchemaAndValidationIsEnforcedThenUnprocessable()
+            throws JsonProcessingException {
+
+        final EventType eventType = EventTypeTestBuilder.builder()
+                .compatibilityMode(CompatibilityMode.FORWARD)
+                .schema("{\"something\": \"something\"}")
+                .build();
+
+        NakadiTestUtils.switchFeature(Feature.FORCE_EVENT_TYPE_CREATE_SCHEMA_VALIDATION, true);
+
+        given().body(MAPPER.writer().writeValueAsString(eventType))
+                .contentType(JSON)
+                .when().post(ENDPOINT)
+                .then().statusCode(HttpStatus.SC_UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
+    public void whenPOSTWithCompatibleModeAndInvalidSchemaThenUnprocessable() throws JsonProcessingException {
+        final EventType eventType = EventTypeTestBuilder.builder()
+                .schema("{\"something\": \"something\"}")
+                .compatibilityMode(CompatibilityMode.COMPATIBLE)
+                .build();
+
+        given().body(MAPPER.writer().writeValueAsString(eventType))
+                .contentType(JSON)
+                .when().post(ENDPOINT)
+                .then().statusCode(HttpStatus.SC_UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
+    public void whenPUTForwardCompatibiltyWithValidSchemaToInvalidThenUnprocessable() throws JsonProcessingException {
+        final EventTypeTestBuilder builder = EventTypeTestBuilder.builder();
+        final EventType src = builder
+                .compatibilityMode(CompatibilityMode.FORWARD)
+                .schema("{}")
+                .build();
+
+        NakadiTestUtils.switchFeature(Feature.FORCE_EVENT_TYPE_CREATE_SCHEMA_VALIDATION, false);
+
+        given().body(MAPPER.writer().writeValueAsString(src))
+                .contentType(JSON)
+                .when().post(ENDPOINT)
+                .then().statusCode(HttpStatus.SC_CREATED);
+
+        final EventType updated = builder
+                .compatibilityMode(CompatibilityMode.FORWARD)
+                .schema("{\"foo\": \"bar\"}")
+                .build();
+
+        NakadiTestUtils.switchFeature(Feature.FORCE_EVENT_TYPE_UPDATE_SCHEMA_VALIDATION, false);
+
+        given().body(MAPPER.writer().writeValueAsString(updated))
+                .contentType(JSON)
+                .when().put(ENDPOINT + "/" + updated.getName())
+                .then().statusCode(HttpStatus.SC_UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
+    public void whenPUTForwardCompatibiltyWithAlreadyInvalidSchemaToAnotherInvalidThenOK()
+            throws JsonProcessingException {
+
+        final EventTypeTestBuilder builder = EventTypeTestBuilder.builder();
+        final EventType src = builder
+                .compatibilityMode(CompatibilityMode.FORWARD)
+                .schema("{\"foo\": \"bar\"}")
+                .build();
+
+        NakadiTestUtils.switchFeature(Feature.FORCE_EVENT_TYPE_CREATE_SCHEMA_VALIDATION, false);
+
+        given().body(MAPPER.writer().writeValueAsString(src))
+                .contentType(JSON)
+                .when().post(ENDPOINT)
+                .then().statusCode(HttpStatus.SC_CREATED);
+
+        final EventType updated = builder
+                .compatibilityMode(CompatibilityMode.FORWARD)
+                .schema("{\"foo\": \"BAZZ\"}")
+                .build();
+
+        NakadiTestUtils.switchFeature(Feature.FORCE_EVENT_TYPE_UPDATE_SCHEMA_VALIDATION, false);
+
+        given().body(MAPPER.writer().writeValueAsString(updated))
+                .contentType(JSON)
+                .when().put(ENDPOINT + "/" + updated.getName())
+                .then().statusCode(HttpStatus.SC_OK);
+    }
+
+    @Test
+    public void whenPUTOfInvalidForwardToCompatibleThenUnprocessable() throws JsonProcessingException {
+
+        final EventTypeTestBuilder builder = EventTypeTestBuilder.builder();
+        final EventType src = builder
+                .compatibilityMode(CompatibilityMode.FORWARD)
+                .schema("{\"foo\": \"bar\"}")
+                .build();
+
+        NakadiTestUtils.switchFeature(Feature.FORCE_EVENT_TYPE_CREATE_SCHEMA_VALIDATION, false);
+
+        given().body(MAPPER.writer().writeValueAsString(src))
+                .contentType(JSON)
+                .when().post(ENDPOINT)
+                .then().statusCode(HttpStatus.SC_CREATED);
+
+        src.setCompatibilityMode(CompatibilityMode.COMPATIBLE);
+
+        NakadiTestUtils.switchFeature(Feature.FORCE_EVENT_TYPE_UPDATE_SCHEMA_VALIDATION, false);
+
+        given().body(MAPPER.writer().writeValueAsString(src))
+                .contentType(JSON)
+                .when().put(ENDPOINT + "/" + src.getName())
+                .then().statusCode(HttpStatus.SC_UNPROCESSABLE_ENTITY);
     }
 
     private void assertRetentionTime(final Long checkingRetentionTime, final String etName) throws IOException {

@@ -154,7 +154,7 @@ public class TestDataFilteringAT extends RealEnvironmentAT {
     }
 
     private void createEventType(final String body) {
-        jsonRequestSpec().body(body).when().post("/event-types").then().body(equalTo("")).statusCode(CREATED.value());
+        jsonRequestSpec().body(body).when().post("/event-types").then().statusCode(CREATED.value());
     }
 
     private void postEvents(final String eventTypeName, final String... events) {

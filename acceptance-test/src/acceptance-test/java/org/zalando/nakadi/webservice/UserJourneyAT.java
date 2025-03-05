@@ -139,7 +139,6 @@ public class UserJourneyAT extends RealEnvironmentAT {
                 .when()
                 .put("/event-types/" + eventTypeName)
                 .then()
-                .body(equalTo(""))
                 .statusCode(OK.value());
 
         // Updates should eventually cause a cache invalidation, so we must retry
@@ -581,7 +580,6 @@ public class UserJourneyAT extends RealEnvironmentAT {
                 .when()
                 .post("/event-types")
                 .then()
-                .body(equalTo(""))
                 .statusCode(CREATED.value());
     }
 

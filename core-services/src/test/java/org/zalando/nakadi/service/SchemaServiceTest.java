@@ -7,13 +7,10 @@ import org.joda.time.DateTime;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mockito;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.zalando.nakadi.cache.EventTypeCache;
 import org.zalando.nakadi.config.NakadiSettings;
-import org.zalando.nakadi.domain.CompatibilityMode;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.EventTypeSchema;
 import org.zalando.nakadi.domain.EventTypeSchemaBase;
@@ -58,6 +55,7 @@ public class SchemaServiceTest {
     private EventType eventType;
     private TimelineSync timelineSync;
     private NakadiSettings nakadiSettings;
+    private FeatureToggleService featureToggleService;
 
     @BeforeEach
     public void setUp() throws IOException {
@@ -70,10 +68,12 @@ public class SchemaServiceTest {
         Mockito.when(eventTypeRepository.findByName(any())).thenReturn(eventType);
         timelineSync = Mockito.mock(TimelineSync.class);
         nakadiSettings = Mockito.mock(NakadiSettings.class);
+        featureToggleService = Mockito.mock(FeatureToggleService.class);
 
         schemaService = new SchemaService(schemaRepository, paginationService,
                 new JsonSchemaEnrichment(new DefaultResourceLoader(), "classpath:schema_metadata.json"),
-                schemaEvolutionService, eventTypeRepository, eventTypeCache, timelineSync, nakadiSettings);
+                schemaEvolutionService, eventTypeRepository, eventTypeCache, timelineSync, nakadiSettings,
+                featureToggleService);
     }
 
     private SchemaEvolutionService createSchemaEvolutionServiceSpy() throws IOException {
@@ -134,6 +134,7 @@ public class SchemaServiceTest {
                 schemaService.getSchemaVersion(eventType.getName(), eventType.getSchema().getVersion().toString());
         Assertions.assertTrue(true);
     }
+
     @Test
     public void invalidEventTypeSchemaJsonSchemaThenThrows() throws Exception {
         final String jsonSchemaString = Resources.toString(
@@ -141,29 +142,17 @@ public class SchemaServiceTest {
                 Charsets.UTF_8);
         eventType.getSchema().setSchema(jsonSchemaString);
 
-        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType));
+        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType, false));
     }
 
     @Test
-    public void whenCompatibleModeAndInvalidJsonSchemaAlwaysThrows() throws Exception {
-        final String jsonSchemaString = Resources.toString(
-                Resources.getResource("invalid-json-schema-structure.json"),
-                Charsets.UTF_8);
-        eventType.getSchema().setSchema(jsonSchemaString);
-        eventType.setCompatibilityMode(CompatibilityMode.COMPATIBLE);
-        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType));
-    }
-
-    @EnumSource(value = CompatibilityMode.class, names = {"NONE", "FORWARD"})
-    @ParameterizedTest
-    public void whenNewEventTypeWithInvalidJsonSchemaThenThrows(final CompatibilityMode mode)
+    public void whenEventTypeWithInvalidJsonSchemaAndStrictValidationThenThrows()
             throws Exception {
         final String jsonSchemaString = Resources.toString(
                 Resources.getResource("invalid-json-schema-structure.json"),
                 Charsets.UTF_8);
         eventType.getSchema().setSchema(jsonSchemaString);
-        eventType.setCompatibilityMode(mode);
-        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType));
+        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType, true));
     }
 
     @Test
@@ -172,14 +161,14 @@ public class SchemaServiceTest {
                 "{\"type\": \"object\", \"properties\": {\"metadata\": {\"type\": \"object\"} }}");
         eventType.setCategory(BUSINESS);
 
-        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType));
+        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType, false));
     }
 
     @Test
     public void whenEventTypeSchemaJsonIsMalformedThenThrows() throws Exception {
         eventType.getSchema().setSchema("invalid-json");
 
-        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType));
+        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType, false));
     }
 
     @Test
@@ -187,7 +176,7 @@ public class SchemaServiceTest {
         Mockito.doThrow(SchemaEvolutionException.class)
                 .when(schemaEvolutionService).collectMetaSchemaIncompatibilities(any(), any());
 
-        assertThrows(SchemaEvolutionException.class, () -> schemaService.validateSchema(eventType));
+        assertThrows(SchemaEvolutionException.class, () -> schemaService.validateSchema(eventType, true));
     }
 
     @Test
@@ -196,7 +185,7 @@ public class SchemaServiceTest {
                 "{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\", \"type\":\"object\"}");
         eventType.setCategory(BUSINESS);
 
-        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType));
+        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType, true));
     }
 
     @Test
@@ -205,7 +194,7 @@ public class SchemaServiceTest {
                 "{\\\"type\\\":\\\"array\\\" }");
         eventType.setCategory(BUSINESS);
 
-        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType));
+        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType, false));
     }
 
     @Test
@@ -219,7 +208,7 @@ public class SchemaServiceTest {
                 "      }\n" +
                 "    }");
 
-        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType));
+        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType, false));
     }
 
     @Test
@@ -232,7 +221,7 @@ public class SchemaServiceTest {
                 "    }\n" +
                 "  }");
 
-        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType));
+        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType, false));
     }
 
     @Test
@@ -342,8 +331,7 @@ public class SchemaServiceTest {
 
         eventType.getSchema().setSchema(jsonSchemaString);
         eventType.setCategory(BUSINESS);
-        eventType.setCompatibilityMode(CompatibilityMode.COMPATIBLE);
-        assertDoesNotThrow(() -> schemaService.validateSchema(eventType));
+        assertDoesNotThrow(() -> schemaService.validateSchema(eventType, true));
     }
 
     @Test
@@ -354,8 +342,7 @@ public class SchemaServiceTest {
 
         eventType.getSchema().setSchema(jsonSchemaString);
         eventType.setCategory(BUSINESS);
-        eventType.setCompatibilityMode(CompatibilityMode.COMPATIBLE);
-        assertDoesNotThrow(() -> schemaService.validateSchema(eventType));
+        assertDoesNotThrow(() -> schemaService.validateSchema(eventType, true));
     }
 
     @Test
@@ -364,7 +351,7 @@ public class SchemaServiceTest {
         eventType.setEventOwnerSelector(
                 new EventOwnerSelector(EventOwnerSelector.Type.PATH, "selector_name", "retailer_id"));
 
-        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType));
+        assertThrows(SchemaValidationException.class, () -> schemaService.validateSchema(eventType, false));
     }
 
     @Test
@@ -377,7 +364,7 @@ public class SchemaServiceTest {
         eventType.setEventOwnerSelector(
                 new EventOwnerSelector(EventOwnerSelector.Type.PATH, "selector_name", "info.retailer_id"));
 
-        assertDoesNotThrow(() -> schemaService.validateSchema(eventType));
+        assertDoesNotThrow(() -> schemaService.validateSchema(eventType, false));
     }
 
     @Test

@@ -12,7 +12,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.zalando.nakadi.cache.EventTypeCache;
 import org.zalando.nakadi.config.NakadiSettings;
 import org.zalando.nakadi.domain.CleanupPolicy;
-import org.zalando.nakadi.domain.CompatibilityMode;
 import org.zalando.nakadi.domain.EventCategory;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.EventTypeBase;
@@ -176,15 +175,10 @@ public class EventTypeService {
         setDefaultEventTypeOptions(eventType);
 
         try {
-            schemaService.validateSchema(eventType);
+            schemaService.validateSchemaForCreate(eventType);
         } catch (final SchemaValidationException e) {
-            if (eventType.getCompatibilityMode() == CompatibilityMode.COMPATIBLE
-                    || featureToggleService.isFeatureEnabled(Feature.FORCE_EVENT_TYPE_CREATE_SCHEMA_VALIDATION)) {
-                throw new InvalidEventTypeException(e);
-            } else {
-                LOG.warn("event type {} with compatibility mode {} has invalid json schema: {}",
-                        eventType.getName(), eventType.getCompatibilityMode(), e.toString());
-            }
+            LOG.warn("Schema validation failed: {}", e.getMessage());
+            throw new InvalidEventTypeException(e);
         }
 
         validateCompaction(eventType);
@@ -472,15 +466,7 @@ public class EventTypeService {
             validateName(eventTypeName, eventTypeBase);
             validateCompactionUpdate(original, eventTypeBase);
 
-            if (featureToggleService.isFeatureEnabled(Feature.FORCE_EVENT_TYPE_UPDATE_SCHEMA_VALIDATION)
-                    || eventTypeBase.getCompatibilityMode() == CompatibilityMode.COMPATIBLE
-                    || isValidSchemaBeforeUpdate(original)) {
-                try {
-                    schemaService.validateSchema(eventTypeBase);
-                } catch (final SchemaValidationException e) {
-                    throw new InvalidEventTypeException(e);
-                }
-            }
+            schemaService.validateSchemaForUpdate(original, eventTypeBase);
 
             validateAudience(original, eventTypeBase);
             partitionResolver.validate(eventTypeBase);
@@ -504,8 +490,11 @@ public class EventTypeService {
             LOG.error("Failed to wait for timeline switch", e);
             throw new ServiceTemporarilyUnavailableException(
                     "Event type is currently in maintenance, please repeat request", e);
+        } catch (final SchemaValidationException e) {
+            LOG.warn("Schema validation failed: {}", e.getMessage());
+            throw new InvalidEventTypeException(e);
         } catch (final SchemaEvolutionException e) {
-            LOG.warn("Schema evolution failed {}", e.getMessage());
+            LOG.warn("Schema evolution failed: {}", e.getMessage());
             throw new InvalidEventTypeException(e);
         } catch (final InternalNakadiException e) {
             LOG.error("Unable to update event type", e);
@@ -530,15 +519,6 @@ public class EventTypeService {
         nakadiAuditLogPublisher.publish(Optional.of(original), Optional.of(eventType),
                 NakadiAuditLogPublisher.ResourceType.EVENT_TYPE, NakadiAuditLogPublisher.ActionType.UPDATED,
                 eventType.getName());
-    }
-
-    private boolean isValidSchemaBeforeUpdate(final EventType original) {
-        try {
-            schemaService.validateSchema(original);
-            return true;
-        } catch (final SchemaValidationException e) {
-            return false;
-        }
     }
 
     private void updateRetentionTime(final EventType original, final EventType eventType) {

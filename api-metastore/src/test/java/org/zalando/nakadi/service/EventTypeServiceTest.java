@@ -13,7 +13,6 @@ import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.zalando.nakadi.cache.EventTypeCache;
 import org.zalando.nakadi.config.NakadiSettings;
-import org.zalando.nakadi.domain.CompatibilityMode;
 import org.zalando.nakadi.domain.EventCategory;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.Feature;
@@ -21,9 +20,7 @@ import org.zalando.nakadi.enrichment.Enrichment;
 import org.zalando.nakadi.exceptions.runtime.AccessDeniedException;
 import org.zalando.nakadi.exceptions.runtime.EventTypeDeletionException;
 import org.zalando.nakadi.exceptions.runtime.InternalNakadiException;
-import org.zalando.nakadi.exceptions.runtime.InvalidEventTypeException;
 import org.zalando.nakadi.exceptions.runtime.InvalidOwningApplicationException;
-import org.zalando.nakadi.exceptions.runtime.SchemaValidationException;
 import org.zalando.nakadi.exceptions.runtime.TopicCreationException;
 import org.zalando.nakadi.kpi.event.NakadiEventTypeLog;
 import org.zalando.nakadi.partitioning.PartitionResolver;
@@ -301,126 +298,5 @@ public class EventTypeServiceTest {
         assertEquals(et.getCategory().toString(), kpiEvent.getCategory());
         assertEquals("disabled", kpiEvent.getAuthz());
         assertEquals(et.getCompatibilityMode().toString(), kpiEvent.getCompatibilityMode());
-    }
-
-    @Test
-    public void whenCreateWithForwardModeAndInvalidSchemaAndValidationNotEnforcedThenOK() {
-        final EventType et = EventTypeTestBuilder.builder()
-                .compatibilityMode(CompatibilityMode.FORWARD)
-                .build();
-        when(featureToggleService.isFeatureEnabled(eq(Feature.FORCE_EVENT_TYPE_CREATE_SCHEMA_VALIDATION)))
-                .thenReturn(false);
-        doThrow(new SchemaValidationException("fake")).when(schemaService).validateSchema(any());
-        assertDoesNotThrow(() -> eventTypeService.create(et, false));
-    }
-
-    @Test
-    public void whenCreateWithForwardModeAndInvalidSchemaAndValidationIsEnforcedThenFail() {
-        final EventType et = EventTypeTestBuilder.builder()
-                .compatibilityMode(CompatibilityMode.FORWARD)
-                .build();
-        when(featureToggleService.isFeatureEnabled(eq(Feature.FORCE_EVENT_TYPE_CREATE_SCHEMA_VALIDATION)))
-                .thenReturn(true);
-        doThrow(new SchemaValidationException("fake")).when(schemaService).validateSchema(any());
-        assertThrows(InvalidEventTypeException.class, () -> eventTypeService.create(et, false));
-    }
-
-    @Test
-    public void whenCreateWithCompatibleModeAndInvalidSchemaThenFail() {
-        final EventType et = EventTypeTestBuilder.builder()
-                .compatibilityMode(CompatibilityMode.COMPATIBLE)
-                .build();
-        doThrow(new SchemaValidationException("fake")).when(schemaService).validateSchema(any());
-        assertThrows(InvalidEventTypeException.class, () -> eventTypeService.create(et, false));
-    }
-
-    @Test
-    public void whenUpdateForwardCompatibilityWithTheSameSchemaAndValidationNotEnforcedThenOK() {
-        final EventTypeTestBuilder builder = EventTypeTestBuilder.builder();
-        final EventType src = builder.compatibilityMode(CompatibilityMode.FORWARD).build();
-        final EventType updated = builder.compatibilityMode(CompatibilityMode.FORWARD).build();
-
-        when(eventTypeRepository.findByName(src.getName())).thenReturn(src);
-        when(schemaEvolutionService.evolve(any(), any())).thenReturn(src); // NPE without it :(
-
-        when(featureToggleService.isFeatureEnabled(eq(Feature.FORCE_EVENT_TYPE_UPDATE_SCHEMA_VALIDATION)))
-                .thenReturn(false);
-
-        assertDoesNotThrow(() -> eventTypeService.update(src.getName(), updated));
-    }
-
-    @Test
-    public void whenUpdateWithTheSameSchemaAndValidationIsEnforcedThenSchemaChecked() {
-        final EventTypeTestBuilder builder = EventTypeTestBuilder.builder();
-        final EventType src = builder.build();
-        final EventType updated = builder.build();
-
-        when(eventTypeRepository.findByName(src.getName())).thenReturn(src);
-        doThrow(new SchemaValidationException("fake")).when(schemaService).validateSchema(any());
-
-        when(featureToggleService.isFeatureEnabled(eq(Feature.FORCE_EVENT_TYPE_UPDATE_SCHEMA_VALIDATION)))
-                .thenReturn(true);
-
-        assertThrows(InvalidEventTypeException.class, () -> eventTypeService.update(src.getName(), updated));
-    }
-
-    @Test
-    public void whenUpdateForwardCompatibiltyWithValidSchemaToInvalidThenError() {
-        final EventTypeTestBuilder builder = EventTypeTestBuilder.builder();
-        final EventType src = builder
-                .compatibilityMode(CompatibilityMode.FORWARD)
-                .schema("{\"something\": \"valid\"}")
-                .build();
-        final EventType updated = builder
-                .compatibilityMode(CompatibilityMode.FORWARD)
-                .schema("{\"something\": \"invalid\"}")
-                .build();
-
-        when(eventTypeRepository.findByName(src.getName())).thenReturn(src);
-        doThrow(new SchemaValidationException("fake"))
-                .when(schemaService).validateSchema(eq(updated));
-
-        when(featureToggleService.isFeatureEnabled(eq(Feature.FORCE_EVENT_TYPE_UPDATE_SCHEMA_VALIDATION)))
-                .thenReturn(false);
-
-        assertThrows(InvalidEventTypeException.class, () -> eventTypeService.update(src.getName(), updated));
-    }
-
-    @Test
-    public void whenUpdateForwardCompatibiltyWithAlreadyInvalidSchemaToAnotherInvalidThenOK() {
-        final EventTypeTestBuilder builder = EventTypeTestBuilder.builder();
-        final EventType src = builder
-                .compatibilityMode(CompatibilityMode.FORWARD)
-                .schema("{\"something\": \"invalid\"}")
-                .build();
-        final EventType updated = builder
-                .compatibilityMode(CompatibilityMode.FORWARD)
-                .schema("{\"something\": \"else\"}")
-                .build();
-
-        when(eventTypeRepository.findByName(src.getName())).thenReturn(src);
-        when(schemaEvolutionService.evolve(any(), any())).thenReturn(src); // NPE without it :(
-        doThrow(new SchemaValidationException("fake"))
-                .when(schemaService).validateSchema(any());
-
-        when(featureToggleService.isFeatureEnabled(eq(Feature.FORCE_EVENT_TYPE_UPDATE_SCHEMA_VALIDATION)))
-                .thenReturn(false);
-
-        assertDoesNotThrow(() -> eventTypeService.update(src.getName(), updated));
-    }
-
-    @Test
-    public void whenUpdateToCompatibleThenSchemaChecked() {
-        final EventTypeTestBuilder builder = EventTypeTestBuilder.builder();
-        final EventType src = builder.compatibilityMode(CompatibilityMode.FORWARD).build();
-        final EventType updated = builder.compatibilityMode(CompatibilityMode.COMPATIBLE).build();
-
-        when(eventTypeRepository.findByName(src.getName())).thenReturn(src);
-        doThrow(new SchemaValidationException("fake")).when(schemaService).validateSchema(any());
-
-        when(featureToggleService.isFeatureEnabled(eq(Feature.FORCE_EVENT_TYPE_UPDATE_SCHEMA_VALIDATION)))
-                .thenReturn(false);
-
-        assertThrows(InvalidEventTypeException.class, () -> eventTypeService.update(src.getName(), updated));
     }
 }

@@ -8,12 +8,14 @@ import org.junit.BeforeClass;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.zalando.nakadi.config.JsonConfig;
+import org.zalando.nakadi.domain.Feature;
 import org.zalando.nakadi.domain.storage.KafkaConfiguration;
 import org.zalando.nakadi.domain.storage.Storage;
 import org.zalando.nakadi.domain.storage.ZookeeperConnection;
 import org.zalando.nakadi.exceptions.runtime.DuplicatedStorageException;
 import org.zalando.nakadi.repository.db.StorageDbRepository;
 import org.zalando.nakadi.repository.db.TimelineDbRepository;
+import org.zalando.nakadi.webservice.utils.NakadiTestUtils;
 
 import java.util.concurrent.TimeUnit;
 
@@ -57,5 +59,11 @@ public abstract class BaseAT {
             STORAGE_DB_REPOSITORY.createStorage(storage);
         } catch (final DuplicatedStorageException ignore) {
         }
+
+        //
+        // This is the actual default in staging and production, it is most likely not possible to switch this off
+        // without breaking users, so eventually we should remove the feature and make the behavior hard-coded:
+        //
+        NakadiTestUtils.switchFeature(Feature.RETURN_BODY_ON_CREATE_UPDATE_EVENT_TYPE, true);
     }
 }
