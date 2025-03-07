@@ -455,6 +455,10 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
     @Override
     public List<Boolean> commitOffsets(
             final List<SubscriptionCursorWithoutToken> cursors) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("cursors to commit {}", cursors);
+        }
+
         final Map<EventTypePartition, List<SubscriptionCursorWithoutToken>> grouped =
                 cursors.stream().collect(Collectors.groupingBy(SubscriptionCursorWithoutToken::getEventTypePartition));
         try {
@@ -474,7 +478,11 @@ public abstract class AbstractZkSubscriptionClient implements ZkSubscriptionClie
                                 // Offsets are lexicographically comparable, except 'BEGIN'
                                 if (cursor.getOffset().compareTo(newMaxOffset) > 0
                                         || newMaxOffset.equalsIgnoreCase(Cursor.BEFORE_OLDEST_OFFSET)) {
+                                    if (LOG.isDebugEnabled()) {
+                                        LOG.debug("cursor switched from {} to {}", newMaxOffset, cursor.getOffset());
+                                    }
                                     newMaxOffset = cursor.getOffset();
+
                                     commits.add(true);
                                 } else {
                                     commits.add(false);
