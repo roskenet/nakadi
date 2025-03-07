@@ -99,12 +99,14 @@ public class TokenAuthorizationServiceTest {
         when(kioService.exists(anyString())).thenReturn(true);
 
         // serviceRegistry should be called, so that mockito is not reporting about isValid not called.
-        authzService.isAuthorizationForResourceValid(rb("warmup-mockito", "event-type")
+        authzService.isAuthorizationForResourceValid(
+                Optional.empty(),
+                rb("warmup-mockito", "event-type")
                 .add(AuthorizationService.Operation.READ, SERVICES_TYPE, "stups_nakadi")
                 .build());
 
         final AuthorizationInvalidException e = assertThrows(AuthorizationInvalidException.class,
-                () -> authzService.isAuthorizationForResourceValid(r));
+                () -> authzService.isAuthorizationForResourceValid(Optional.empty(), r));
 
         assertThat(e.getMessage(),
                 equalTo("authorization attribute services:nakadi is invalid"));
@@ -118,10 +120,12 @@ public class TokenAuthorizationServiceTest {
         when(principal.isExternal()).thenReturn(false);
 
         when(kioService.exists(eq("idonotexist"))).thenReturn(false);
-        assertThrows(AuthorizationInvalidException.class, () -> authzService.isAuthorizationForResourceValid(r));
+        assertThrows(
+                AuthorizationInvalidException.class,
+                () -> authzService.isAuthorizationForResourceValid(Optional.empty(), r));
 
         when(kioService.exists(eq("idonotexist"))).thenReturn(true);
-        authzService.isAuthorizationForResourceValid(r);
+        authzService.isAuthorizationForResourceValid(Optional.empty(), r);
     }
 
     @Test
@@ -132,7 +136,7 @@ public class TokenAuthorizationServiceTest {
 
         when(principal.isExternal()).thenReturn(false);
 
-        authzService.isAuthorizationForResourceValid(r);
+        authzService.isAuthorizationForResourceValid(Optional.empty(), r);
     }
 
     @Test
@@ -144,7 +148,7 @@ public class TokenAuthorizationServiceTest {
 
         final AuthorizationInvalidException e = assertThrows(
                 AuthorizationInvalidException.class,
-                () -> authzService.isAuthorizationForResourceValid(r));
+                () -> authzService.isAuthorizationForResourceValid(Optional.empty(), r));
         assertThat(e.getMessage(),
                 equalTo("Gateway is not allowed in authorization section"));
     }
@@ -206,7 +210,7 @@ public class TokenAuthorizationServiceTest {
                 .add(AuthorizationService.Operation.READ, BUSINESS_PARTNER_TYPE, "ahzhd657-dhsdjs-dshd83-dhsdjs")
                 .build();
         when(merchantRegistry.isValid(eq("ahzhd657-dhsdjs-dshd83-dhsdjs"))).thenReturn(true);
-        authzService.isAuthorizationForResourceValid(r);
+        authzService.isAuthorizationForResourceValid(Optional.empty(), r);
     }
 
     @Test
@@ -219,7 +223,7 @@ public class TokenAuthorizationServiceTest {
         when(merchantRegistry.isValid(eq("abcde"))).thenReturn(true);
 
         final AuthorizationInvalidException e = assertThrows(AuthorizationInvalidException.class,
-                () -> authzService.isAuthorizationForResourceValid(r));
+                () -> authzService.isAuthorizationForResourceValid(Optional.empty(), r));
         assertThat(e.getMessage(),
                 equalTo("Business Partner cannot be present with wild card in authorization"));
     }
@@ -235,7 +239,7 @@ public class TokenAuthorizationServiceTest {
 
         final AuthorizationInvalidException e = assertThrows(
                 AuthorizationInvalidException.class,
-                () -> authzService.isAuthorizationForResourceValid(r));
+                () -> authzService.isAuthorizationForResourceValid(Optional.empty(), r));
         assertThat(e.getMessage(), equalTo("Only one business partner allowed for each operation"));
     }
 
@@ -250,7 +254,7 @@ public class TokenAuthorizationServiceTest {
         when(principal.getBpids()).thenReturn(Collections.singleton("ahzhd657-dhsdjs-dshd83-dhsdjs"));
         when(merchantRegistry.isValid(eq("ahzhd657-dhsdjs-dshd83-dhsdjs"))).thenReturn(true);
 
-        authzService.isAuthorizationForResourceValid(r);
+        authzService.isAuthorizationForResourceValid(Optional.empty(), r);
     }
 
     @Test
@@ -265,7 +269,7 @@ public class TokenAuthorizationServiceTest {
                 .add(AuthorizationService.Operation.ADMIN, "business_partner", "ahzhd657-dhsdjs-dshd83-dhsdjs")
                 .build();
         final AuthorizationInvalidException e1 = assertThrows(AuthorizationInvalidException.class,
-                () -> authzService.isAuthorizationForResourceValid(r));
+                () -> authzService.isAuthorizationForResourceValid(Optional.empty(), r));
         assertThat(e1.getMessage(),
                 equalTo("Business partner must only add itself as both admin and reader"));
     }
@@ -283,7 +287,7 @@ public class TokenAuthorizationServiceTest {
                 .build();
 
         final AuthorizationInvalidException e2 = assertThrows(AuthorizationInvalidException.class,
-                () -> authzService.isAuthorizationForResourceValid(r));
+                () -> authzService.isAuthorizationForResourceValid(Optional.empty(), r));
         assertThat(e2.getMessage(),
                 equalTo("Business partner must only add itself as both admin and reader"));
     }
@@ -294,7 +298,7 @@ public class TokenAuthorizationServiceTest {
         when(principal.isExternal()).thenReturn(true);
 
         final AuthorizationInvalidException e = assertThrows(AuthorizationInvalidException.class,
-                () -> authzService.isAuthorizationForResourceValid(r));
+                () -> authzService.isAuthorizationForResourceValid(Optional.empty(), r));
         assertThat(e.getMessage(), equalTo("Empty authorization is not allowed"));
     }
 
@@ -308,7 +312,7 @@ public class TokenAuthorizationServiceTest {
         when(principal.isExternal()).thenReturn(false);
 
         final OperationOnResourceNotPermittedException e = assertThrows(OperationOnResourceNotPermittedException.class,
-                () -> authzService.isAuthorizationForResourceValid(r));
+                () -> authzService.isAuthorizationForResourceValid(Optional.empty(), r));
         assertThat(e.getMessage(), equalTo("Subscription including business " +
                 "partner can be only created by corresponding business partner"));
     }
@@ -323,7 +327,7 @@ public class TokenAuthorizationServiceTest {
         when(principal.isExternal()).thenReturn(true);
         when(merchantRegistry.isValid(any())).thenReturn(true);
 
-        authzService.isAuthorizationForResourceValid(r);
+        authzService.isAuthorizationForResourceValid(Optional.empty(), r);
     }
 
     @Test
@@ -336,7 +340,7 @@ public class TokenAuthorizationServiceTest {
         when(kioService.exists(any())).thenReturn(true);
 
         final AuthorizationInvalidException e = assertThrows(AuthorizationInvalidException.class,
-                () -> authzService.isAuthorizationForResourceValid(r));
+                () -> authzService.isAuthorizationForResourceValid(Optional.empty(), r));
         assertThat(e.getMessage(),
                 equalTo("Authorization should contain business partner"));
     }
@@ -350,10 +354,30 @@ public class TokenAuthorizationServiceTest {
         when(kioService.exists(eq("nakadi"))).thenReturn(true);
         when(principal.isExternal()).thenReturn(false);
 
-        authzService.isAuthorizationForResourceValid(r);
+        authzService.isAuthorizationForResourceValid(Optional.empty(), r);
 
         //For Null Authorization
-        authzService.isAuthorizationForResourceValid(rb("myResource1", "event-type").build());
+        authzService.isAuthorizationForResourceValid(
+                Optional.empty(),
+                rb("myResource1", "event-type").build());
+    }
+
+    @Test
+    public void testOnlyAddedAttributesAreVaidated() {
+
+        final Resource oldResource = rb("myResource1", "event-type")
+                .add(AuthorizationService.Operation.READ, "services", "stups_idonotexist")
+                .build();
+
+        final Resource newResource = rb("myResource1", "event-type")
+                .add(AuthorizationService.Operation.READ, "services", "stups_idonotexist")
+                .add(AuthorizationService.Operation.READ, "services", "stups_nakadi")
+                .build();
+
+        when(kioService.exists(eq("nakadi"))).thenReturn(true);
+        when(principal.isExternal()).thenReturn(false);
+
+        authzService.isAuthorizationForResourceValid(Optional.of(oldResource), newResource);
     }
 
     @Test
@@ -365,7 +389,7 @@ public class TokenAuthorizationServiceTest {
         when(merchantRegistry.isValid("abcde")).thenReturn(true);
 
         final OperationOnResourceNotPermittedException e = assertThrows(OperationOnResourceNotPermittedException.class,
-                () -> authzService.isAuthorizationForResourceValid(r));
+                () -> authzService.isAuthorizationForResourceValid(Optional.empty(), r));
 
         assertThat(e.getMessage(),
                 equalTo("Business Partner is not allowed access to the resource"));
@@ -379,7 +403,7 @@ public class TokenAuthorizationServiceTest {
         when(merchantRegistry.isValid("abcde")).thenReturn(false);
 
         final AuthorizationInvalidException e = assertThrows(AuthorizationInvalidException.class,
-                () -> authzService.isAuthorizationForResourceValid(r));
+                () -> authzService.isAuthorizationForResourceValid(Optional.empty(), r));
         assertThat(e.getMessage(),
                 equalTo("authorization attribute business_partner:abcde is invalid"));
     }
@@ -412,7 +436,7 @@ public class TokenAuthorizationServiceTest {
 
         when(teamService.isValidTeam(eq(attribute.getValue()))).thenReturn(true);
         when(principal.isExternal()).thenReturn(false);
-        authzService.isAuthorizationForResourceValid(r);
+        authzService.isAuthorizationForResourceValid(Optional.empty(), r);
     }
 
     @Test

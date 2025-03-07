@@ -21,6 +21,7 @@ import org.zalando.nakadi.plugin.api.exceptions.PluginException;
 import org.zalando.nakadi.repository.db.AuthorizationDbRepository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
@@ -130,8 +131,10 @@ public class AdminService {
 
     private void validateAllAdmins(final List<Permission> admins) throws UnableProcessException, PluginException {
         try {
-            authorizationService.isAuthorizationForResourceValid(new ResourceImpl<>(PERMISSION_RESOURCE,
-                    PERMISSION_RESOURCE, ResourceAuthorization.fromPermissionsList(admins), null));
+            authorizationService.isAuthorizationForResourceValid(
+                    Optional.empty(),
+                    new ResourceImpl<>(PERMISSION_RESOURCE, PERMISSION_RESOURCE,
+                            ResourceAuthorization.fromPermissionsList(admins), null));
         } catch (AuthorizationInvalidException e) {
             throw new UnprocessableEntityException(e.getMessage());
         }

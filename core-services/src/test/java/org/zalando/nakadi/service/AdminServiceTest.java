@@ -72,7 +72,7 @@ public class AdminServiceTest {
         for (final AuthorizationService.Operation operation : AuthorizationService.Operation.values()) {
             defaultAdminPermissions.add(new Permission("org/zalando/nakadi", operation, defaultAdmin));
         }
-        doNothing().when(authorizationService).isAuthorizationForResourceValid(any());
+        doNothing().when(authorizationService).isAuthorizationForResourceValid(any(), any());
         when(featureToggleService.isFeatureEnabled(Feature.DISABLE_DB_WRITE_OPERATIONS))
                 .thenReturn(false);
     }

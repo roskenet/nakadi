@@ -22,6 +22,8 @@ import org.zalando.nakadi.plugin.api.exceptions.OperationOnResourceNotPermittedE
 import org.zalando.nakadi.plugin.api.exceptions.PluginException;
 import org.zalando.nakadi.utils.EventTypeTestBuilder;
 
+import java.util.Optional;
+
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.fail;
@@ -54,9 +56,9 @@ public class AuthorizationValidatorTest {
 
         final Resource resource = new ResourceImpl("myResource1", "event-type", auth, null);
         Mockito.doThrow(new AuthorizationInvalidException("some attributes are not ok"))
-                .when(authorizationService).isAuthorizationForResourceValid(any());
+                .when(authorizationService).isAuthorizationForResourceValid(any(), any());
         try {
-            validator.validateAuthorization(resource);
+            validator.validateAuthorization(Optional.empty(), resource);
             fail("Exception expected to be thrown");
         } catch (final UnprocessableEntityException e) {
             assertThat(e.getMessage(), equalTo("some attributes are not ok"));
@@ -74,7 +76,7 @@ public class AuthorizationValidatorTest {
         final Resource resource = new ResourceImpl("myResource1", "event-type", auth, null);
 
         try {
-            validator.validateAuthorization(resource);
+            validator.validateAuthorization(Optional.empty(), resource);
             fail("Exception expected to be thrown");
         } catch (final UnableProcessException e) {
             assertThat(e.getMessage(), equalTo(
@@ -91,9 +93,9 @@ public class AuthorizationValidatorTest {
                 ImmutableList.of(attr2),
                 ImmutableList.of(attr3));
         Mockito.doThrow(new OperationOnResourceNotPermittedException("blah"))
-                .when(authorizationService).isAuthorizationForResourceValid(any());
+                .when(authorizationService).isAuthorizationForResourceValid(any(), any());
         final Resource resource = new ResourceImpl("myResource1", "event-type", auth, null);
-        validator.validateAuthorization(resource);
+        validator.validateAuthorization(Optional.empty(), resource);
     }
 
     @Test(expected = UnprocessableEntityException.class)
@@ -104,9 +106,9 @@ public class AuthorizationValidatorTest {
                 ImmutableList.of(attr2),
                 ImmutableList.of(attr3));
         Mockito.doThrow(new AuthorizationInvalidException("blah"))
-                .when(authorizationService).isAuthorizationForResourceValid(any());
+                .when(authorizationService).isAuthorizationForResourceValid(any(), any());
         final Resource resource = new ResourceImpl("myResource1", "event-type", auth, null);
-        validator.validateAuthorization(resource);
+        validator.validateAuthorization(Optional.empty(), resource);
     }
 
     @Test(expected = ServiceTemporarilyUnavailableException.class)
@@ -117,9 +119,9 @@ public class AuthorizationValidatorTest {
                 ImmutableList.of(attr2),
                 ImmutableList.of(attr3));
         Mockito.doThrow(new PluginException("blah"))
-                .when(authorizationService).isAuthorizationForResourceValid(any());
+                .when(authorizationService).isAuthorizationForResourceValid(any(), any());
         final Resource resource = new ResourceImpl("myResource1", "event-type", auth, null);
-        validator.validateAuthorization(resource);
+        validator.validateAuthorization(Optional.empty(), resource);
     }
 
     @Test

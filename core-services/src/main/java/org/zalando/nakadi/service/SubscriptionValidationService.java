@@ -92,7 +92,9 @@ public class SubscriptionValidationService {
             validateInitialCursors(subscription, allPartitions);
         }
         // Verify that subscription authorization object is valid
-        authorizationValidator.validateAuthorization(subscription.asBaseResource("new-subscription"));
+        authorizationValidator.validateAuthorization(
+                Optional.empty(),
+                subscription.asBaseResource("new-subscription"));
 
         if (featureToggleService.isFeatureEnabled(Feature.VALIDATE_SUBSCRIPTION_OWNING_APPLICATION)) {
             if (!applicationService.exists(subscription.getOwningApplication())) {
@@ -118,7 +120,9 @@ public class SubscriptionValidationService {
         if (!Objects.equals(newValue.getInitialCursors(), old.getInitialCursors())) {
             throw new SubscriptionUpdateConflictException("Not allowed to change initial cursors");
         }
-        authorizationValidator.validateAuthorization(old.asResource(), newValue.asBaseResource(old.getId()));
+        authorizationValidator.validateAuthorization(
+                Optional.of(old.asResource()),
+                newValue.asBaseResource(old.getId()));
     }
 
     public void validatePartitionsToStream(final Subscription subscription, final List<EventTypePartition> partitions) {

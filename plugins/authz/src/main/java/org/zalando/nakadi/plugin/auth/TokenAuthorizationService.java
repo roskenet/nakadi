@@ -25,6 +25,7 @@ import org.zalando.nakadi.plugin.auth.subject.Principal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -121,7 +122,9 @@ public class TokenAuthorizationService implements AuthorizationService {
     }
 
     @Override
-    public void isAuthorizationForResourceValid(final Resource resource) throws AuthorizationInvalidException {
+    public void isAuthorizationForResourceValid(final Optional<Resource> oldResource, final Resource resource)
+            throws AuthorizationInvalidException {
+
         final Principal subject = getPrincipal(true);
         //For BP with empty authorization
         if (resource.getAuthorization() == null) {
@@ -135,7 +138,8 @@ public class TokenAuthorizationService implements AuthorizationService {
 
         final Map<String, List<AuthorizationAttribute>> authorization = resource.getAuthorization();
 
-        isAuthorizationAttributeValid(authorization);
+        isAuthorizationAttributeValid(oldResource.map(Resource::getAuthorization), authorization);
+
         if (isGatewayInAuthorization(authorization)) {
             throw new AuthorizationInvalidException("Gateway is not allowed in authorization section");
         }
@@ -234,13 +238,20 @@ public class TokenAuthorizationService implements AuthorizationService {
     }
 
     private void isAuthorizationAttributeValid(
+            final Optional<Map<String, List<AuthorizationAttribute>>> oldAuthorizationAttributes,
             final Map<String, List<AuthorizationAttribute>> authorizationAttributes)
             throws AuthorizationInvalidException {
 
         final List<String> errors = new LinkedList<>();
         for (final Map.Entry<String, List<AuthorizationAttribute>> entry : authorizationAttributes.entrySet()) {
-            entry.getValue().forEach(attr -> {
-                if (!isAuthorizationAttributeValidInternal(entry.getKey(), attr)) {
+
+            final String operation = entry.getKey();
+            final Collection<AuthorizationAttribute> addedAttrs = findAddedAuthorizationAttributes(
+                    oldAuthorizationAttributes.map(old -> old.get(operation)),
+                    entry.getValue());
+
+            addedAttrs.forEach(attr -> {
+                if (!isAuthorizationAttributeValidInternal(operation, attr)) {
                     errors.add(String.format("authorization attribute %s:%s is invalid",
                             attr.getDataType(), attr.getValue()));
                 }
@@ -251,6 +262,15 @@ public class TokenAuthorizationService implements AuthorizationService {
             final String errorMessage = errors.stream().collect(Collectors.joining(", "));
             throw new AuthorizationInvalidException(errorMessage);
         }
+    }
+
+    private Collection<AuthorizationAttribute> findAddedAuthorizationAttributes(
+            final Optional<List<AuthorizationAttribute>> oldAttributes,
+            final List<AuthorizationAttribute> newAttributes) {
+
+        final Set<AuthorizationAttribute> attributes = new HashSet<>(newAttributes);
+        attributes.removeAll(oldAttributes.orElse(Collections.emptyList()));
+        return attributes;
     }
 
     private boolean isGatewayInAuthorization(final Map<String, List<AuthorizationAttribute>> authorizationAttributes) {

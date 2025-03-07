@@ -29,15 +29,19 @@ public interface AuthorizationService {
      * Checks whether all the attributes for authorization for the resource are valid.
      * It throws exception in case of problem and returns nothing otherwise.
      *
+     * For an update operation on a resource, both old and new versions may be provided, in which case only the newly
+     * added authorization attributes should be validated.
+     *
      * Example: Take a resource, for example, a subscription. A plugin implementing this method could
      * check that all the authorisation attributed in subscription is valid and have rights to perform the operation.
      *
+     * @param oldResource for an update operation -- older version of the same resource
      * @param resource the resource that the subject wants to perform an operation on
      * @throws PluginException if an error occurred during execution
      * @throws AuthorizationInvalidException if an authorization does not meet the required condition
      * @throws OperationOnResourceNotPermittedException if an error occurred during execution
      */
-    void isAuthorizationForResourceValid(Resource resource) throws PluginException,
+    void isAuthorizationForResourceValid(Optional<Resource> oldResource, Resource resource) throws PluginException,
             AuthorizationInvalidException, OperationOnResourceNotPermittedException;
 
     /**

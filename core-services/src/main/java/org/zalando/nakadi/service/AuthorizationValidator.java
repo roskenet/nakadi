@@ -50,11 +50,19 @@ public class AuthorizationValidator {
         this.eventTypeCache = eventTypeCache;
     }
 
-    public void validateAuthorization(final Resource resource) throws UnableProcessException,
-            ServiceTemporarilyUnavailableException {
-        checkAuthorisationForResourceAreValid(resource);
-        if (resource.getAuthorization() != null) {
-            checkAuthAttributesNoDuplicates(resource.getAuthorization());
+    public void validateAuthorization(final Optional<Resource> oldResource, final Resource newResource)
+            throws UnableProcessException, ServiceTemporarilyUnavailableException {
+
+        final Map<String, List<AuthorizationAttribute>> newAuth = newResource.getAuthorization();
+        if (oldResource.map(Resource::getAuthorization).orElse(null) != null && newAuth == null) {
+            throw new UnableProcessException(
+                    "Changing authorization object to `null` is not possible due to existing one");
+        }
+
+        checkAuthorisationForResourceAreValid(oldResource, newResource);
+
+        if (newAuth != null) {
+            checkAuthAttributesNoDuplicates(newAuth);
         }
     }
 
@@ -91,11 +99,11 @@ public class AuthorizationValidator {
         }
     }
 
-    private void checkAuthorisationForResourceAreValid(final Resource resource)
+    private void checkAuthorisationForResourceAreValid(final Optional<Resource> oldResource, final Resource resource)
             throws UnableProcessException, ServiceTemporarilyUnavailableException, ForbiddenOperationException {
 
         try {
-            authorizationService.isAuthorizationForResourceValid(resource);
+            authorizationService.isAuthorizationForResourceValid(oldResource, resource);
         } catch (OperationOnResourceNotPermittedException e) {
             throw new ForbiddenOperationException(e.getMessage());
         } catch (AuthorizationInvalidException e) {
@@ -253,17 +261,6 @@ public class AuthorizationValidator {
             return;
         }
         authorizeResourceAdmin(subscription.asResource());
-    }
-
-    public void validateAuthorization(final Resource oldValue, final Resource newValue)
-            throws UnableProcessException, ServiceTemporarilyUnavailableException {
-        final Map<String, List<AuthorizationAttribute>> oldAuth = oldValue.getAuthorization();
-        final Map<String, List<AuthorizationAttribute>> newAuth = newValue.getAuthorization();
-        if (oldAuth != null && newAuth == null) {
-            throw new UnableProcessException(
-                    "Changing authorization object to `null` is not possible due to existing one");
-        }
-        validateAuthorization(newValue);
     }
 
     public List<ExplainResourceResult> explainAuthorization(final Resource resource) {

@@ -15,6 +15,7 @@ import org.zalando.nakadi.service.auth.AuthorizationResourceMapping;
 import org.zalando.nakadi.service.validation.EventOwnerValidator;
 import org.zalando.nakadi.service.validation.EventTypeAnnotationsValidator;
 
+import java.util.Optional;
 import javax.validation.Valid;
 
 @RestController
@@ -49,7 +50,7 @@ public class ExplainController {
 
         final var eventTypeResource = AuthorizationResourceMapping.mapToResource(authResource);
         try {
-            authorizationValidator.validateAuthorization(eventTypeResource);
+            authorizationValidator.validateAuthorization(Optional.empty(), eventTypeResource);
         } catch (RuntimeException ex) {
             if (ex instanceof PluginException) {
                 throw ex;

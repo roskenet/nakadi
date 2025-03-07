@@ -188,7 +188,7 @@ public class EventTypeService {
             throw new AuthorizationSectionException("Authorization section is mandatory");
         }
         if (checkAuth) {
-            authorizationValidator.validateAuthorization(mapToResource(eventType));
+            authorizationValidator.validateAuthorization(Optional.empty(), mapToResource(eventType));
         }
 
         validateOwningApplication(null, eventType.getOwningApplication());
@@ -462,7 +462,9 @@ public class EventTypeService {
                 authorizationValidator.authorizeEventTypeAdmin(original);
             }
 
-            authorizationValidator.validateAuthorization(mapToResource(original), mapToResource(eventTypeBase));
+            authorizationValidator.validateAuthorization(
+                    Optional.of(mapToResource(original)),
+                    mapToResource(eventTypeBase));
             validateName(eventTypeName, eventTypeBase);
             validateCompactionUpdate(original, eventTypeBase);
 
@@ -476,8 +478,7 @@ public class EventTypeService {
             updateAnnotationsAndLabels(original, eventType);
             eventTypeAnnotationsValidator.validateAnnotations(
                     original,
-                    eventTypeBase
-            );
+                    eventTypeBase);
             EventOwnerValidator.validateEventOwnerSelector(eventType);
 
             updateRetentionTime(original, eventType);

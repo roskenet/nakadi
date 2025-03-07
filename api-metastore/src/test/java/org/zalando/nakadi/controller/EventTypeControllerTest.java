@@ -404,7 +404,9 @@ public class EventTypeControllerTest extends EventTypeControllerTestCase {
                 ImmutableList.of(new ResourceAuthorizationAttribute("type2", "value2")),
                 ImmutableList.of(new ResourceAuthorizationAttribute("type3", "value3"))));
 
-        doThrow(new UnableProcessException("dummy")).when(authorizationValidator).validateAuthorization(any());
+        doThrow(new UnableProcessException("dummy"))
+                .when(authorizationValidator)
+                .validateAuthorization(any(), any());
 
         postETAndExpect422WithProblem(eventType, Problem.valueOf(UNPROCESSABLE_ENTITY, "dummy"));
     }

@@ -22,8 +22,8 @@ public class DefaultAuthorizationService implements AuthorizationService {
     }
 
     @Override
-    public void isAuthorizationForResourceValid(final Resource resource) throws PluginException,
-            AuthorizationInvalidException, OperationOnResourceNotPermittedException {
+    public void isAuthorizationForResourceValid(final Optional<Resource> oldResource, final Resource resource)
+            throws PluginException, AuthorizationInvalidException, OperationOnResourceNotPermittedException {
     }
 
     public DefaultAuthorizationService() {
