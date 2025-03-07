@@ -323,10 +323,21 @@ class StreamingState extends State {
 
                     if (getContext().getUnprocessableEventPolicy() == UnprocessableEventPolicy.DEAD_LETTER_QUEUE) {
                         sendToDeadLetterQueue(failedEvent, partition.getFailedCommitsCount());
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("sendToDeadLetterQueue: successfull for {} " +
+                                            "from partition {} due to failed commits count {}",
+                                    failedEvent.getPosition(), etp, partition.getFailedCommitsCount());
+                        }
                     }
 
                     getAutocommit().addSkippedEvent(failedEvent.getPosition());
-                    this.addTask(() -> getAutocommit().autocommit());
+                    this.addTask(() -> {
+                        LOG.debug("task: called for {} from partition {}",
+                                failedEvent.getPosition(), etp);
+                        getAutocommit().autocommit();
+                        LOG.debug("task: finished for {} from partition {}",
+                                failedEvent.getPosition(), etp);
+                    });
 
                     // reset failed commits, but keep looking until last dead letter offset
                     getZk().updateTopology(topology -> Arrays.stream(topology.getPartitions())

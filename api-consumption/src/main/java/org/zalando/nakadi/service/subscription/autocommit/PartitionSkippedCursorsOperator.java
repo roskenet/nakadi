@@ -65,4 +65,12 @@ public class PartitionSkippedCursorsOperator {
         }
         return null;
     }
+
+    @Override
+    public String toString() {
+        return "PartitionSkippedCursorsOperator{" +
+                "skippedIntervals=" + skippedIntervals +
+                ", committed=" + committed +
+                '}';
+    }
 }

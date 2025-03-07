@@ -83,6 +83,9 @@ public class AutocommitSupport {
             toAutocommit.add(c);
         }
         if (null == toAutocommit) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("No cursors to autocommit for {}", partitionsState);
+            }
             return;
         }
 

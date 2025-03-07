@@ -22,4 +22,12 @@ class CursorInterval {
     public void setEnd(final NakadiCursor end) {
         this.end = end;
     }
+
+    @Override
+    public String toString() {
+        return "CursorInterval{" +
+                "begin=" + begin +
+                ", end=" + end +
+                '}';
+    }
 }
