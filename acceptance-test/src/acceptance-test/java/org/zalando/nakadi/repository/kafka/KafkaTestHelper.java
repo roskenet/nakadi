@@ -4,6 +4,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.DescribeConfigsResult;
 import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -14,9 +15,12 @@ import org.zalando.nakadi.view.Cursor;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -40,7 +44,7 @@ public class KafkaTestHelper {
         return new KafkaProducer<>(createKafkaProperties());
     }
 
-    protected static Properties createKafkaProperties() {
+    public static Properties createKafkaProperties() {
         final Properties props = new Properties();
         props.put("bootstrap.servers", "localhost:29092");
         props.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
@@ -133,6 +137,18 @@ public class KafkaTestHelper {
                     .findFirst()
                     .get()
                     .value();
+        }
+    }
+
+    public static void deleteRecords(final String topic, final int partition,
+                                     final long beforeOffset, final long waitMillis) {
+        try (AdminClient adminClient = AdminClient.create(createKafkaProperties())) {
+            final TopicPartition topicPartition = new TopicPartition(topic, partition);
+            adminClient
+                    .deleteRecords(Map.of(topicPartition, RecordsToDelete.beforeOffset(beforeOffset)))
+                    .all().get(waitMillis, TimeUnit.MILLISECONDS);
+        } catch (final InterruptedException | ExecutionException | TimeoutException e) {
+            throw new RuntimeException(e);
         }
     }
 }

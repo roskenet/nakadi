@@ -1,6 +1,5 @@
 package org.zalando.nakadi.webservice.utils;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
@@ -144,7 +143,6 @@ public class TestStreamingClient {
                 while (oldIdx < client.getJsonBatches().size()) {
                     final StreamBatch batch = client.getJsonBatches().get(oldIdx);
                     if (batch.getEvents() != null && !batch.getEvents().isEmpty()) {
-                        try {
                             final SubscriptionCursor cursor = batch.getCursor();
                             LOG.debug("Committing: {}", cursor);
                             final int responseCode = NakadiTestUtils.commitCursors(
@@ -152,9 +150,6 @@ public class TestStreamingClient {
                                     Collections.singletonList(batch.getCursor()),
                                     client.getSessionId());
                             LOG.info("Commit response code: {}", responseCode);
-                        } catch (JsonProcessingException e) {
-                            throw new RuntimeException(e);
-                        }
                     }
                     oldIdx += 1;
                 }

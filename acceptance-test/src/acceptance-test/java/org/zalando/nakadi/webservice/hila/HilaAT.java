@@ -18,7 +18,10 @@ import org.zalando.nakadi.domain.Subscription;
 import org.zalando.nakadi.domain.SubscriptionBase;
 import org.zalando.nakadi.domain.SubscriptionEventTypeStats;
 import org.zalando.nakadi.domain.UnprocessableEventPolicy;
+import org.zalando.nakadi.repository.kafka.KafkaTestHelper;
+import org.zalando.nakadi.repository.zookeeper.ZooKeeperHolder;
 import org.zalando.nakadi.service.BlacklistService;
+import org.zalando.nakadi.service.subscription.zk.NewZkSubscriptionClient;
 import org.zalando.nakadi.util.ThreadUtils;
 import org.zalando.nakadi.utils.JsonTestHelper;
 import org.zalando.nakadi.utils.RandomSubscriptionBuilder;
@@ -30,13 +33,16 @@ import org.zalando.nakadi.webservice.BaseAT;
 import org.zalando.nakadi.webservice.SettingsControllerAT;
 import org.zalando.nakadi.webservice.utils.NakadiTestUtils;
 import org.zalando.nakadi.webservice.utils.TestStreamingClient;
+import org.zalando.nakadi.webservice.utils.ZookeeperTestUtils;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -60,6 +66,7 @@ import static org.zalando.nakadi.domain.SubscriptionEventTypeStats.Partition.Ass
 import static org.zalando.nakadi.utils.TestUtils.randomTextString;
 import static org.zalando.nakadi.utils.TestUtils.waitFor;
 import static org.zalando.nakadi.webservice.utils.NakadiTestUtils.commitCursors;
+import static org.zalando.nakadi.webservice.utils.NakadiTestUtils.createBusinessEventTypeWithPartitions;
 import static org.zalando.nakadi.webservice.utils.NakadiTestUtils.createEventType;
 import static org.zalando.nakadi.webservice.utils.NakadiTestUtils.createSubscription;
 import static org.zalando.nakadi.webservice.utils.NakadiTestUtils.createSubscriptionForEventTypeFromBegin;
@@ -108,7 +115,7 @@ public class HilaAT extends BaseAT {
 
     @Test(timeout = 30000)
     public void whenEventTypeRepartitionedTheNewSubscriptionShouldHaveUpdatedPartition() throws Exception {
-        final EventType eventType = NakadiTestUtils.createBusinessEventTypeWithPartitions(1);
+        final EventType eventType = createBusinessEventTypeWithPartitions(1);
         publishBusinessEventWithUserDefinedPartition(
                 eventType.getName(), 1, x -> "{\"foo\":\"bar\"}", p -> "0");
         NakadiTestUtils.repartitionEventType(eventType, 2);
@@ -538,7 +545,7 @@ public class HilaAT extends BaseAT {
 
     @Test(timeout = 15000)
     public void whenResetCursorsOfAssignedPartitionsThenOnlyAffectedStreamsClosed() throws Exception {
-        final EventType eventType = NakadiTestUtils.createBusinessEventTypeWithPartitions(2);
+        final EventType eventType = createBusinessEventTypeWithPartitions(2);
         final Subscription subscription = createSubscription(
                 RandomSubscriptionBuilder.builder()
                         .withEventType(eventType.getName())
@@ -580,7 +587,7 @@ public class HilaAT extends BaseAT {
 
     @Test(timeout = 15000)
     public void whenResetCursorsOfUnassignedPartitionsThenNoStreamsClosed() throws Exception {
-        final EventType eventType = NakadiTestUtils.createBusinessEventTypeWithPartitions(2);
+        final EventType eventType = createBusinessEventTypeWithPartitions(2);
         final Subscription subscription = createSubscription(
                 RandomSubscriptionBuilder.builder()
                         .withEventType(eventType.getName())
@@ -900,7 +907,7 @@ public class HilaAT extends BaseAT {
     @Test(timeout = 25_000)
     public void shouldSkipPoisonPillAndDeadLetterFoundInTheQueueLater() throws IOException, InterruptedException {
 
-        final EventType eventType = NakadiTestUtils.createBusinessEventTypeWithPartitions(4);
+        final EventType eventType = createBusinessEventTypeWithPartitions(4);
 
         // using random strings here allows us to scan the DLQ from BEGIN later, as there is (almost) no risk of false
         // positives due to other tests leaving their values there
@@ -927,12 +934,8 @@ public class HilaAT extends BaseAT {
                     cursorWithPoisonPill.set(streamBatch.getCursor());
                     throw new RuntimeException("poison pill found");
                 } else {
-                    try {
-                        NakadiTestUtils.commitCursors(
-                                subscription.getId(), ImmutableList.of(streamBatch.getCursor()), client.getSessionId());
-                    } catch (JsonProcessingException e) {
-                        throw new RuntimeException(e);
-                    }
+                    NakadiTestUtils.commitCursors(
+                            subscription.getId(), ImmutableList.of(streamBatch.getCursor()), client.getSessionId());
                 }
             });
 
@@ -1000,6 +1003,97 @@ public class HilaAT extends BaseAT {
         waitFor(() -> Assert.assertFalse(client.isRunning()));
         // check that we skipped over offset 0
         Assert.assertEquals("001-0001-000000000000000001", client.getJsonBatches().get(0).getCursor().getOffset());
+    }
+
+    @Test(timeout = 50_000)
+    public void testAutoDlqWorksWithExpiredOffsets() throws Exception {
+        //setup event types and subscriptions
+        final int numPartitions = 1;
+        final EventType eventType = createBusinessEventTypeWithPartitions(numPartitions);
+        final Subscription subscription =
+                createAutoDLQSubscription(eventType, UnprocessableEventPolicy.DEAD_LETTER_QUEUE, 3);
+
+        // publish events
+        final int numValues = 5;
+        final String[] values = new String[numValues];
+        for (int i = 0; i < numValues; ++i) {
+            values[i] = randomTextString();
+        }
+        publishBusinessEventWithUserDefinedPartition(eventType.getName(),
+                numValues, i -> values[i], i -> String.valueOf(i % numPartitions));
+
+        // choose an event to be poison pill
+        final String poisonPillValue = values[2];
+
+        // imitate offsets lost due to retention expiry -- start
+        // remove events [0, 1] from et topic
+        final var eventTypeTopic = (String) NakadiTestUtils
+                .listTimelines(eventType.getName()).get(0)
+                .get("topic");
+        KafkaTestHelper.deleteRecords(eventTypeTopic, 0, 2, 1000);
+        Thread.sleep(2000);
+
+        //update zk offset to 0
+        createOffsetNode(subscription.getId(), eventType.getName(), "0", "001-0001-000000000000000000");
+        Thread.sleep(1000);
+        // at this point we have last committed offset in zk as 0 and available offsets in et [2, 3, 4]
+        // we want to have atleast gap of 2 offsets between last committed offset and available offsets in et
+
+        // imitate offsets lost due to retention expiry -- end
+
+        // finally consume to simulate processing failure
+        final AtomicInteger failedReprocessingCounter = new AtomicInteger(0);
+        final Map<Integer, Integer>  unchangedCounter = new HashMap<>();
+        while (true) {
+            final TestStreamingClient client = TestStreamingClient.create(
+                    URL, subscription.getId(), "batch_limit=3&commit_timeout=1&stream_timeout=2");
+            client.start(streamBatch -> {
+                if (!streamBatch.getEvents().isEmpty()) {
+                    if (streamBatch.getEvents().stream()
+                            .anyMatch(event -> poisonPillValue.equals(event.getString("foo")))) {
+                        failedReprocessingCounter.incrementAndGet();
+                        throw new RuntimeException("poison pill found");
+                    } else {
+                        NakadiTestUtils.commitCursors(
+                                subscription.getId(),
+                                ImmutableList.of(streamBatch.getCursor()),
+                                client.getSessionId());
+                    }
+                }
+            });
+
+            waitFor(() -> Assert.assertFalse(client.isRunning()));
+            final var count = failedReprocessingCounter.get();
+            unchangedCounter.put(count, unchangedCounter.getOrDefault(failedReprocessingCounter.get(), 0) + 1);
+
+            final int expectedNumberOfRetries = 6;
+            if (failedReprocessingCounter.get() > expectedNumberOfRetries) {
+                Assert.fail("encountered processing loop for failed event, exceeded " +
+                        expectedNumberOfRetries + " retries");
+            }
+            
+            final int allowedUnchangedCounter = 3;
+            if (unchangedCounter.get(count) > allowedUnchangedCounter) {
+                //its good to exit now as we have not observed new reprocessing failures since last 3 tries.
+                break;
+            }
+
+            Thread.sleep(3000); // to prevent 409
+        }
+    }
+
+    private static void createOffsetNode(final String subscriptionId, final String eventType,
+                                         final String partition,
+                                         final String offset) throws Exception {
+        final var zkClient = new NewZkSubscriptionClient(
+                subscriptionId,
+                new ZooKeeperHolder.DisposableCuratorFramework(ZookeeperTestUtils.createCurator(ZOOKEEPER_URL)),
+                new ObjectMapper()
+        );
+
+        zkClient.createOffsetZNodes(List.of(new SubscriptionCursorWithoutToken(
+                eventType, partition, offset)));
+        zkClient.close();
     }
 
     private static boolean isCommitTimeoutReached(final TestStreamingClient client) {

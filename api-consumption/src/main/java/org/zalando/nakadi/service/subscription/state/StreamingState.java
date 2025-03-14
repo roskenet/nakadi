@@ -331,6 +331,7 @@ class StreamingState extends State {
                     }
 
                     getAutocommit().addSkippedEvent(failedEvent.getPosition());
+
                     this.addTask(() -> {
                         LOG.debug("task: called for {} from partition {}",
                                 failedEvent.getPosition(), etp);
@@ -774,7 +775,7 @@ class StreamingState extends State {
 
                         // Checks that current cursor is still available in storage. Otherwise reset to oldest
                         // available offset for the partition
-                        offsets.get(pk).ensureDataAvailable(beforeFirstAvailable);
+                        offsets.get(pk).ensureDataAvailable(beforeFirstAvailable, getAutocommit()::onCommit);
                         return offsets.get(pk).getSentOffset();
                     })
                     .collect(Collectors.toList());

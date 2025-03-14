@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 class PartitionData {
@@ -171,12 +172,14 @@ class PartitionData {
      *
      * @param beforeFirst Position to check against (last inaccessible position in stream)
      */
-    void ensureDataAvailable(final NakadiCursor beforeFirst) {
+    void ensureDataAvailable(final NakadiCursor beforeFirst,
+                             final Consumer<NakadiCursor> onCommitOffsetChanged) {
         if (comparator.compare(beforeFirst, commitOffset) > 0) {
             // allows to track lost events
             skippedEventsCount = cursorOperationsService.calculateDistance(commitOffset, beforeFirst);
             LOG.warn("Oldest kafka position is {} and commit offset is {}, updating", beforeFirst, commitOffset);
             commitOffset = beforeFirst;
+            onCommitOffsetChanged.accept(commitOffset);
         }
 
         if (comparator.compare(beforeFirst, sentOffset) > 0) {

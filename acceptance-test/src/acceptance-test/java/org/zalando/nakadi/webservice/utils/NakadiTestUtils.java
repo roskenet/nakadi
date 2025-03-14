@@ -69,6 +69,13 @@ public class NakadiTestUtils {
         return eventType;
     }
 
+    public static void createEventTypeInNakadi(final String eventTypeJson) throws JsonProcessingException {
+        given()
+                .body(eventTypeJson)
+                .contentType(JSON)
+                .post("/event-types").print();
+    }
+
     public static void createEventTypeInNakadi(final EventType eventType) throws JsonProcessingException {
         given()
                 .body(MAPPER.writeValueAsString(eventType))
@@ -323,15 +330,20 @@ public class NakadiTestUtils {
     }
 
     public static int commitCursors(final String subscriptionId, final List<SubscriptionCursor> cursors,
-                                    final String streamId) throws JsonProcessingException {
+                                    final String streamId) {
         return commitCursors(given(), subscriptionId, cursors, streamId);
     }
 
     public static int commitCursors(final RequestSpecification requestSpec, final String subscriptionId,
-                                    final List<SubscriptionCursor> cursors, final String streamId)
-            throws JsonProcessingException {
+                                    final List<SubscriptionCursor> cursors, final String streamId) {
+        String payload = null;
+        try {
+            payload = MAPPER.writeValueAsString(new ItemsWrapper<>(cursors));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
         return requestSpec
-                .body(MAPPER.writeValueAsString(new ItemsWrapper<>(cursors)))
+                .body(payload)
                 .contentType(JSON)
                 .header("X-Nakadi-StreamId", streamId)
                 .post(format("/subscriptions/{0}/cursors", subscriptionId))
