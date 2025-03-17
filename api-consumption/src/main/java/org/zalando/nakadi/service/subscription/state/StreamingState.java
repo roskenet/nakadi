@@ -683,12 +683,34 @@ class StreamingState extends State {
         }
 
         if (getContext().getMaxEventSendCount() != null) {
+            newAssignedPartitions.forEach(this::updateTopologyForDlq);
             updateFailedCommitsTracking(thisSessionPartitions);
         }
 
         trackIdleness(topology);
 
         return modified;
+    }
+
+    private void updateTopologyForDlq(final Partition partition) {
+        // check failed commits and indicate that we should switch in looking for dead letters mode, unless already
+        if (getContext().getMaxEventSendCount() != null &&
+                partition.getFailedCommitsCount() >= getContext().getMaxEventSendCount() &&
+                !partition.isLookingForDeadLetter()) {
+            final var lastCommitOffset = offsets.get(partition.getKey()).getCommitOffset();
+            final NakadiCursor lastDeadLetterCursor = getContext().getCursorOperationsService()
+                    .shiftCursor(lastCommitOffset, getBatchLimitEvents());
+
+            final String lastDeadLetterOffset = getContext().getCursorConverter()
+                    .convert(lastDeadLetterCursor).getOffset();
+
+            final Partition lookingDeadLetter = partition
+                    .toLastDeadLetterOffset(lastDeadLetterOffset)
+                    .toZeroFailedCommits();
+            failedCommitPartitions.put(partition.getKey(), lookingDeadLetter);
+
+            getZk().updateTopology(ignore -> new Partition[]{lookingDeadLetter});
+        }
     }
 
     private void updateFailedCommitsTracking(final Partition[] thisSessionPartitions) {
@@ -836,25 +858,6 @@ class StreamingState extends State {
 
         offsets.put(partition.getKey(), pd);
         getAutocommit().addPartition(cursor);
-
-        // check failed commits and indicate that we should switch in looking for dead letters mode, unless already
-        if (getContext().getMaxEventSendCount() != null &&
-                partition.getFailedCommitsCount() >= getContext().getMaxEventSendCount() &&
-                !partition.isLookingForDeadLetter()) {
-
-            final NakadiCursor lastDeadLetterCursor = getContext().getCursorOperationsService()
-                    .shiftCursor(cursor, getBatchLimitEvents());
-
-            final String lastDeadLetterOffset = getContext().getCursorConverter()
-                    .convert(lastDeadLetterCursor).getOffset();
-
-            final Partition lookingDeadLetter = partition
-                    .toLastDeadLetterOffset(lastDeadLetterOffset)
-                    .toZeroFailedCommits();
-            failedCommitPartitions.put(partition.getKey(), lookingDeadLetter);
-
-            getZk().updateTopology(topology -> new Partition[]{lookingDeadLetter});
-        }
     }
 
     private void reassignCommitted() {
