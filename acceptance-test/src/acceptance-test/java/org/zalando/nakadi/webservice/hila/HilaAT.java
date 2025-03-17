@@ -1046,7 +1046,7 @@ public class HilaAT extends BaseAT {
         final Map<Integer, Integer>  unchangedCounter = new HashMap<>();
         while (true) {
             final TestStreamingClient client = TestStreamingClient.create(
-                    URL, subscription.getId(), "batch_limit=3&commit_timeout=1&stream_timeout=2");
+                    URL, subscription.getId(), "batch_limit=1&commit_timeout=1&stream_timeout=2");
             client.start(streamBatch -> {
                 if (!streamBatch.getEvents().isEmpty()) {
                     if (streamBatch.getEvents().stream()
