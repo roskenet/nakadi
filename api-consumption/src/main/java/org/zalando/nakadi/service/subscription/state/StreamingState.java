@@ -683,6 +683,7 @@ class StreamingState extends State {
         }
 
         if (getContext().getMaxEventSendCount() != null) {
+            updateTopologyForDlq(newAssignedPartitions);
             updateFailedCommitsTracking(thisSessionPartitions);
         }
 
@@ -691,7 +692,34 @@ class StreamingState extends State {
         return modified;
     }
 
+    private void updateTopologyForDlq(final List<Partition> partitions) {
+        // should only be called after latest commit offsets for partitions are updated in-memory
+        for (final Partition partition : partitions) {
+            // check failed commits and indicate that we should switch in looking for dead letters mode, unless already
+            final boolean exceededMaxAttemptsAndNoExistingDeadLetterOffset =
+                    getContext().getMaxEventSendCount() != null &&
+                            partition.getFailedCommitsCount() >= getContext().getMaxEventSendCount() &&
+                            !partition.isLookingForDeadLetter();
+            if (exceededMaxAttemptsAndNoExistingDeadLetterOffset) {
+                final var lastCommitOffset = offsets.get(partition.getKey()).getCommitOffset();
+                final NakadiCursor lastDeadLetterCursor = getContext().getCursorOperationsService()
+                        .shiftCursor(lastCommitOffset, getBatchLimitEvents());
+
+                final String lastDeadLetterOffset = getContext().getCursorConverter()
+                        .convert(lastDeadLetterCursor).getOffset();
+
+                final Partition lookingDeadLetter = partition
+                        .toLastDeadLetterOffset(lastDeadLetterOffset)
+                        .toZeroFailedCommits();
+                failedCommitPartitions.put(partition.getKey(), lookingDeadLetter);
+
+                getZk().updateTopology(ignore -> new Partition[]{lookingDeadLetter});
+            }
+        }
+    }
+
     private void updateFailedCommitsTracking(final Partition[] thisSessionPartitions) {
+        // TODO: figure out, why is it being overridden?
         failedCommitPartitions = Arrays.stream(thisSessionPartitions)
                 .filter(p -> p.getFailedCommitsCount() > 0 || p.isLookingForDeadLetter())
                 .collect(Collectors.toMap(
@@ -836,25 +864,6 @@ class StreamingState extends State {
 
         offsets.put(partition.getKey(), pd);
         getAutocommit().addPartition(cursor);
-
-        // check failed commits and indicate that we should switch in looking for dead letters mode, unless already
-        if (getContext().getMaxEventSendCount() != null &&
-                partition.getFailedCommitsCount() >= getContext().getMaxEventSendCount() &&
-                !partition.isLookingForDeadLetter()) {
-
-            final NakadiCursor lastDeadLetterCursor = getContext().getCursorOperationsService()
-                    .shiftCursor(cursor, getBatchLimitEvents());
-
-            final String lastDeadLetterOffset = getContext().getCursorConverter()
-                    .convert(lastDeadLetterCursor).getOffset();
-
-            final Partition lookingDeadLetter = partition
-                    .toLastDeadLetterOffset(lastDeadLetterOffset)
-                    .toZeroFailedCommits();
-            failedCommitPartitions.put(partition.getKey(), lookingDeadLetter);
-
-            getZk().updateTopology(topology -> new Partition[]{lookingDeadLetter});
-        }
     }
 
     private void reassignCommitted() {

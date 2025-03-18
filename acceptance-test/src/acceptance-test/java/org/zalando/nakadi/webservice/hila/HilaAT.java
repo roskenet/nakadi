@@ -1005,6 +1005,11 @@ public class HilaAT extends BaseAT {
         Assert.assertEquals("001-0001-000000000000000001", client.getJsonBatches().get(0).getCursor().getOffset());
     }
 
+    /**
+     * This test simulates the scenario where the consumer is unable to skip an event through auto-dlq
+     * due to expired offsets in ZK.
+     * This is verified by checking whether auto-dlq loop is broken after certain number of retries.
+     */
     @Test(timeout = 50_000)
     public void testAutoDlqWorksWithExpiredOffsets() throws Exception {
         //setup event types and subscriptions
@@ -1045,8 +1050,10 @@ public class HilaAT extends BaseAT {
         final AtomicInteger failedReprocessingCounter = new AtomicInteger(0);
         final Map<Integer, Integer>  unchangedCounter = new HashMap<>();
         while (true) {
+            // setting batch_limit = 1 to test whether lastDeadLetterOffset is updated correctly
+            // if its not then we will be stuck in processing loop
             final TestStreamingClient client = TestStreamingClient.create(
-                    URL, subscription.getId(), "batch_limit=3&commit_timeout=1&stream_timeout=2");
+                    URL, subscription.getId(), "batch_limit=1&commit_timeout=1&stream_timeout=2");
             client.start(streamBatch -> {
                 if (!streamBatch.getEvents().isEmpty()) {
                     if (streamBatch.getEvents().stream()
