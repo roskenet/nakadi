@@ -3,6 +3,9 @@ package org.zalando.nakadi.validation;
 import org.everit.json.schema.FormatValidator;
 import org.everit.json.schema.Schema;
 import org.everit.json.schema.ValidationException;
+import org.everit.json.schema.internal.DateFormatValidator;
+import org.everit.json.schema.internal.RegexFormatValidator;
+import org.everit.json.schema.internal.TimeFormatValidator;
 import org.everit.json.schema.loader.SchemaLoader;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +29,11 @@ public class EventValidatorBuilder {
     private static final FormatValidator[] PROSPECTIVE_FORMAT_VALIDATORS = {
             new UUIDValidator("uuid"),
             new UUIDValidator("UUID"),
+            new DateFormatValidator(), // format: date
+            new TimeFormatValidator(), // format: time
+            new RegexFormatValidator(), // format: regex
+            new ISO3166Alpha2CountryCodeValidator(), // format: iso-3166-alpha-2
+            new BCP47LanguageTagValidator(), // format: bcp47
     };
     private static final JsonSchemaValidator METADATA_VALIDATOR = new MetadataValidator();
     private final JsonSchemaEnrichment loader;
