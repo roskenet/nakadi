@@ -206,7 +206,7 @@ public class NakadiTestUtils {
             req.header(new Header("X-CONSUMER-TAG", consumerTagHeader));
         }
 
-        req.post(path)
+        req.post(path).prettyPeek()
                 .then()
                 .statusCode(HttpStatus.SC_OK);
     }
@@ -259,11 +259,21 @@ public class NakadiTestUtils {
                 .statusCode(HttpStatus.SC_OK);
     }
 
+
     public static void publishBusinessEventWithUserDefinedPartition(
             final String eventType,
             final int count,
             final IntFunction<String> fooGenerator,
             final IntFunction<String> partitionGenerator) {
+        publishBusinessEventWithUserDefinedPartition(eventType, count, fooGenerator, partitionGenerator, null);
+    }
+
+    public static void publishBusinessEventWithUserDefinedPartition(
+            final String eventType,
+            final int count,
+            final IntFunction<String> fooGenerator,
+            final IntFunction<String> partitionGenerator,
+            final String consumerTagHeader) {
         publishEvents(
                 eventType,
                 count, i -> {
@@ -276,7 +286,8 @@ public class NakadiTestUtils {
                     event.put("metadata", metadata);
                     event.put("foo", fooGenerator.apply(i));
                     return event.toString();
-                });
+                },
+                consumerTagHeader);
     }
 
     public static void publishBusinessEventsWithUserDefinedPartition(

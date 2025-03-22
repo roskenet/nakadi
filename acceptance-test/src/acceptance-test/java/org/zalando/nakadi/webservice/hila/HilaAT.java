@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -1079,6 +1080,81 @@ public class HilaAT extends BaseAT {
                         expectedNumberOfRetries + " retries");
             }
             
+            final int allowedUnchangedCounter = 3;
+            if (unchangedCounter.get(count) > allowedUnchangedCounter) {
+                //its good to exit now as we have not observed new reprocessing failures since last 3 tries.
+                break;
+            }
+
+            Thread.sleep(3000); // to prevent 409
+        }
+    }
+
+    @Test
+    public void testAutoDlqWorksWithInvisibleEvents() throws Exception {
+        //https://github.bus.zalan.do/aruha/team-aruha/issues/2230
+        final int numPartitions = 1;
+        final EventType eventType = createBusinessEventTypeWithPartitions(numPartitions);
+        final Subscription subscription =
+                createAutoDLQSubscription(eventType, UnprocessableEventPolicy.DEAD_LETTER_QUEUE, 3);
+
+        final int numValues = 2;
+        final String[] values = new String[numValues];
+        for (int i = 0; i < numValues; ++i) {
+            values[i] = randomTextString();
+        }
+
+        final String poisonPillValue = values[0];
+        final String invisibleValue = values[1];
+
+        publishBusinessEventWithUserDefinedPartition(
+                eventType.getName(),
+                1,
+                ignore -> poisonPillValue,
+                ignore -> "0"
+        );
+
+        publishBusinessEventWithUserDefinedPartition(
+                eventType.getName(),
+                1,
+                ignore -> invisibleValue,
+                ignore -> "0",
+                "consumer_subscription_id=" + UUID.randomUUID().toString()
+        );
+
+        // events visible to consumer are [0, _]
+
+        // finally consume to simulate processing failure
+        final AtomicInteger failedReprocessingCounter = new AtomicInteger(0);
+        final Map<Integer, Integer>  unchangedCounter = new HashMap<>();
+        while (true) {
+            final TestStreamingClient client = TestStreamingClient.create(
+                    URL, subscription.getId(), "commit_timeout=1&stream_timeout=2");
+            client.start(streamBatch -> {
+                if (!streamBatch.getEvents().isEmpty()) {
+                    if (streamBatch.getEvents().stream()
+                            .anyMatch(event -> poisonPillValue.equals(event.getString("foo")))) {
+                        failedReprocessingCounter.incrementAndGet();
+                        throw new RuntimeException("poison pill found");
+                    } else {
+                        NakadiTestUtils.commitCursors(
+                                subscription.getId(),
+                                ImmutableList.of(streamBatch.getCursor()),
+                                client.getSessionId());
+                    }
+                }
+            });
+
+            waitFor(() -> Assert.assertFalse(client.isRunning()));
+            final var count = failedReprocessingCounter.get();
+            unchangedCounter.put(count, unchangedCounter.getOrDefault(failedReprocessingCounter.get(), 0) + 1);
+
+            final int expectedNumberOfRetries = 6;
+            if (failedReprocessingCounter.get() > expectedNumberOfRetries) {
+                Assert.fail("encountered processing loop for failed event, exceeded " +
+                        expectedNumberOfRetries + " retries");
+            }
+
             final int allowedUnchangedCounter = 3;
             if (unchangedCounter.get(count) > allowedUnchangedCounter) {
                 //its good to exit now as we have not observed new reprocessing failures since last 3 tries.
