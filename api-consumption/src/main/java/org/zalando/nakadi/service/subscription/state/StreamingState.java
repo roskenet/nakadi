@@ -330,14 +330,12 @@ class StreamingState extends State {
                         }
                     }
 
-                    getAutocommit().addSkippedEvent(failedEvent.getPosition());
-
                     this.addTask(() -> {
                         LOG.debug("task: called for {} from partition {}",
                                 failedEvent.getPosition(), etp);
-                        getAutocommit().autocommit();
-                        LOG.debug("task: finished for {} from partition {}",
-                                failedEvent.getPosition(), etp);
+                        final var committed = getAutocommit().autoCommitNow(failedEvent.getPosition());
+                        LOG.debug("task: finished with {} for {} from partition {}",
+                                committed, failedEvent.getPosition(), etp);
                     });
 
                     // reset failed commits, but keep looking until last dead letter offset
