@@ -36,11 +36,13 @@ import org.zalando.nakadi.webservice.utils.TestStreamingClient;
 import org.zalando.nakadi.webservice.utils.ZookeeperTestUtils;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -904,22 +906,22 @@ public class HilaAT extends BaseAT {
         waitFor(() -> Assert.assertFalse(client.isRunning()), 15_000);
     }
 
-    @Test(timeout = 25_000)
-    public void shouldSkipPoisonPillAndDeadLetterFoundInTheQueueLater() throws IOException, InterruptedException {
+    @Test(timeout = 30_000)
+    public void shouldSkipOnlyPoisonPillAndDeadLetterFoundInTheQueueLater() throws IOException, InterruptedException {
 
-        final EventType eventType = createBusinessEventTypeWithPartitions(4);
+        final EventType eventType = createBusinessEventTypeWithPartitions(8);
 
         // using random strings here allows us to scan the DLQ from BEGIN later, as there is (almost) no risk of false
         // positives due to other tests leaving their values there
         final int numValues = 50;
         final String[] values = new String[numValues];
         for (int i = 0; i < numValues; ++i) {
-            values[i] = randomTextString();
+            values[i] = UUID.randomUUID().toString();
         }
         publishBusinessEventWithUserDefinedPartition(eventType.getName(),
-                numValues, i -> values[i], i -> String.valueOf(i % 4));
+                numValues, i -> values[i], i -> String.valueOf(i % 8));
 
-        final String poisonPillValue = values[10];
+        final String poisonPillValue = values[40];
 
         final Subscription subscription =
                 createAutoDLQSubscription(eventType, UnprocessableEventPolicy.DEAD_LETTER_QUEUE, 3);
@@ -929,13 +931,15 @@ public class HilaAT extends BaseAT {
             final TestStreamingClient client = TestStreamingClient.create(
                     URL, subscription.getId(), "batch_limit=3&commit_timeout=1&stream_timeout=2");
             client.start(streamBatch -> {
-                if (streamBatch.getEvents().stream()
-                        .anyMatch(event -> poisonPillValue.equals(event.getString("foo")))) {
-                    cursorWithPoisonPill.set(streamBatch.getCursor());
-                    throw new RuntimeException("poison pill found");
-                } else {
-                    NakadiTestUtils.commitCursors(
-                            subscription.getId(), ImmutableList.of(streamBatch.getCursor()), client.getSessionId());
+                if (streamBatch.getEvents() != null && !streamBatch.getEvents().isEmpty()) {
+                    if (streamBatch.getEvents().stream()
+                            .anyMatch(event -> poisonPillValue.equals(event.getString("foo")))) {
+                        cursorWithPoisonPill.set(streamBatch.getCursor());
+                        throw new RuntimeException("poison pill found");
+                    } else {
+                        NakadiTestUtils.commitCursors(
+                                subscription.getId(), ImmutableList.of(streamBatch.getCursor()), client.getSessionId());
+                    }
                 }
             });
 
@@ -953,16 +957,24 @@ public class HilaAT extends BaseAT {
         // now we can trawl the dead letter queue from BEGIN to find our unique poison pill there
         final Subscription dlqStoreEventTypeSub = createSubscriptionForEventTypeFromBegin("nakadi.dead.letter.queue");
         final TestStreamingClient dlqStoreClient = TestStreamingClient.create(
-                URL, dlqStoreEventTypeSub.getId(), "batch_limit=1&stream_timeout=5");
+                URL, dlqStoreEventTypeSub.getId(), "batch_limit=10&batch_flush_timeout=1&stream_timeout=8");
 
+        final var valuesFound = Arrays.stream(values)
+                .collect(Collectors.toMap(v -> v, v -> 0));
         dlqStoreClient.startWithAutocommit(batches ->
-                Assert.assertTrue("failed event should be found in the dead letter queue",
-                        batches.stream()
-                        .flatMap(b -> b.getEvents().stream())
-                        .anyMatch(e ->
-                                subscription.getId().equals(e.get("subscription_id")) &&
-                                poisonPillValue.equals(e.getJSONObject("event").getString("foo")))));
+            batches.stream().flatMap(streamBatch -> streamBatch.getEvents().stream())
+                    .forEach(event -> {
+                        final String value = event.getJSONObject("event").getString("foo");
+                        valuesFound.computeIfPresent(value , (k, v) -> v + 1);
+            })
+        );
+
         waitFor(() -> Assert.assertFalse(dlqStoreClient.isRunning()));
+
+        final var expectedResult = Map.of(poisonPillValue, 1);
+        final var actualResult = valuesFound.entrySet().stream().filter(e -> e.getValue() > 0)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        Assert.assertEquals(expectedResult, actualResult);
     }
 
     @Test(timeout = 35_000)
