@@ -250,9 +250,11 @@ class StreamingState extends State {
 
     private long getMessagesAllowedToSend() {
         final long unconfirmed = offsets.values().stream().mapToLong(PartitionData::getUnconfirmed).sum();
-        final long limit = getParameters().maxUncommittedMessages - unconfirmed;
+        final long maxUncommitted = isStreamInDlqMode()? 1: getParameters().maxUncommittedMessages;
+        final long limit = maxUncommitted - unconfirmed;
         return getParameters().getMessagesAllowedToSend(limit, this.sentEvents);
     }
+
 
     private void checkBatchTimeouts() {
         streamToOutput();
@@ -298,6 +300,12 @@ class StreamingState extends State {
                                 .toArray(Partition[]::new));
                         failedCommitPartitions.remove(etp);
                         partition = null;
+
+                        if (failedCommitPartitions.isEmpty()) {
+                            // we reinit messagesAllowedToSend, because the stream is not in DLQ mode anymore
+                            // which means go back to normal maxUncommittedMessages limit
+                            messagesAllowedToSend = (int) getMessagesAllowedToSend();
+                        }
                         messagesAllowedForPartition = messagesAllowedToSend;
                     }
                 }
@@ -403,13 +411,17 @@ class StreamingState extends State {
                                                       final PartitionData partitionData,
                                                       final int messagesAllowedToSend) {
         if (inDlqMode(partition)) {
-            return partitionData.isCommitted() ? 1 : 0;
+            return partitionData.isCommitted() ? Math.min(1, messagesAllowedToSend) : 0;
         }
         return messagesAllowedToSend;
     }
 
     private static boolean inDlqMode(final Partition partition) {
         return partition != null && partition.isLookingForDeadLetter();
+    }
+
+    private boolean isStreamInDlqMode() {
+        return failedCommitPartitions.values().stream().anyMatch(StreamingState::inDlqMode);
     }
 
     private void sendToDeadLetterQueue(final ConsumedEvent event, final int failedCommitsCount) {
