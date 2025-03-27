@@ -1120,7 +1120,7 @@ public class HilaAT extends BaseAT {
                 ignore -> "i_am_visible",
                 ignore -> "0"
         );
-        // events visible to consumer are [0, _, 1]
+        // events visible to consumer are [0, _, 2]
 
         // finally consume to simulate processing failure
         final AtomicInteger retryAttemptCount = new AtomicInteger(0);
