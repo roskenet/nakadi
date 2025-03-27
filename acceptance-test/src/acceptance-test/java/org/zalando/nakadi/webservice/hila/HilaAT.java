@@ -46,6 +46,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 import static com.jayway.restassured.RestAssured.given;
@@ -626,7 +627,6 @@ public class HilaAT extends BaseAT {
                 Collections.singletonList(
                         new SubscriptionCursorWithoutToken(
                                 eventType.getName(), begin.getPartitionId(), begin.getOldestAvailableOffset())));
-
         waitFor(() -> Assert.assertFalse(client1.isRunning()));
         Assert.assertTrue(
                 client1.getJsonBatches().stream()
@@ -1015,6 +1015,70 @@ public class HilaAT extends BaseAT {
         waitFor(() -> Assert.assertFalse(client.isRunning()));
         // check that we skipped over offset 0
         Assert.assertEquals("001-0001-000000000000000001", client.getJsonBatches().get(0).getCursor().getOffset());
+    }
+
+    @Test(timeout = 35_000)
+    public void testDlqModeWorksCorrectlyWithMixOfDlqAndNonDlqPartitions() throws IOException {
+        final EventType eventType = createBusinessEventTypeWithPartitions(1);
+        publishBusinessEventWithUserDefinedPartition(eventType.getName(),
+                2, ignore -> "dummy", ignore -> String.valueOf(0));
+
+        final int maxEventSendCount = 2;
+        final Subscription subscription = createAutoDLQSubscription(eventType, UnprocessableEventPolicy.SKIP_EVENT,
+                maxEventSendCount);
+        final TestStreamingClient client = TestStreamingClient
+                .create(URL, subscription.getId(),
+                        "batch_limit=3&commit_timeout=5" +
+                        "&batch_flush_timeout=2&max_uncommitted_events=10");
+
+        client.start();
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+        Assert.assertTrue(isCommitTimeoutReached(client));
+
+        client.start();
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+        Assert.assertTrue(isCommitTimeoutReached(client));
+
+        // add another non-dlq partition to event type
+        NakadiTestUtils.repartitionEventType(eventType, 2);
+        publishBusinessEventWithUserDefinedPartition(eventType.getName(),
+                9, ignore -> "dummy", ignore -> String.valueOf(1));
+
+        final BiFunction<TestStreamingClient, String, List<StreamBatch>> getNonEmptyBatches =
+                (nakadiClient, partition) ->
+                nakadiClient.getJsonBatches()
+                        .stream().filter(batch -> !batch.getEvents().isEmpty() &&
+                                batch.getCursor().getPartition().equals(partition))
+                        .collect(Collectors.toList());
+        //DLQ MODE
+        client.start();
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+        Assert.assertTrue(getNonEmptyBatches.apply(client, "0")
+                .stream().allMatch(batch -> batch.getEvents().size() == 1));
+        Assert.assertTrue(getNonEmptyBatches.apply(client, "1")
+                .stream().allMatch(batch -> batch.getEvents().size() == 3));
+        Assert.assertTrue(isCommitTimeoutReached(client));
+
+        client.start();
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+        Assert.assertTrue(getNonEmptyBatches.apply(client, "0")
+                .stream().allMatch(batch -> batch.getEvents().size() == 1));
+        Assert.assertTrue(getNonEmptyBatches.apply(client, "1")
+                .stream().allMatch(batch -> batch.getEvents().size() == 3));
+        Assert.assertTrue(isCommitTimeoutReached(client));
+
+        client.start(streamBatch -> {
+            if (!streamBatch.getEvents().isEmpty() && streamBatch.getCursor().getPartition().equals("1")) {
+                // commit partition '1' cursors so it's not put into dlq mode too
+                NakadiTestUtils.commitCursors(subscription.getId(),
+                        ImmutableList.of(streamBatch.getCursor()), client.getSessionId());
+            }
+
+        });
+        // check that we skipped over offset 0 for dlq partition 0
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+        Assert.assertEquals("001-0001-000000000000000001",
+                getNonEmptyBatches.apply(client, "0").get(0).getCursor().getOffset());
     }
 
     /**
