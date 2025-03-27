@@ -903,19 +903,7 @@ class StreamingState extends State {
 
             final PartitionData.CommitResult commitResult = data.onCommitOffset(cursor);
             getAutocommit().onCommit(cursor);
-
-            final Partition partition = failedCommitPartitions.get(etp);
-            if (partition != null && partition.getFailedCommitsCount() > 0) {
-                if (commitResult.committedCount > 0) {
-                    dlqPartitionCommitPending.remove(etp);
-                }
-                getZk().updateTopology(topology -> Arrays.stream(topology.getPartitions())
-                        .filter(p -> p.getPartition().equals(etp.getPartition()))
-                        .filter(p -> p.getFailedCommitsCount() > 0)
-                        .map(p -> p.toZeroFailedCommits())
-                        .toArray(Partition[]::new));
-                failedCommitPartitions.computeIfPresent(etp, (ignore, p) -> p.toZeroFailedCommits());
-            }
+            handleOffsetChangedDlq(etp, commitResult);
 
             if (commitResult.seekOnKafka) {
                 reconfigureKafkaConsumer(true);
@@ -935,6 +923,22 @@ class StreamingState extends State {
                 reassignCommitted();
                 logPartitionAssignment("New offset received for releasing partition " + etp);
             }
+        }
+    }
+
+    private void handleOffsetChangedDlq(final EventTypePartition etp,
+                                        final PartitionData.CommitResult commitResult) {
+        if (commitResult.committedCount > 0) {
+            dlqPartitionCommitPending.remove(etp);
+        }
+        final Partition partition = failedCommitPartitions.get(etp);
+        if (partition != null && partition.getFailedCommitsCount() > 0) {
+            getZk().updateTopology(topology -> Arrays.stream(topology.getPartitions())
+                    .filter(p -> p.getPartition().equals(etp.getPartition()))
+                    .filter(p -> p.getFailedCommitsCount() > 0)
+                    .map(p -> p.toZeroFailedCommits())
+                    .toArray(Partition[]::new));
+            failedCommitPartitions.computeIfPresent(etp, (ignore, p) -> p.toZeroFailedCommits());
         }
     }
 
