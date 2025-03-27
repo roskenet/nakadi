@@ -57,6 +57,7 @@ class StreamingState extends State {
     // correctly, and p0 is not receiving any updates - reassignment won't complete.
     private final Map<EventTypePartition, Long> releasingPartitions = new HashMap<>();
     private Map<EventTypePartition, Partition> failedCommitPartitions = new HashMap<>();
+    private final Set<EventTypePartition> dlqPartitionCommitPending = new HashSet<>(1);
     private String failedCommitsDebugStringToFlush;
     private ZkSubscription<ZkSubscriptionClient.Topology> topologyChangeSubscription;
     private HighLevelConsumer eventConsumer;
@@ -250,8 +251,7 @@ class StreamingState extends State {
 
     private long getMessagesAllowedToSend() {
         final long unconfirmed = offsets.values().stream().mapToLong(PartitionData::getUnconfirmed).sum();
-        final long maxUncommitted = isStreamInDlqMode()? 1: getParameters().maxUncommittedMessages;
-        final long limit = maxUncommitted - unconfirmed;
+        final long limit = getParameters().maxUncommittedMessages - unconfirmed;
         return getParameters().getMessagesAllowedToSend(limit, this.sentEvents);
     }
 
@@ -278,14 +278,13 @@ class StreamingState extends State {
         final boolean wasCommitted = isEverythingCommitted();
         int messagesAllowedToSend = (int) getMessagesAllowedToSend();
         boolean sentSomething = false;
-
         for (final Map.Entry<EventTypePartition, PartitionData> e : offsets.entrySet()) {
             final EventTypePartition etp = e.getKey();
             final PartitionData partitionData = e.getValue();
             Partition partition = failedCommitPartitions.get(etp);
 
             int messagesAllowedForPartition =
-                    getMessagesAllowedForPartition(partition, partitionData, messagesAllowedToSend);
+                    getMessagesAllowedForPartition(partition, messagesAllowedToSend);
 
             // loop sends all the events from partition, until max uncommitted reached or no more events
             while (true) {
@@ -300,13 +299,8 @@ class StreamingState extends State {
                                 .toArray(Partition[]::new));
                         failedCommitPartitions.remove(etp);
                         partition = null;
-
-                        if (failedCommitPartitions.isEmpty()) {
-                            // we reinit messagesAllowedToSend, because the stream is not in DLQ mode anymore
-                            // which means go back to normal maxUncommittedMessages limit
-                            messagesAllowedToSend = (int) getMessagesAllowedToSend();
-                        }
-                        messagesAllowedForPartition = messagesAllowedToSend;
+                        // reset the number of messages allowed for this partition because its out of dlq mode
+                        messagesAllowedForPartition = getMessagesAllowedForPartition(partition, messagesAllowedToSend);
                     }
                 }
 
@@ -323,43 +317,17 @@ class StreamingState extends State {
                 if (!toSend.isEmpty() &&
                         inDlqMode(partition) &&
                         partition.getFailedCommitsCount() >= getContext().getMaxEventSendCount()) {
-
-                    final ConsumedEvent failedEvent = toSend.remove(0);
-
-                    LOG.warn("Skipping event {} from partition {} due to failed commits count {}",
-                            failedEvent.getPosition(), etp, partition.getFailedCommitsCount());
-
-                    if (getContext().getUnprocessableEventPolicy() == UnprocessableEventPolicy.DEAD_LETTER_QUEUE) {
-                        sendToDeadLetterQueue(failedEvent, partition.getFailedCommitsCount());
-                        if (LOG.isDebugEnabled()) {
-                            LOG.debug("sendToDeadLetterQueue: successfull for {} " +
-                                            "from partition {} due to failed commits count {}",
-                                    failedEvent.getPosition(), etp, partition.getFailedCommitsCount());
-                        }
-                    }
-
-                    getAutocommit().addSkippedEvent(failedEvent.getPosition());
-
-                    this.addTask(() -> {
-                        LOG.debug("task: called for {} from partition {}",
-                                failedEvent.getPosition(), etp);
-                        getAutocommit().autocommit();
-                        LOG.debug("task: finished for {} from partition {}",
-                                failedEvent.getPosition(), etp);
-                    });
-
-                    // reset failed commits, but keep looking until last dead letter offset
-                    getZk().updateTopology(topology -> Arrays.stream(topology.getPartitions())
-                            .filter(p -> p.getPartition().equals(etp.getPartition()))
-                            .map(p -> p.toZeroFailedCommits())
-                            .toArray(Partition[]::new));
-
+                    skipEvent(toSend.remove(0), partition);
                     // we are sure the batch is empty
                     break;
                 }
 
                 sentSomething |= !toSend.isEmpty();
 
+                if (inDlqMode(partition) && sentSomething) {
+                   dlqPartitionCommitPending.add(etp);
+                   assert dlqPartitionCommitPending.size() == 1;
+                }
                 flushData(etp, toSend, makeDebugMessage(partitionData));
                 if (toSend.isEmpty()) {
                     break;
@@ -407,21 +375,54 @@ class StreamingState extends State {
         }
     }
 
-    private static int getMessagesAllowedForPartition(final Partition partition,
-                                                      final PartitionData partitionData,
-                                                      final int messagesAllowedToSend) {
+    private void skipEvent(final ConsumedEvent failedEvent,
+                           final Partition partition) {
+        LOG.warn("Skipping event {} from partition {} due to failed commits count {}",
+                failedEvent.getPosition(), partition.getPartition(), partition.getFailedCommitsCount());
+
+        if (getContext().getUnprocessableEventPolicy() == UnprocessableEventPolicy.DEAD_LETTER_QUEUE) {
+            sendToDeadLetterQueue(failedEvent, partition.getFailedCommitsCount());
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("sendToDeadLetterQueue: successfull for {} " +
+                                "from partition {} due to failed commits count {}",
+                        failedEvent.getPosition(), partition.getPartition(), partition.getFailedCommitsCount());
+            }
+        }
+
+        getAutocommit().addSkippedEvent(failedEvent.getPosition());
+
+        this.addTask(() -> {
+            LOG.debug("task: called for {} from partition {}",
+                    failedEvent.getPosition(), partition.getPartition());
+            getAutocommit().autocommit();
+            LOG.debug("task: finished for {} from partition {}",
+                    failedEvent.getPosition(), partition.getPartition());
+        });
+
+        // reset failed commits, but keep looking until last dead letter offset
+        getZk().updateTopology(topology -> Arrays.stream(topology.getPartitions())
+                .filter(p -> p.getPartition().equals(partition.getPartition()))
+                .map(p -> p.toZeroFailedCommits())
+                .toArray(Partition[]::new));
+    }
+
+    private int getMessagesAllowedForPartition(final Partition partition,
+                                               final int messagesAllowedToSend) {
         if (inDlqMode(partition)) {
-            return partitionData.isCommitted() ? Math.min(1, messagesAllowedToSend) : 0;
+            // if the same/another dlq partition was already sent an event but didn't
+            // receive commit then we shouldnt send more. This is to ensure we
+            // can narrow down the event that caused the failure.
+            if (!dlqPartitionCommitPending.isEmpty()) {
+                return 0;
+            }
+            // otherwise allow 1 if messagesAllowedToSend allows
+            return Math.min(1, messagesAllowedToSend);
         }
         return messagesAllowedToSend;
     }
 
     private static boolean inDlqMode(final Partition partition) {
         return partition != null && partition.isLookingForDeadLetter();
-    }
-
-    private boolean isStreamInDlqMode() {
-        return failedCommitPartitions.values().stream().anyMatch(StreamingState::inDlqMode);
     }
 
     private void sendToDeadLetterQueue(final ConsumedEvent event, final int failedCommitsCount) {
@@ -915,6 +916,7 @@ class StreamingState extends State {
             }
 
             if (commitResult.committedCount > 0) {
+                dlqPartitionCommitPending.remove(etp);
                 committedEvents += commitResult.committedCount;
                 this.lastCommitMillis = System.currentTimeMillis();
                 streamToOutput();
