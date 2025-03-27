@@ -326,7 +326,10 @@ class StreamingState extends State {
 
                 if (inDlqMode(partition) && sentSomething) {
                    dlqPartitionCommitPending.add(etp);
-                   assert dlqPartitionCommitPending.size() == 1;
+                   if (dlqPartitionCommitPending.size() > 1) {
+                      LOG.warn("only expected one dlq commit pending partition, however found multiple {}",
+                              dlqPartitionCommitPending);
+                   }
                 }
                 flushData(etp, toSend, makeDebugMessage(partitionData));
                 if (toSend.isEmpty()) {
