@@ -1117,7 +1117,7 @@ public class HilaAT extends BaseAT {
         publishBusinessEventWithUserDefinedPartition(
                 eventType.getName(),
                 1,
-                ignore -> "i_am_visible",
+                ignore -> "first_visible_after_poison_pill",
                 ignore -> "0"
         );
         // events visible to consumer are [0, _, 2]
@@ -1147,13 +1147,11 @@ public class HilaAT extends BaseAT {
             if (retryAttemptCount.get() == expectedNumberOfRetries) {
                 // should skip poison pill + invisible event
                 Assert.assertEquals(
-                        "encountered processing loop for failed event, exceeded "
-                                + expectedNumberOfRetries + " retries",
-                        "001-0001-000000000000000002", client.getJsonBatches().get(0).getCursor().getOffset());
+                        "expected to receive the first visible event after the poison pill",
+                        "first_visible_after_poison_pill",
+                        client.getJsonBatches().get(0).getEvents().get(0).getString("foo"));
                 break;
             }
-
-
             Thread.sleep(3000); // to prevent 409
         }
     }
