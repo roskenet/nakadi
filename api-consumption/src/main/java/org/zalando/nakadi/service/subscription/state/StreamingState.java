@@ -903,6 +903,9 @@ class StreamingState extends State {
 
             final Partition partition = failedCommitPartitions.get(etp);
             if (partition != null && partition.getFailedCommitsCount() > 0) {
+                if (commitResult.committedCount > 0) {
+                    dlqPartitionCommitPending.remove(etp);
+                }
                 getZk().updateTopology(topology -> Arrays.stream(topology.getPartitions())
                         .filter(p -> p.getPartition().equals(etp.getPartition()))
                         .filter(p -> p.getFailedCommitsCount() > 0)
@@ -916,7 +919,6 @@ class StreamingState extends State {
             }
 
             if (commitResult.committedCount > 0) {
-                dlqPartitionCommitPending.remove(etp);
                 committedEvents += commitResult.committedCount;
                 this.lastCommitMillis = System.currentTimeMillis();
                 streamToOutput();
