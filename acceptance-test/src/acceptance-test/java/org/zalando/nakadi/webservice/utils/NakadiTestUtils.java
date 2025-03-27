@@ -206,7 +206,7 @@ public class NakadiTestUtils {
             req.header(new Header("X-CONSUMER-TAG", consumerTagHeader));
         }
 
-        req.post(path).prettyPeek()
+        req.post(path)
                 .then()
                 .statusCode(HttpStatus.SC_OK);
     }

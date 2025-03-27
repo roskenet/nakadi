@@ -1093,19 +1093,11 @@ public class HilaAT extends BaseAT {
     @Test
     public void testAutoDlqWorksWithInvisibleEvents() throws Exception {
         //https://github.bus.zalan.do/aruha/team-aruha/issues/2230
-        final int numPartitions = 1;
-        final EventType eventType = createBusinessEventTypeWithPartitions(numPartitions);
+        final EventType eventType = createBusinessEventTypeWithPartitions(1);
         final Subscription subscription =
                 createAutoDLQSubscription(eventType, UnprocessableEventPolicy.DEAD_LETTER_QUEUE, 3);
 
-        final int numValues = 2;
-        final String[] values = new String[numValues];
-        for (int i = 0; i < numValues; ++i) {
-            values[i] = randomTextString();
-        }
-
-        final String poisonPillValue = values[0];
-        final String invisibleValue = values[1];
+        final String poisonPillValue =  "visible_but_deadly";
 
         publishBusinessEventWithUserDefinedPartition(
                 eventType.getName(),
@@ -1117,24 +1109,29 @@ public class HilaAT extends BaseAT {
         publishBusinessEventWithUserDefinedPartition(
                 eventType.getName(),
                 1,
-                ignore -> invisibleValue,
+                ignore -> "i_am_invisible",
                 ignore -> "0",
                 "consumer_subscription_id=" + UUID.randomUUID().toString()
         );
 
-        // events visible to consumer are [0, _]
+        publishBusinessEventWithUserDefinedPartition(
+                eventType.getName(),
+                1,
+                ignore -> "i_am_visible",
+                ignore -> "0"
+        );
+        // events visible to consumer are [0, _, 1]
 
         // finally consume to simulate processing failure
-        final AtomicInteger failedReprocessingCounter = new AtomicInteger(0);
-        final Map<Integer, Integer>  unchangedCounter = new HashMap<>();
+        final AtomicInteger retryAttemptCount = new AtomicInteger(0);
         while (true) {
+            retryAttemptCount.incrementAndGet();
             final TestStreamingClient client = TestStreamingClient.create(
                     URL, subscription.getId(), "commit_timeout=1&stream_timeout=2");
             client.start(streamBatch -> {
                 if (!streamBatch.getEvents().isEmpty()) {
                     if (streamBatch.getEvents().stream()
                             .anyMatch(event -> poisonPillValue.equals(event.getString("foo")))) {
-                        failedReprocessingCounter.incrementAndGet();
                         throw new RuntimeException("poison pill found");
                     } else {
                         NakadiTestUtils.commitCursors(
@@ -1146,20 +1143,16 @@ public class HilaAT extends BaseAT {
             });
 
             waitFor(() -> Assert.assertFalse(client.isRunning()));
-            final var count = failedReprocessingCounter.get();
-            unchangedCounter.put(count, unchangedCounter.getOrDefault(failedReprocessingCounter.get(), 0) + 1);
-
-            final int expectedNumberOfRetries = 6;
-            if (failedReprocessingCounter.get() > expectedNumberOfRetries) {
-                Assert.fail("encountered processing loop for failed event, exceeded " +
-                        expectedNumberOfRetries + " retries");
-            }
-
-            final int allowedUnchangedCounter = 3;
-            if (unchangedCounter.get(count) > allowedUnchangedCounter) {
-                //its good to exit now as we have not observed new reprocessing failures since last 3 tries.
+            final int expectedNumberOfRetries = 7; // 6 (dlq skip) + 1 (resume normal consumption)
+            if (retryAttemptCount.get() == expectedNumberOfRetries) {
+                // should skip poison pill + invisible event
+                Assert.assertEquals(
+                        "encountered processing loop for failed event, exceeded "
+                                + expectedNumberOfRetries + " retries",
+                        "001-0001-000000000000000002", client.getJsonBatches().get(0).getCursor().getOffset());
                 break;
             }
+
 
             Thread.sleep(3000); // to prevent 409
         }

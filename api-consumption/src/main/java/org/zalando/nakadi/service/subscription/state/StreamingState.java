@@ -338,13 +338,12 @@ class StreamingState extends State {
                     // will not miss consuming some events.
                     // Hence, it's not only safe to commit but also crucial otherwise
                     // the same event will be sent again and again.
-
                     this.addTask(() -> {
                         LOG.debug("task: called for {} from partition {}",
                                 failedEvent.getPosition(), etp);
-                        final var committed = getAutocommit().autoCommitNow(failedEvent.getPosition());
+                        final boolean result = getAutocommit().autoCommitNow(failedEvent.getPosition());
                         LOG.debug("task: finished with {} for {} from partition {}",
-                                committed, failedEvent.getPosition(), etp);
+                                result, failedEvent.getPosition(), etp);
                     });
 
                     // reset failed commits, but keep looking until last dead letter offset
