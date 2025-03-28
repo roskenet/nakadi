@@ -45,14 +45,28 @@ public class SchemaDiffTest {
                 is(errorMessages));
     }
 
+    @ParameterizedTest
+    @MethodSource("getAllowedChanges")
+    public void checkJsonSchemaAllowedChanges(
+            final String description,
+            final Schema original,
+            final Schema updated) {
+        assertTrue(
+                service.collectChanges(original, updated).isEmpty(),
+                description);
+    }
     static Stream<Arguments> getInvalidChanges() throws IOException {
         return loadTestExamples("schema-evolution-examples.invalid.json", true);
+    }
+
+    static Stream<Arguments> getAllowedChanges() throws IOException {
+        return loadTestExamples("schema-evolution-examples.allowed.json", false);
     }
 
     static Stream<Arguments> loadTestExamples(final String filename, final boolean withErrors) throws IOException {
         final JSONArray testCases = new JSONArray(readFile(filename));
 
-        ArrayList<Arguments> tests = new ArrayList<>();
+        final ArrayList<Arguments> tests = new ArrayList<>();
         for (final Object testCaseObject : testCases) {
             final JSONObject testCase = (JSONObject) testCaseObject;
             final String description = testCase.getString("description");

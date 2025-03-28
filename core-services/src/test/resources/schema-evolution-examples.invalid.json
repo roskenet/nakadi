@@ -558,7 +558,7 @@
         }
       }
     },
-    "errors": ["TYPE_CHANGED #/items/$ref"]
+    "errors": ["TYPE_CHANGED #/items"]
   },
   {
     "description": "Detect changes to boolean additional properties",

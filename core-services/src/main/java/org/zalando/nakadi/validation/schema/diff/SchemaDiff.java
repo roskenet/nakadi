@@ -49,23 +49,16 @@ public class SchemaDiff {
             return;
         }
 
-        final Schema original;
-        final Schema update;
-        if (!originalIn.getClass().equals(updateIn.getClass())) {
-            // Tricky part. EmptySchema is the same as an empty ObjectSchema.
-            if (originalIn instanceof EmptySchema && updateIn instanceof ObjectSchema) {
-                original = replaceWithEmptyObjectSchema(originalIn);
-                update = updateIn;
-            } else if (typeNarrowed(originalIn, updateIn)) {
+        final Schema original = normalize(originalIn);
+        final Schema update = normalize(updateIn);
+        if (!original.getClass().equals(update.getClass())) {
+            if (typeNarrowed(originalIn, updateIn)) {
                 state.addChange(TYPE_NARROWED);
                 return;
             } else {
                 state.addChange(TYPE_CHANGED);
                 return;
             }
-        } else {
-            original = originalIn;
-            update = updateIn;
         }
 
         state.analyzeSchema(originalIn, () -> {
@@ -111,5 +104,15 @@ public class SchemaDiff {
                 .build();
     }
 
-
+    private static Schema normalize(final Schema schemaIn) {
+        Schema schema = schemaIn;
+        if (schema instanceof ReferenceSchema) {
+            schema = ((ReferenceSchema) schema).getReferredSchema();
+        }
+        // Tricky part. EmptySchema is the same as an empty ObjectSchema.
+        if (schema instanceof EmptySchema) {
+            schema = replaceWithEmptyObjectSchema(schema);
+        }
+        return schema;
+    }
 }
