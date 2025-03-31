@@ -94,4 +94,15 @@ public class AutocommitSupport {
                 .collect(Collectors.toList());
         zkSubscriptionClient.commitOffsets(converted);
     }
+
+    public boolean autoCommitNow(final NakadiCursor nakadiCursor) {
+        if (nakadiCursor == null) {
+            LOG.error("autoCommitNow called with null cursor");
+            return false;
+        }
+        final List<Boolean> commitResult = zkSubscriptionClient
+                .commitOffsets(List.of(cursorConverter.convertToNoToken(nakadiCursor)));
+        return !commitResult.isEmpty() && commitResult.get(0);
+    }
+
 }
