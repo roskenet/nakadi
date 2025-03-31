@@ -330,14 +330,20 @@ class StreamingState extends State {
                         }
                     }
 
-                    getAutocommit().addSkippedEvent(failedEvent.getPosition());
-
+                    // Auto-dlq mode guarantees:
+                    // - the batch size is 1 which means we have a specific offset that we want to skip
+                    // - when a cursor to be skipped is identified, we don't expect users to commit offset.
+                    // - the next batch is not sent until the commit is done.
+                    // The above points ensure that we are not over-committing and the user
+                    // will not miss consuming some events.
+                    // Hence, it's not only safe to commit but also crucial otherwise
+                    // the same event will be sent again and again.
                     this.addTask(() -> {
                         LOG.debug("task: called for {} from partition {}",
                                 failedEvent.getPosition(), etp);
-                        getAutocommit().autocommit();
-                        LOG.debug("task: finished for {} from partition {}",
-                                failedEvent.getPosition(), etp);
+                        final boolean result = getAutocommit().autoCommitNow(failedEvent.getPosition());
+                        LOG.debug("task: finished with {} for {} from partition {}",
+                                result, failedEvent.getPosition(), etp);
                     });
 
                     // reset failed commits, but keep looking until last dead letter offset

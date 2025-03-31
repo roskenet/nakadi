@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -1085,6 +1086,72 @@ public class HilaAT extends BaseAT {
                 break;
             }
 
+            Thread.sleep(3000); // to prevent 409
+        }
+    }
+
+    @Test
+    public void testAutoDlqWorksWithInvisibleEvents() throws Exception {
+        //https://github.bus.zalan.do/aruha/team-aruha/issues/2230
+        final EventType eventType = createBusinessEventTypeWithPartitions(1);
+        final Subscription subscription =
+                createAutoDLQSubscription(eventType, UnprocessableEventPolicy.DEAD_LETTER_QUEUE, 3);
+
+        final String poisonPillValue =  "visible_but_deadly";
+
+        publishBusinessEventWithUserDefinedPartition(
+                eventType.getName(),
+                1,
+                ignore -> poisonPillValue,
+                ignore -> "0"
+        );
+
+        publishBusinessEventWithUserDefinedPartition(
+                eventType.getName(),
+                1,
+                ignore -> "i_am_invisible",
+                ignore -> "0",
+                "consumer_subscription_id=" + UUID.randomUUID().toString()
+        );
+
+        publishBusinessEventWithUserDefinedPartition(
+                eventType.getName(),
+                1,
+                ignore -> "first_visible_after_poison_pill",
+                ignore -> "0"
+        );
+        // events visible to consumer are [0, _, 2]
+
+        // finally consume to simulate processing failure
+        final AtomicInteger retryAttemptCount = new AtomicInteger(0);
+        while (true) {
+            retryAttemptCount.incrementAndGet();
+            final TestStreamingClient client = TestStreamingClient.create(
+                    URL, subscription.getId(), "commit_timeout=1&stream_timeout=2");
+            client.start(streamBatch -> {
+                if (!streamBatch.getEvents().isEmpty()) {
+                    if (streamBatch.getEvents().stream()
+                            .anyMatch(event -> poisonPillValue.equals(event.getString("foo")))) {
+                        throw new RuntimeException("poison pill found");
+                    } else {
+                        NakadiTestUtils.commitCursors(
+                                subscription.getId(),
+                                ImmutableList.of(streamBatch.getCursor()),
+                                client.getSessionId());
+                    }
+                }
+            });
+
+            waitFor(() -> Assert.assertFalse(client.isRunning()));
+            final int expectedNumberOfRetries = 7; // 6 (dlq skip) + 1 (resume normal consumption)
+            if (retryAttemptCount.get() == expectedNumberOfRetries) {
+                // should skip poison pill + invisible event
+                Assert.assertEquals(
+                        "expected to receive the first visible event after the poison pill",
+                        "first_visible_after_poison_pill",
+                        client.getJsonBatches().get(0).getEvents().get(0).getString("foo"));
+                break;
+            }
             Thread.sleep(3000); // to prevent 409
         }
     }
