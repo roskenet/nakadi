@@ -47,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static com.jayway.restassured.RestAssured.given;
@@ -56,6 +57,8 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasProperty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
@@ -1079,6 +1082,54 @@ public class HilaAT extends BaseAT {
         waitFor(() -> Assert.assertFalse(client.isRunning()));
         Assert.assertEquals("001-0001-000000000000000001",
                 getNonEmptyBatches.apply(client, "0").get(0).getCursor().getOffset());
+    }
+
+    @Test(timeout = 36_000)
+    public void testMultiPartitionDlqModeOnlySendsSingleEventAtATime() throws IOException {
+        final int numPartitions = 2;
+        final EventType eventType = createBusinessEventTypeWithPartitions(numPartitions);
+        publishBusinessEventWithUserDefinedPartition(eventType.getName(),
+                4, i -> UUID.randomUUID().toString(), i -> String.valueOf(i % numPartitions));
+
+        final int maxEventSendCount = 2;
+        final Subscription subscription = createAutoDLQSubscription(eventType, UnprocessableEventPolicy.SKIP_EVENT,
+                maxEventSendCount);
+        final TestStreamingClient client = TestStreamingClient
+                .create(URL, subscription.getId(), "batch_limit=2&commit_timeout=2&batch_flush_timeout=1");
+        final Supplier<List<StreamBatch>> getNonEmptyBatches = () ->
+                client.getJsonBatches()
+                        .stream().filter(batch -> !batch.getEvents().isEmpty())
+                        .collect(Collectors.toList());
+
+        client.start();
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+        Assert.assertTrue(isCommitTimeoutReached(client));
+
+        client.start();
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+        Assert.assertTrue(isCommitTimeoutReached(client));
+
+        //DLQ MODE
+        // 2 partitions * 2 events per batch * 2 retries config = 8 retries
+        for (int i = 0; i < 8; i++) {
+            client.start();
+            waitFor(() -> Assert.assertFalse(client.isRunning()));
+            Assert.assertEquals(1, getNonEmptyBatches.get().size());
+            Assert.assertEquals(1, getNonEmptyBatches.get().get(0).getEvents().size());
+            Assert.assertTrue(isCommitTimeoutReached(client));
+        }
+
+        publishBusinessEventWithUserDefinedPartition(eventType.getName(),
+                4, i -> UUID.randomUUID().toString(), i -> String.valueOf(i % numPartitions));
+
+        client.start();
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+        // check batches return to normal batch size
+        Assert.assertThat(getNonEmptyBatches.get(), hasSize(2));
+        //check that we skipped over first batch completely
+        Assert.assertThat(getNonEmptyBatches.get(), hasItem(
+                hasProperty("cursor",
+                        hasProperty("offset", equalTo("001-0001-000000000000000003")))));
     }
 
     /**
