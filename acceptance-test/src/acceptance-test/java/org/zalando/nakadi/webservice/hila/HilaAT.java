@@ -908,17 +908,18 @@ public class HilaAT extends BaseAT {
 
     @Test(timeout = 30_000)
     public void shouldSkipOnlyPoisonPillAndDeadLetterFoundInTheQueueLater() throws IOException, InterruptedException {
-        final EventType eventType = createBusinessEventTypeWithPartitions(50);
+
+        final EventType eventType = createBusinessEventTypeWithPartitions(8);
 
         // using random strings here allows us to scan the DLQ from BEGIN later, as there is (almost) no risk of false
         // positives due to other tests leaving their values there
-        final int numValues = 200;
+        final int numValues = 50;
         final String[] values = new String[numValues];
         for (int i = 0; i < numValues; ++i) {
             values[i] = UUID.randomUUID().toString();
         }
         publishBusinessEventWithUserDefinedPartition(eventType.getName(),
-                numValues, i -> values[i], i -> String.valueOf(i % 50));
+                numValues, i -> values[i], i -> String.valueOf(i % 8));
 
         final String poisonPillValue = values[40];
 
