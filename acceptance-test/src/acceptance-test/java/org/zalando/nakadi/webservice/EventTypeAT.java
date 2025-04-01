@@ -34,6 +34,7 @@ import org.zalando.problem.Problem;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -437,7 +438,7 @@ public class EventTypeAT extends BaseAT {
         final TopicPartition tp = new TopicPartition(topic, 0);
         consumer.assign(ImmutableList.of(tp));
         consumer.seek(tp, 0);
-        final ConsumerRecords<byte[], byte[]> records = consumer.poll(5000);
+        final ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofMillis(5000));
         final ConsumerRecord<byte[], byte[]> record = records.iterator().next();
         assertThat(record.key(), equalTo("abc".getBytes(StandardCharsets.UTF_8)));
 
