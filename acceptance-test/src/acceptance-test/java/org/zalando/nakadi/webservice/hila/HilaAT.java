@@ -36,6 +36,7 @@ import org.zalando.nakadi.webservice.utils.TestStreamingClient;
 import org.zalando.nakadi.webservice.utils.ZookeeperTestUtils;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -45,6 +46,8 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static com.jayway.restassured.RestAssured.given;
@@ -54,6 +57,8 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasProperty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
@@ -625,7 +630,6 @@ public class HilaAT extends BaseAT {
                 Collections.singletonList(
                         new SubscriptionCursorWithoutToken(
                                 eventType.getName(), begin.getPartitionId(), begin.getOldestAvailableOffset())));
-
         waitFor(() -> Assert.assertFalse(client1.isRunning()));
         Assert.assertTrue(
                 client1.getJsonBatches().stream()
@@ -905,22 +909,22 @@ public class HilaAT extends BaseAT {
         waitFor(() -> Assert.assertFalse(client.isRunning()), 15_000);
     }
 
-    @Test(timeout = 25_000)
-    public void shouldSkipPoisonPillAndDeadLetterFoundInTheQueueLater() throws IOException, InterruptedException {
+    @Test(timeout = 30_000)
+    public void shouldSkipOnlyPoisonPillAndDeadLetterFoundInTheQueueLater() throws IOException, InterruptedException {
 
-        final EventType eventType = createBusinessEventTypeWithPartitions(4);
+        final EventType eventType = createBusinessEventTypeWithPartitions(8);
 
         // using random strings here allows us to scan the DLQ from BEGIN later, as there is (almost) no risk of false
         // positives due to other tests leaving their values there
         final int numValues = 50;
         final String[] values = new String[numValues];
         for (int i = 0; i < numValues; ++i) {
-            values[i] = randomTextString();
+            values[i] = UUID.randomUUID().toString();
         }
         publishBusinessEventWithUserDefinedPartition(eventType.getName(),
-                numValues, i -> values[i], i -> String.valueOf(i % 4));
+                numValues, i -> values[i], i -> String.valueOf(i % 8));
 
-        final String poisonPillValue = values[10];
+        final String poisonPillValue = values[40];
 
         final Subscription subscription =
                 createAutoDLQSubscription(eventType, UnprocessableEventPolicy.DEAD_LETTER_QUEUE, 3);
@@ -930,13 +934,15 @@ public class HilaAT extends BaseAT {
             final TestStreamingClient client = TestStreamingClient.create(
                     URL, subscription.getId(), "batch_limit=3&commit_timeout=1&stream_timeout=2");
             client.start(streamBatch -> {
-                if (streamBatch.getEvents().stream()
-                        .anyMatch(event -> poisonPillValue.equals(event.getString("foo")))) {
-                    cursorWithPoisonPill.set(streamBatch.getCursor());
-                    throw new RuntimeException("poison pill found");
-                } else {
-                    NakadiTestUtils.commitCursors(
-                            subscription.getId(), ImmutableList.of(streamBatch.getCursor()), client.getSessionId());
+                if (streamBatch.getEvents() != null && !streamBatch.getEvents().isEmpty()) {
+                    if (streamBatch.getEvents().stream()
+                            .anyMatch(event -> poisonPillValue.equals(event.getString("foo")))) {
+                        cursorWithPoisonPill.set(streamBatch.getCursor());
+                        throw new RuntimeException("poison pill found");
+                    } else {
+                        NakadiTestUtils.commitCursors(
+                                subscription.getId(), ImmutableList.of(streamBatch.getCursor()), client.getSessionId());
+                    }
                 }
             });
 
@@ -954,16 +960,24 @@ public class HilaAT extends BaseAT {
         // now we can trawl the dead letter queue from BEGIN to find our unique poison pill there
         final Subscription dlqStoreEventTypeSub = createSubscriptionForEventTypeFromBegin("nakadi.dead.letter.queue");
         final TestStreamingClient dlqStoreClient = TestStreamingClient.create(
-                URL, dlqStoreEventTypeSub.getId(), "batch_limit=1&stream_timeout=5");
+                URL, dlqStoreEventTypeSub.getId(), "batch_limit=10&batch_flush_timeout=1&stream_timeout=8");
 
+        final var valuesFound = Arrays.stream(values)
+                .collect(Collectors.toMap(v -> v, v -> 0));
         dlqStoreClient.startWithAutocommit(batches ->
-                Assert.assertTrue("failed event should be found in the dead letter queue",
-                        batches.stream()
-                        .flatMap(b -> b.getEvents().stream())
-                        .anyMatch(e ->
-                                subscription.getId().equals(e.get("subscription_id")) &&
-                                poisonPillValue.equals(e.getJSONObject("event").getString("foo")))));
+            batches.stream().flatMap(streamBatch -> streamBatch.getEvents().stream())
+                    .forEach(event -> {
+                        final String value = event.getJSONObject("event").getString("foo");
+                        valuesFound.computeIfPresent(value , (k, v) -> v + 1);
+            })
+        );
+
         waitFor(() -> Assert.assertFalse(dlqStoreClient.isRunning()));
+
+        final var expectedResult = Map.of(poisonPillValue, 1);
+        final var actualResult = valuesFound.entrySet().stream().filter(e -> e.getValue() > 0)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        Assert.assertEquals(expectedResult, actualResult);
     }
 
     @Test(timeout = 35_000)
@@ -1004,6 +1018,118 @@ public class HilaAT extends BaseAT {
         waitFor(() -> Assert.assertFalse(client.isRunning()));
         // check that we skipped over offset 0
         Assert.assertEquals("001-0001-000000000000000001", client.getJsonBatches().get(0).getCursor().getOffset());
+    }
+
+    @Test(timeout = 35_000)
+    public void testDlqModeWorksCorrectlyWithMixOfDlqAndNonDlqPartitions() throws IOException {
+        final EventType eventType = createBusinessEventTypeWithPartitions(1);
+        publishBusinessEventWithUserDefinedPartition(eventType.getName(),
+                2, ignore -> "dummy", ignore -> String.valueOf(0));
+
+        final int maxEventSendCount = 2;
+        final Subscription subscription = createAutoDLQSubscription(eventType, UnprocessableEventPolicy.SKIP_EVENT,
+                maxEventSendCount);
+        final TestStreamingClient client = TestStreamingClient
+                .create(URL, subscription.getId(),
+                        "batch_limit=3&commit_timeout=5" +
+                        "&batch_flush_timeout=2&max_uncommitted_events=10");
+
+        client.start();
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+        Assert.assertTrue(isCommitTimeoutReached(client));
+
+        client.start();
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+        Assert.assertTrue(isCommitTimeoutReached(client));
+
+        // add another non-dlq partition to event type
+        NakadiTestUtils.repartitionEventType(eventType, 2);
+        publishBusinessEventWithUserDefinedPartition(eventType.getName(),
+                9, ignore -> "dummy", ignore -> String.valueOf(1));
+
+        final BiFunction<TestStreamingClient, String, List<StreamBatch>> getNonEmptyBatches =
+                (nakadiClient, partition) ->
+                nakadiClient.getJsonBatches()
+                        .stream().filter(batch -> !batch.getEvents().isEmpty() &&
+                                batch.getCursor().getPartition().equals(partition))
+                        .collect(Collectors.toList());
+        //DLQ MODE
+        client.start();
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+        Assert.assertTrue(getNonEmptyBatches.apply(client, "0")
+                .stream().allMatch(batch -> batch.getEvents().size() == 1));
+        Assert.assertTrue(getNonEmptyBatches.apply(client, "1")
+                .stream().allMatch(batch -> batch.getEvents().size() == 3));
+        Assert.assertTrue(isCommitTimeoutReached(client));
+
+        client.start();
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+        Assert.assertTrue(getNonEmptyBatches.apply(client, "0")
+                .stream().allMatch(batch -> batch.getEvents().size() == 1));
+        Assert.assertTrue(getNonEmptyBatches.apply(client, "1")
+                .stream().allMatch(batch -> batch.getEvents().size() == 3));
+        Assert.assertTrue(isCommitTimeoutReached(client));
+
+        client.start(streamBatch -> {
+            if (!streamBatch.getEvents().isEmpty() && streamBatch.getCursor().getPartition().equals("1")) {
+                // commit partition '1' cursors so it's not put into dlq mode too
+                NakadiTestUtils.commitCursors(subscription.getId(),
+                        ImmutableList.of(streamBatch.getCursor()), client.getSessionId());
+            }
+
+        });
+        // check that we skipped over offset 0 for dlq partition 0
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+        Assert.assertEquals("001-0001-000000000000000001",
+                getNonEmptyBatches.apply(client, "0").get(0).getCursor().getOffset());
+    }
+
+    @Test(timeout = 36_000)
+    public void testMultiPartitionDlqModeOnlySendsSingleEventAtATime() throws IOException {
+        final int numPartitions = 2;
+        final EventType eventType = createBusinessEventTypeWithPartitions(numPartitions);
+        publishBusinessEventWithUserDefinedPartition(eventType.getName(),
+                4, i -> UUID.randomUUID().toString(), i -> String.valueOf(i % numPartitions));
+
+        final int maxEventSendCount = 2;
+        final Subscription subscription = createAutoDLQSubscription(eventType, UnprocessableEventPolicy.SKIP_EVENT,
+                maxEventSendCount);
+        final TestStreamingClient client = TestStreamingClient
+                .create(URL, subscription.getId(), "batch_limit=2&commit_timeout=2&batch_flush_timeout=1");
+        final Supplier<List<StreamBatch>> getNonEmptyBatches = () ->
+                client.getJsonBatches()
+                        .stream().filter(batch -> !batch.getEvents().isEmpty())
+                        .collect(Collectors.toList());
+
+        client.start();
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+        Assert.assertTrue(isCommitTimeoutReached(client));
+
+        client.start();
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+        Assert.assertTrue(isCommitTimeoutReached(client));
+
+        //DLQ MODE
+        // 2 partitions * 2 events per batch * 2 retries config = 8 retries
+        for (int i = 0; i < 8; i++) {
+            client.start();
+            waitFor(() -> Assert.assertFalse(client.isRunning()));
+            Assert.assertEquals(1, getNonEmptyBatches.get().size());
+            Assert.assertEquals(1, getNonEmptyBatches.get().get(0).getEvents().size());
+            Assert.assertTrue(isCommitTimeoutReached(client));
+        }
+
+        publishBusinessEventWithUserDefinedPartition(eventType.getName(),
+                4, i -> UUID.randomUUID().toString(), i -> String.valueOf(i % numPartitions));
+
+        client.start();
+        waitFor(() -> Assert.assertFalse(client.isRunning()));
+        // check batches return to normal batch size
+        Assert.assertThat(getNonEmptyBatches.get(), hasSize(2));
+        //check that we skipped over first batch completely
+        Assert.assertThat(getNonEmptyBatches.get(), hasItem(
+                hasProperty("cursor",
+                        hasProperty("offset", equalTo("001-0001-000000000000000003")))));
     }
 
     /**
