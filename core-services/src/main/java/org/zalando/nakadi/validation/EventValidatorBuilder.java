@@ -13,9 +13,12 @@ import org.springframework.stereotype.Component;
 import org.zalando.nakadi.domain.EventCategory;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.EventTypeSchema;
+import org.zalando.nakadi.domain.Feature;
 import org.zalando.nakadi.exceptions.runtime.NoSuchSchemaException;
+import org.zalando.nakadi.service.FeatureToggleService;
 
 import java.util.Optional;
+import java.util.function.Predicate;
 
 @Component
 public class EventValidatorBuilder {
@@ -37,10 +40,12 @@ public class EventValidatorBuilder {
     };
     private static final JsonSchemaValidator METADATA_VALIDATOR = new MetadataValidator();
     private final JsonSchemaEnrichment loader;
+    private final FeatureToggleService featureToggleService;
 
     @Autowired
-    public EventValidatorBuilder(final JsonSchemaEnrichment loader) {
+    public EventValidatorBuilder(final JsonSchemaEnrichment loader, final FeatureToggleService featureToggleService) {
         this.loader = loader;
+        this.featureToggleService = featureToggleService;
     }
 
     public JsonSchemaValidator build(final EventType eventType) {
@@ -68,8 +73,13 @@ public class EventValidatorBuilder {
         for (final var validator: ASSERTED_FORMAT_VALIDATORS) {
             builder.addFormatValidator(validator);
         }
+        final Predicate<String> isFormatAsserted = (formatName) -> {
+            final Feature feature = Feature.valueOf(
+                    "ASSERT_JSON_FORMAT_" + formatName.toUpperCase().replace('-', '_'));
+            return featureToggleService.isFeatureEnabled(feature);
+        };
         for (final var validator: PROSPECTIVE_FORMAT_VALIDATORS) {
-            builder.addFormatValidator(new LoggingFormatChecker(validator, eventTypeName));
+            builder.addFormatValidator(new LoggingFormatChecker(validator, eventTypeName, isFormatAsserted));
         }
         return builder;
     }
