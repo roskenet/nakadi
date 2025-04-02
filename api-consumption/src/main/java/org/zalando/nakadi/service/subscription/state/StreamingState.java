@@ -277,7 +277,7 @@ class StreamingState extends State {
         final long currentTimeMillis = System.currentTimeMillis();
         final boolean wasCommitted = isEverythingCommitted();
         int messagesAllowedToSend = (int) getMessagesAllowedToSend();
-        boolean sentSomething = false;
+        boolean hasSentAnyEvents = false;
         for (final Map.Entry<EventTypePartition, PartitionData> e : offsets.entrySet()) {
             final EventTypePartition etp = e.getKey();
             final PartitionData partitionData = e.getValue();
@@ -322,15 +322,16 @@ class StreamingState extends State {
                     break;
                 }
 
-                sentSomething |= !toSend.isEmpty();
-
-                if (inDlqMode(partition) && sentSomething) {
-                   dlqPartitionCommitPending.add(etp);
-                   if (dlqPartitionCommitPending.size() > 1) {
-                      LOG.warn("only expected one dlq commit pending partition, however found multiple {}",
-                              dlqPartitionCommitPending);
-                   }
+                if (inDlqMode(partition) && !toSend.isEmpty()) {
+                    dlqPartitionCommitPending.add(etp);
+                    if (dlqPartitionCommitPending.size() > 1) {
+                        LOG.warn("only expected one dlq commit pending partition, however found multiple {}",
+                                dlqPartitionCommitPending);
+                    }
                 }
+                
+                hasSentAnyEvents |= !toSend.isEmpty();
+
                 flushData(etp, toSend, makeDebugMessage(partitionData));
                 if (toSend.isEmpty()) {
                     break;
@@ -354,7 +355,7 @@ class StreamingState extends State {
                     messagesAllowedToSend);
             deltaSize -= heaviestPartition.getValue().getBytesInMemory();
 
-            sentSomething = true;
+            hasSentAnyEvents = true;
             flushData(
                     heaviestPartition.getKey(),
                     events,
@@ -367,7 +368,7 @@ class StreamingState extends State {
 
         getContext().getKpiCollector().checkAndSendKpi();
 
-        if (wasCommitted && sentSomething) {
+        if (wasCommitted && hasSentAnyEvents) {
             this.lastCommitMillis = System.currentTimeMillis();
         }
         pollPaused = messagesAllowedToSend <= 0;
