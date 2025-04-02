@@ -19,6 +19,7 @@ import org.zalando.nakadi.repository.LowLevelConsumer;
 import org.zalando.nakadi.utils.TestUtils;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -48,7 +49,7 @@ public class NakadiKafkaConsumerTest {
 
     private static final String TOPIC = TestUtils.randomValidEventTypeName();
     private static final int PARTITION = randomUInt();
-    private static final long POLL_TIMEOUT = randomULong();
+    private static final Duration POLL_TIMEOUT = Duration.ofMillis(randomULong());
     private static final Date CREATED_AT = new Date();
 
     private static KafkaCursor kafkaCursor(final String topic, final int partition, final long offset) {
@@ -126,7 +127,7 @@ public class NakadiKafkaConsumerTest {
         final ConsumerRecords<byte[], byte[]> emptyRecords = new ConsumerRecords<>(ImmutableMap.of());
 
         final KafkaConsumer<byte[], byte[]> kafkaConsumerMock = mock(KafkaConsumer.class);
-        final ArgumentCaptor<Long> pollTimeoutCaptor = ArgumentCaptor.forClass(Long.class);
+        final ArgumentCaptor<Duration> pollTimeoutCaptor = ArgumentCaptor.forClass(Duration.class);
         when(kafkaConsumerMock.poll(pollTimeoutCaptor.capture())).thenReturn(consumerRecords, emptyRecords);
 
         // we mock KafkaConsumer anyway, so the cursors we pass are not really important
@@ -202,13 +203,13 @@ public class NakadiKafkaConsumerTest {
         verify(kafkaConsumerMock, times(1)).close();
     }
 
-    private ConsumerRecord createRecord(final String topic,
+    private ConsumerRecord<byte[], byte[]> createRecord(final String topic,
                                         final int partition,
                                         final long offset,
                                         final long timestamp,
                                         final byte[] key,
                                         final byte[] value) {
-        return new ConsumerRecord(topic, partition, offset, timestamp,
+        return new ConsumerRecord<>(topic, partition, offset, timestamp,
                 TimestampType.CREATE_TIME, 0, 0, key, value, new RecordHeaders(), Optional.empty());
     }
 

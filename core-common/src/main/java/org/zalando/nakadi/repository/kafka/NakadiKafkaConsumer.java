@@ -11,6 +11,7 @@ import org.zalando.nakadi.domain.TestProjectIdHeader;
 import org.zalando.nakadi.repository.LowLevelConsumer;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -22,11 +23,11 @@ import java.util.stream.Collectors;
 public class NakadiKafkaConsumer implements LowLevelConsumer {
 
     private final Consumer<byte[], byte[]> kafkaConsumer;
-    private final long pollTimeout;
+    private final Duration pollTimeout;
 
     public NakadiKafkaConsumer(
             final Consumer<byte[], byte[]> kafkaConsumer,
-            final long pollTimeout) {
+            final Duration pollTimeout) {
         this.kafkaConsumer = kafkaConsumer;
         this.pollTimeout = pollTimeout;
         // define topic/partitions to consume from

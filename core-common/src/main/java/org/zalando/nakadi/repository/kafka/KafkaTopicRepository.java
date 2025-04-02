@@ -55,6 +55,7 @@ import org.zalando.nakadi.service.TracingService;
 import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -698,7 +699,7 @@ public class KafkaTopicRepository implements TopicRepository {
 
         final NakadiKafkaConsumer consumer = new NakadiKafkaConsumer(
                 kafkaFactory.getConsumer(clientId),
-                nakadiSettings.getKafkaPollTimeoutMs());
+                Duration.ofMillis(nakadiSettings.getKafkaPollTimeoutMs()));
         try {
             consumer.reassign(cursors);
             return consumer;
