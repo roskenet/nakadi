@@ -277,7 +277,7 @@ class StreamingState extends State {
         final long currentTimeMillis = System.currentTimeMillis();
         final boolean wasCommitted = isEverythingCommitted();
         int messagesAllowedToSend = (int) getMessagesAllowedToSend();
-        boolean sentSomething = false;
+        boolean hasSentAnyEvents = false;
         for (final Map.Entry<EventTypePartition, PartitionData> e : offsets.entrySet()) {
             final EventTypePartition etp = e.getKey();
             final PartitionData partitionData = e.getValue();
@@ -329,8 +329,8 @@ class StreamingState extends State {
                                 dlqPartitionCommitPending);
                     }
                 }
-
-                sentSomething |= !toSend.isEmpty();
+                
+                hasSentAnyEvents |= !toSend.isEmpty();
 
                 flushData(etp, toSend, makeDebugMessage(partitionData));
                 if (toSend.isEmpty()) {
@@ -355,7 +355,7 @@ class StreamingState extends State {
                     messagesAllowedToSend);
             deltaSize -= heaviestPartition.getValue().getBytesInMemory();
 
-            sentSomething = true;
+            hasSentAnyEvents = true;
             flushData(
                     heaviestPartition.getKey(),
                     events,
@@ -368,7 +368,7 @@ class StreamingState extends State {
 
         getContext().getKpiCollector().checkAndSendKpi();
 
-        if (wasCommitted && sentSomething) {
+        if (wasCommitted && hasSentAnyEvents) {
             this.lastCommitMillis = System.currentTimeMillis();
         }
         pollPaused = messagesAllowedToSend <= 0;
