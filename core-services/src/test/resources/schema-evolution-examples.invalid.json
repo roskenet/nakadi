@@ -655,5 +655,34 @@
       ]
     },
     "errors": ["SCHEMA_REMOVED #/items", "NUMBER_OF_ITEMS_CHANGED #/"]
+  },
+  {
+    "description": "Give up on recursive references (for normalization, with undefined outcome)",
+    "original_schema": {
+      "type": "object",
+      "properties": {
+        "something": {
+          "type": "string"
+        }
+      }
+    },
+    "update_schema": {
+      "$ref": "#/definitions/SubType1",
+      "definitions": {
+        "SubType1": {
+          "$ref": "#/definitions/SubType2"
+        },
+        "SubType2": {
+          "$ref": "#/definitions/SubType1",
+          "type": "object",
+          "properties": {
+            "something": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "errors": ["TYPE_CHANGED #/"]
   }
 ]

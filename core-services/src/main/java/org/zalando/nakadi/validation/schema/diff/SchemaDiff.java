@@ -22,6 +22,8 @@ import static org.zalando.nakadi.domain.SchemaChange.Type.TYPE_CHANGED;
 import static org.zalando.nakadi.domain.SchemaChange.Type.TYPE_NARROWED;
 
 public class SchemaDiff {
+    private static final int REFERENCE_SCHEMA_NESTING_LIMIT = 5;
+
     public List<SchemaChange> collectChanges(final Schema original, final Schema update) {
         final SchemaDiffState state = new SchemaDiffState();
 
@@ -106,8 +108,11 @@ public class SchemaDiff {
 
     private static Schema normalize(final Schema schemaIn) {
         Schema schema = schemaIn;
-        while (schema instanceof ReferenceSchema) {
+        // N.B.: workaround to avoid infinite loop on bad inputs with infinite references of references.
+        int i = 0;
+        while (schema instanceof ReferenceSchema && i < REFERENCE_SCHEMA_NESTING_LIMIT) {
             schema = ((ReferenceSchema) schema).getReferredSchema();
+            i++;
         }
         // Tricky part. EmptySchema is the same as an empty ObjectSchema.
         if (schema instanceof EmptySchema) {
