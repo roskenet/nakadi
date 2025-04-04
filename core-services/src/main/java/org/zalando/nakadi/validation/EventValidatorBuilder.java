@@ -17,6 +17,8 @@ import org.zalando.nakadi.domain.Feature;
 import org.zalando.nakadi.exceptions.runtime.NoSuchSchemaException;
 import org.zalando.nakadi.service.FeatureToggleService;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 
@@ -38,6 +40,17 @@ public class EventValidatorBuilder {
             new ISO3166Alpha2CountryCodeValidator(), // format: iso-3166-alpha-2
             new BCP47LanguageTagValidator(), // format: bcp47
     };
+    private static final Map<String, Feature> FORMAT_TO_FEATURE_MAPPING;
+    static {
+        FORMAT_TO_FEATURE_MAPPING = new HashMap<>();
+        for (final var validator: PROSPECTIVE_FORMAT_VALIDATORS) {
+            final var formatName = validator.formatName();
+            final var feature = Feature.valueOf(
+                    "ASSERT_JSON_FORMAT_" + formatName.toUpperCase().replace('-', '_'));
+            FORMAT_TO_FEATURE_MAPPING.put(formatName, feature);
+        }
+    }
+
     private static final JsonSchemaValidator METADATA_VALIDATOR = new MetadataValidator();
     private final JsonSchemaEnrichment loader;
     private final FeatureToggleService featureToggleService;
@@ -73,11 +86,8 @@ public class EventValidatorBuilder {
         for (final var validator: ASSERTED_FORMAT_VALIDATORS) {
             builder.addFormatValidator(validator);
         }
-        final Predicate<String> isFormatAsserted = (formatName) -> {
-            final Feature feature = Feature.valueOf(
-                    "ASSERT_JSON_FORMAT_" + formatName.toUpperCase().replace('-', '_'));
-            return featureToggleService.isFeatureEnabled(feature);
-        };
+        final Predicate<String> isFormatAsserted =
+                (formatName) -> featureToggleService.isFeatureEnabled(FORMAT_TO_FEATURE_MAPPING.get(formatName));
         for (final var validator: PROSPECTIVE_FORMAT_VALIDATORS) {
             builder.addFormatValidator(new LoggingFormatChecker(validator, eventTypeName, isFormatAsserted));
         }
