@@ -106,7 +106,7 @@ public class SchemaDiff {
 
     private static Schema normalize(final Schema schemaIn) {
         Schema schema = schemaIn;
-        if (schema instanceof ReferenceSchema) {
+        while (schema instanceof ReferenceSchema) {
             schema = ((ReferenceSchema) schema).getReferredSchema();
         }
         // Tricky part. EmptySchema is the same as an empty ObjectSchema.
