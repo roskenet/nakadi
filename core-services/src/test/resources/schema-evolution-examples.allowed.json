@@ -1,0 +1,89 @@
+[
+  {
+    "description": "Empty sub-schema is object with empty properties",
+    "original_schema": {},
+    "update_schema": {
+      "properties": {}
+    }
+  },
+  {
+    "description": "References are resolve to compare effective schemas (var 1)",
+    "original_schema": {
+      "type": "object",
+      "properties": {
+        "something": {
+          "type": "string"
+        }
+      }
+    },
+    "update_schema": {
+      "$ref": "#/definitions/SubType",
+      "definitions": {
+        "SubType": {
+          "type": "object",
+          "properties": {
+            "something": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "description": "References are resolve to compare effective schemas (var 2)",
+    "original_schema": {
+      "$ref": "#/$defs/MyType",
+      "$defs": {
+        "MyType": {
+          "type": "object",
+          "properties": {
+            "something": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "update_schema": {
+      "$ref": "#/definitions/SubType",
+      "definitions": {
+        "SubType": {
+          "type": "object",
+          "properties": {
+            "something": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "description": "References are resolve to compare effective schemas (var 3: ref of ref)",
+    "original_schema": {
+      "type": "object",
+      "properties": {
+        "something": {
+          "type": "string"
+        }
+      }
+    },
+    "update_schema": {
+      "$ref": "#/definitions/SubType1",
+      "definitions": {
+        "SubType1": {
+          "$ref": "#/definitions/SubType2"
+        },
+        "SubType2": {
+          "type": "object",
+          "properties": {
+            "something": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+]
