@@ -124,7 +124,7 @@ the right Gradle version if it's not already installed.
 
 To get the source, clone the git repository.
 ```sh
-git clone git@github.bus.zalan.do:aruha/nakadi.git
+git clone git@github.com:zalando-build/aruha-nakadi.git
 ```
 ### Building
 

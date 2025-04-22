@@ -1,6 +1,6 @@
 # Nakadi-plugin-api
 
-Nakadi-plugin-api is an API to develop extensions for [Nakadi](https://github.bus.zalan.do/aruha/nakadi).
+Nakadi-plugin-api is an API to develop extensions for [Nakadi](https://github.com/zalando-build/aruha-nakadi).
 
 ## Current plugin stubs
 
