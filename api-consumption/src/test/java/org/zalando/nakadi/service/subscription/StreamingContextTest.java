@@ -7,10 +7,10 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.EncoderFactory;
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
 import org.zalando.nakadi.cache.EventTypeCache;
+import org.zalando.nakadi.cache.SubscriptionCache;
 import org.zalando.nakadi.domain.ConsumedEvent;
 import org.zalando.nakadi.domain.EventCategory;
 import org.zalando.nakadi.domain.EventType;
@@ -23,11 +23,12 @@ import org.zalando.nakadi.exceptions.runtime.NakadiRuntimeException;
 import org.zalando.nakadi.generated.avro.Envelope;
 import org.zalando.nakadi.generated.avro.Metadata;
 import org.zalando.nakadi.mapper.NakadiRecordMapper;
+import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.repository.kafka.KafkaRecordDeserializer;
 import org.zalando.nakadi.security.Client;
+import org.zalando.nakadi.service.BlacklistService;
 import org.zalando.nakadi.service.EventStreamChecks;
 import org.zalando.nakadi.service.FeatureToggleService;
-import org.zalando.nakadi.service.LocalSchemaRegistry;
 import org.zalando.nakadi.service.SchemaProviderService;
 import org.zalando.nakadi.service.subscription.model.Session;
 import org.zalando.nakadi.service.subscription.state.CleanupState;
@@ -35,6 +36,7 @@ import org.zalando.nakadi.service.subscription.state.DummyState;
 import org.zalando.nakadi.service.subscription.state.State;
 import org.zalando.nakadi.service.subscription.zk.ZkSubscriptionClient;
 import org.zalando.nakadi.util.ThreadUtils;
+import org.zalando.nakadi.utils.TestUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -52,7 +54,6 @@ import java.util.function.Predicate;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -177,7 +178,6 @@ public class StreamingContextTest {
     }
 
     @Test
-    @Ignore
     public void testOnNodeShutdown() throws Exception {
         final StreamingContext ctxSpy = Mockito.spy(createTestContext(null));
         final Thread t = new Thread(() -> {
@@ -193,7 +193,7 @@ public class StreamingContextTest {
         t.start();
         t.join(1000);
 
-        new Thread(() -> ctxSpy.terminateStream()).start();
+        new Thread(ctxSpy::terminateStream).start();
         ThreadUtils.sleep(2000);
 
         Mockito.verify(ctxSpy).switchState(Mockito.isA(CleanupState.class));
@@ -215,7 +215,7 @@ public class StreamingContextTest {
                 .build();
 
         doThrow(new NakadiRuntimeException(new Exception("Failed!"))).when(zkMock).registerSession(any());
-        assertThrows(NakadiRuntimeException.class, () -> context.registerSession());
+        assertThrows(NakadiRuntimeException.class, context::registerSession);
 
         // CleanupState calls context.unregisterSession() in finally block
         context.unregisterSession();
@@ -237,22 +237,29 @@ public class StreamingContextTest {
         final var et = new EventType();
         et.setCategory(EventCategory.BUSINESS);
 
-        final var eventStreamCheck = mock(EventStreamChecks.class);
         final var schemaProvider = mock(SchemaProviderService.class);
         final var featureToggleService = mock(FeatureToggleService.class);
         final var etCache = mock(EventTypeCache.class);
-        final var deserializer = new KafkaRecordDeserializer(
-                new NakadiRecordMapper(mock(LocalSchemaRegistry.class)), schemaProvider);
+
+        final AuthorizationService authorizationService = mock(AuthorizationService.class);
+        final var eventStreamCheck = new EventStreamChecks(
+                mock(BlacklistService.class),
+                authorizationService,
+                new KafkaRecordDeserializer(
+                        new NakadiRecordMapper(TestUtils.getLocalSchemaRegistry()),
+                        schemaProvider
+                ),
+                mock(SubscriptionCache.class),
+                etCache
+        );
 
         final Schema schema = Schema.createRecord("Foo", null, null, false);
         schema.setFields(List.of(new Schema.Field("name", Schema.create(Schema.Type.STRING), null, null)));
 
-        when(schemaProvider.getAvroSchema(incorrectEventTypeName, "1.0.0")).
-                thenReturn(schema);
-        when(eventStreamCheck.isConsumptionBlocked(any())).
-                thenReturn(false);
-        when(etCache.getEventType(eq(supportedEventTypeName))).thenReturn(et);
+        when(schemaProvider.getAvroSchema(incorrectEventTypeName, "1.0.0")).thenReturn(schema);
+        when(etCache.getEventType(supportedEventTypeName)).thenReturn(et);
         when(featureToggleService.isFeatureEnabled(Feature.SKIP_MISPLACED_EVENTS)).thenReturn(true);
+        when(authorizationService.isAuthorized(any(), any())).thenReturn(true);
 
         final Client client = mock(Client.class);
         when(client.getClientId()).thenReturn("consumingAppId");
@@ -272,8 +279,6 @@ public class StreamingContextTest {
         final StreamingContext context = new StreamingContext.Builder()
                 .setSubscription(subscription)
                 .setEventStreamChecks(eventStreamCheck)
-                .setKafkaRecordDeserializer(deserializer)
-                .setEventTypeCache(etCache)
                 .setKafkaPollTimeout(0)
                 .setParameters(spMock)
                 .setFeatureToggleService(featureToggleService)
@@ -282,9 +287,17 @@ public class StreamingContextTest {
         final String noMetadataEvent = "{}";
         final String noEventTypeEvent = "{\"metadata\": {}}";
         final String incorrectEvent = String.
-                format("{\"metadata\": {\"event_type\": \"%s\"}, \"foo\": \"bar\"}", incorrectEventTypeName);
+                format("{\"metadata\": {"
+                        + "\"event_type\": \"%s\","
+                        + "\"occurred_at\": \"2024-10-10T15:42:03.746Z\","
+                        + "\"received_at\": \"2024-10-10T15:42:03.747Z\""
+                        + "}, \"foo\": \"bar\"}", incorrectEventTypeName);
         final String correctEvent = String.
-                format("{\"metadata\": {\"event_type\": \"%s\"}, \"foo\": \"bar\"}", supportedEventTypeName);
+                format("{\"metadata\": {"
+                        + "\"event_type\": \"%s\","
+                        + "\"occurred_at\": \"2024-10-10T15:42:03.746Z\","
+                        + "\"received_at\": \"2024-10-10T15:42:03.747Z\""
+                        + "}, \"foo\": \"bar\"}", supportedEventTypeName);
 
         final var cursor = NakadiCursor.of(Timeline.createTimeline(
                 supportedEventTypeName, 0, new Storage(null, Storage.Type.KAFKA), null, null),
@@ -293,16 +306,16 @@ public class StreamingContextTest {
                 bytes -> context.isConsumptionBlocked(
                         new ConsumedEvent(bytes, cursor, 0L, null, Collections.emptyMap(), Optional.empty()));
 
-        Assert.assertEquals(true, isConsumptionBlocked.test(noMetadataEvent.getBytes()));
-        Assert.assertEquals(true, isConsumptionBlocked.test(noEventTypeEvent.getBytes()));
-        Assert.assertEquals(true, isConsumptionBlocked.test(incorrectEvent.getBytes()));
-        Assert.assertEquals(false, isConsumptionBlocked.test(correctEvent.getBytes()));
+        Assert.assertTrue(isConsumptionBlocked.test(noMetadataEvent.getBytes()));
+        Assert.assertTrue(isConsumptionBlocked.test(noEventTypeEvent.getBytes()));
+        Assert.assertTrue(isConsumptionBlocked.test(incorrectEvent.getBytes()));
+        Assert.assertFalse(isConsumptionBlocked.test(correctEvent.getBytes()));
 
         final var incorrectRecord = getAvroRecordBytes(incorrectEventTypeName, schema);
         final var correctRecord = getAvroRecordBytes(supportedEventTypeName, schema);
 
-        Assert.assertEquals(true, isConsumptionBlocked.test(incorrectRecord));
-        Assert.assertEquals(false, isConsumptionBlocked.test(correctRecord));
+        Assert.assertTrue(isConsumptionBlocked.test(incorrectRecord));
+        Assert.assertFalse(isConsumptionBlocked.test(correctRecord));
     }
 
     private static byte[] getAvroRecordBytes(final String eventTypeName,

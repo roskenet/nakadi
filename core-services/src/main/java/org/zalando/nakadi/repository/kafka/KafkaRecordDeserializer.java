@@ -59,6 +59,9 @@ public class KafkaRecordDeserializer implements RecordDeserializer {
     public String getEventTypeName(final  byte[] data) throws IOException {
         if (data[0] == AVRO_V1_HEADER[0] && data[1] == AVRO_V1_HEADER[1]) {
             final Envelope envelope = nakadiRecordMapper.fromBytesEnvelope(data);
+            if (envelope.getMetadata() == null || envelope.getMetadata().getEventType() == null) {
+                return null;
+            }
             return envelope.getMetadata().getEventType();
         } else {
             final MetadataHolder metadataHolder = OBJECT_MAPPER.readValue(data, MetadataHolder.class);

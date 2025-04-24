@@ -77,12 +77,14 @@ public class EventStreamReadingAT extends BaseAT {
     //   },
     //   "foo": "bar_<N>"
     // }
-    private static final Function<Integer, String> DUMMY_EVENT = i -> {
+    private final Function<Integer, String> dummyEventGenerator = i -> {
         final ObjectNode event = JSON_MAPPER.createObjectNode();
         final ObjectNode metadata = JSON_MAPPER.createObjectNode();
         event.set("metadata", metadata);
         metadata.put("eid", UUID.randomUUID().toString());
+        metadata.put("event_type", eventType.getName());
         metadata.put("occurred_at", "2016-06-14T13:00:00Z");
+        metadata.put("received_at", "2016-06-14T13:00:10Z");
         event.put("foo", "bar_" + i);
         return event.toString();
     };
@@ -124,7 +126,7 @@ public class EventStreamReadingAT extends BaseAT {
         // ARRANGE //
         // push events to one of the partitions
         final int eventsPushed = 2;
-        kafkaHelper.writeMultipleMessageToPartition(TEST_PARTITION, topicName, DUMMY_EVENT, eventsPushed);
+        kafkaHelper.writeMultipleMessageToPartition(TEST_PARTITION, topicName, dummyEventGenerator, eventsPushed);
 
         // ACT //
         final Response response = readEvents(Optional.empty());
@@ -137,7 +139,7 @@ public class EventStreamReadingAT extends BaseAT {
 
         // validate amount of batches and structure of each batch
         Assert.assertThat(batches, Matchers.hasSize(PARTITIONS_NUM));
-        batches.forEach(batch -> validateBatchStructure(batch));
+        batches.forEach(this::validateBatchStructure);
 
         // find the batch where we expect to see the messages we pushed
         final Map<String, Object> batchToCheck = batches
@@ -165,7 +167,7 @@ public class EventStreamReadingAT extends BaseAT {
         // ARRANGE //
         // push events to one of the partitions
         final int eventsPushed = 2;
-        kafkaHelper.writeMultipleMessageToPartition(TEST_PARTITION, topicName, DUMMY_EVENT, eventsPushed);
+        kafkaHelper.writeMultipleMessageToPartition(TEST_PARTITION, topicName, dummyEventGenerator, eventsPushed);
 
         // ACT //
         final Response response = RestAssured.given()
@@ -191,7 +193,7 @@ public class EventStreamReadingAT extends BaseAT {
         // push events to one of the partitions so that they don't fit into one branch
         final int batchLimit = 5;
         final int eventsPushed = 8;
-        kafkaHelper.writeMultipleMessageToPartition(TEST_PARTITION, topicName, DUMMY_EVENT, eventsPushed);
+        kafkaHelper.writeMultipleMessageToPartition(TEST_PARTITION, topicName, dummyEventGenerator, eventsPushed);
 
         // ACT //
         final Response response = RestAssured.given()

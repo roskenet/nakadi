@@ -10,7 +10,6 @@ import org.zalando.nakadi.cache.EventTypeCache;
 import org.zalando.nakadi.domain.Subscription;
 import org.zalando.nakadi.exceptions.runtime.InternalNakadiException;
 import org.zalando.nakadi.exceptions.runtime.NoSuchEventTypeException;
-import org.zalando.nakadi.repository.kafka.KafkaRecordDeserializer;
 import org.zalando.nakadi.service.AuthorizationValidator;
 import org.zalando.nakadi.service.ConsumptionKpiCollectorFactory;
 import org.zalando.nakadi.service.CursorConverter;
@@ -50,7 +49,6 @@ public class SubscriptionStreamerFactory {
     private final EventStreamChecks eventStreamChecks;
     private final long streamMemoryLimitBytes;
     private final ConsumptionKpiCollectorFactory consumptionKpiCollectorFactory;
-    private final KafkaRecordDeserializer kafkaRecordDeserializer;
     private final FeatureToggleService featureToggleService;
     private final EventPublisher eventPublisher;
     private final UUIDGenerator uuidGenerator;
@@ -72,7 +70,6 @@ public class SubscriptionStreamerFactory {
             final EventStreamChecks eventStreamChecks,
             @Value("${nakadi.subscription.maxStreamMemoryBytes}") final long streamMemoryLimitBytes,
             final ConsumptionKpiCollectorFactory consumptionKpiCollectorFactory,
-            final KafkaRecordDeserializer kafkaRecordDeserializer,
             final FeatureToggleService featureToggleService,
             final EventPublisher eventPublisher,
             @Value("${nakadi.dlq.storeEventTypeName}") final String deadLetterQueueEventTypeName,
@@ -91,7 +88,6 @@ public class SubscriptionStreamerFactory {
         this.eventStreamChecks = eventStreamChecks;
         this.streamMemoryLimitBytes = streamMemoryLimitBytes;
         this.consumptionKpiCollectorFactory = consumptionKpiCollectorFactory;
-        this.kafkaRecordDeserializer = kafkaRecordDeserializer;
         this.featureToggleService = featureToggleService;
         this.eventPublisher = eventPublisher;
         this.deadLetterQueueEventTypeName = deadLetterQueueEventTypeName;
@@ -130,8 +126,6 @@ public class SubscriptionStreamerFactory {
                 .setKpiCollector(consumptionKpiCollectorFactory.createForHiLA(
                         subscription.getId(), streamParameters.getConsumingClient()))
                 .setCursorOperationsService(cursorOperationsService)
-                .setKafkaRecordDeserializer(kafkaRecordDeserializer)
-                .setEventTypeCache(eventTypeCache)
                 .setFeatureToggleService(featureToggleService)
                 .setEventPublisher(eventPublisher)
                 .setDeadLetterQueueEventTypeName(deadLetterQueueEventTypeName)
