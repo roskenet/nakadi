@@ -1,3 +1,10 @@
+
+plugins {
+    id 'nu.studer.credentials' version '3.0'
+}
+
+def runningLocally = System.getenv("CDP_BUILD_VERSION") == null
+
 subprojects {
     buildscript {
         ext {
@@ -8,10 +15,22 @@ subprojects {
             maven {
                 url "https://plugins.gradle.org/m2/"
             }
+
         }
     }
 
     repositories {
+        maven {
+            name = "zalando"
+            url = uri("https://maven.zalando.net/repository/releases")
+
+            if (runningLocally) {
+                credentials {
+                    username zalandoUsername
+                    password = project.credentials.forKey("zalandoPassword")
+                }
+            }
+        }
         mavenCentral()
         maven { url 'https://jitpack.io' }
     }
