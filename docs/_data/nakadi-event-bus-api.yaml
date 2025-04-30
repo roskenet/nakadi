@@ -2197,6 +2197,61 @@ paths:
           schema:
             $ref: '#/definitions/AvroSchema'
 
+  /debug/eval-filter:
+    post:
+      tags:
+        - debug
+      description: |
+        Accepts a JSON event and a filter expression and returns a boolean result.
+        Can be used to simulate the behavior of the filters that are applicable to all the event streaming endpoints.
+      parameters:
+        - name: eval_filter_request
+          in: body
+          schema:
+            description: Request body for evaluating a filter expression.
+            type: object
+            properties:
+              event:
+                type: object
+                example: |
+                    {
+                        "metadata": {
+                            "published_by": "order-processor-v2",
+                            "event_type": "order-processor-v2.order.created",
+                            "occurred_at": "2015-12-19T16:39:57-08:00"
+                        },
+                        "data": {
+                            "order_id": 123456,
+                            "customer_id": 654321
+                        }
+                    }
+              filter:
+                type: string
+                example: |
+                  e.metadata.published_by LIKE 'order-processor-v%'
+            required:
+              - event
+              - filter
+          required: true
+      responses:
+        '200':
+          description: The result of applying the filter on the event.
+          schema:
+            type: object
+            properties:
+              result:
+                type: boolean
+                description: |
+                  Result of evaluating the filter expression against the event.
+                  True means that the event would be accepted by the filter and thus sent to the consumer.
+                example: true
+              parsed_filter:
+                type: string
+                description: |
+                  The stringified AST of the filter expression. May be useful to debug misbehaving filters.
+                example: |
+                  (e.metadata.published_by LIKE 'order-processor-v%')
+
 # ################################### #
 #                                     #
 #             Definitions             #
