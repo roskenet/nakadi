@@ -35,50 +35,28 @@ public class DebugController {
             final Library library = new Library();
             final EventsWrapper predicateInput = library.singletonInput(eventBytes);
 
-            // TODO use Problem class for error responses
             Criterion criterion;
             Function<EventsWrapper, Boolean> compiledPredicate;
             final Boolean result;
             try {
                 criterion = library.parseExpression(evalFilterRequest.getFilter());
             } catch (final SqlParserException e) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                        "error", "SQL_PARSER_ERROR",
-                        "message", "filter expression could not be parsed",
-                        "caused_by", Map.of(
-                                "exception", e.getClass().getName(),
-                                "message", e.getMessage())
-                ));
+                return reportError(HttpStatus.BAD_REQUEST, "SQL_PARSER_ERROR", "filter expression could not be parsed", e);
             } catch (final Exception e) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                        "error", "SQL_PARSER_UNEXPECTED_ERROR",
-                        "message", "an unexpected error occurred while parsing the filter expression",
-                        "caused_by", Map.of(
-                                "exception", e.getClass().getName(),
-                                "message", e.getMessage())
-                ));
+                return reportError(HttpStatus.INTERNAL_SERVER_ERROR, "SQL_PARSER_UNEXPECTED_ERROR",
+                        "an unexpected error occurred while parsing the filter expression", e);
             }
             try {
                 compiledPredicate = library.compilePredicate(criterion);
             } catch (final Exception e) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                        "error", "FILTER_COMPILATION_ERROR",
-                        "message", "filter expression could not be compiled",
-                        "caused_by", Map.of(
-                                "exception", e.getClass().getName(),
-                                "message", e.getMessage())
-                ));
+                return reportError(HttpStatus.INTERNAL_SERVER_ERROR, "FILTER_COMPILATION_ERROR",
+                        "filter expression could not be compiled", e);
             }
             try {
                 result = compiledPredicate.apply(predicateInput);
             } catch (final Exception e) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                        "error", "FILTER_EVALUATION_ERROR",
-                        "message", "evaluation of filter expression on the event resulted in an exception",
-                        "caused_by", Map.of(
-                                "exception", e.getClass().getName(),
-                                "message", e.getMessage())
-                ));
+                return reportError(HttpStatus.INTERNAL_SERVER_ERROR, "FILTER_EVALUATION_ERROR",
+                        "evaluation of filter expression on the event resulted in an exception", e);
             }
 
             final EvalFilterResponse response = new EvalFilterResponse();
@@ -86,14 +64,20 @@ public class DebugController {
             response.setResult(result);
             return ResponseEntity.status(HttpStatus.OK).body(response);
         } catch (final Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                    "error", "INTERNAL_SERVER_ERROR",
-                    "message", "something unexpected went wrong",
-                    "caused_by", Map.of(
-                            "exception", e.getClass().getName(),
-                            "message", e.getMessage())
-            ));
+            return reportError(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR",
+                    "something unexpected went wrong", e);
         }
+    }
+
+    private ResponseEntity<?> reportError(final HttpStatus httpStatus, final String error, final String message, final Exception e) {
+        // TODO use Problem class for error responses
+        return ResponseEntity.status(httpStatus).body(Map.of(
+                "error", error,
+                "message", message,
+                "caused_by", Map.of(
+                        "exception", e.getClass().getName(),
+                        "message", e.getMessage())
+        ));
     }
 
 }
