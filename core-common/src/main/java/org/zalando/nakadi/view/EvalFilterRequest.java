@@ -13,7 +13,7 @@ public class EvalFilterRequest {
         return event;
     }
 
-    public EvalFilterRequest setEvent(JsonNode event) {
+    public EvalFilterRequest setEvent(final JsonNode event) {
         this.event = event;
         return this;
     }
@@ -22,15 +22,19 @@ public class EvalFilterRequest {
         return filter;
     }
 
-    public EvalFilterRequest setFilter(String filter) {
+    public EvalFilterRequest setFilter(final String filter) {
         this.filter = filter;
         return this;
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         EvalFilterRequest that = (EvalFilterRequest) o;
         return Objects.equals(event, that.event) && Objects.equals(filter, that.filter);
     }

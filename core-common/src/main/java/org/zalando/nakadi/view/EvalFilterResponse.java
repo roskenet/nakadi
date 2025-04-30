@@ -14,7 +14,7 @@ public class EvalFilterResponse {
         return result;
     }
 
-    public EvalFilterResponse setResult(boolean result) {
+    public EvalFilterResponse setResult(final boolean result) {
         this.result = result;
         return this;
     }
@@ -23,15 +23,19 @@ public class EvalFilterResponse {
         return parsedFilter;
     }
 
-    public EvalFilterResponse setParsedFilter(String parsedFilter) {
+    public EvalFilterResponse setParsedFilter(final String parsedFilter) {
         this.parsedFilter = parsedFilter;
         return this;
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         EvalFilterResponse that = (EvalFilterResponse) o;
         return result == that.result && Objects.equals(parsedFilter, that.parsedFilter);
     }
