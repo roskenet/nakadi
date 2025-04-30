@@ -38,8 +38,8 @@ public class DebugController {
             final FilterExpressionCompiler library = new FilterExpressionCompiler();
             final EventsWrapper predicateInput = library.singletonInput(eventBytes);
 
-            Criterion criterion;
-            Function<EventsWrapper, Boolean> compiledPredicate;
+            final Criterion criterion;
+            final Function<EventsWrapper, Boolean> compiledPredicate;
             final Boolean result;
             try {
                 criterion = library.parseExpression(evalFilterRequest.getFilter());
