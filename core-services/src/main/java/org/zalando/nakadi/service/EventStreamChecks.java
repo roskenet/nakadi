@@ -7,6 +7,7 @@ import org.zalando.nakadi.cache.EventTypeCache;
 import org.zalando.nakadi.cache.SubscriptionCache;
 import org.zalando.nakadi.domain.ConsumedEvent;
 import org.zalando.nakadi.domain.EventCategory;
+import org.zalando.nakadi.domain.Feature;
 import org.zalando.nakadi.domain.HeaderTag;
 import org.zalando.nakadi.exceptions.runtime.NakadiRuntimeException;
 import org.zalando.nakadi.exceptions.runtime.NoSuchSubscriptionException;
@@ -39,17 +40,20 @@ public class EventStreamChecks {
     private final SubscriptionCache subscriptionCache;
     private final EventTypeCache eventTypeCache;
     private final KafkaRecordDeserializer kafkaRecordDeserializer;
+    private final FeatureToggleService featureToggleService;
 
     public EventStreamChecks(
             final BlacklistService blacklistService,
             final AuthorizationService authorizationService,
             final KafkaRecordDeserializer kafkaRecordDeserializer,
             final SubscriptionCache subscriptionCache,
+            final FeatureToggleService featureToggleService,
             final EventTypeCache eventTypeCache) {
         this.blacklistService = blacklistService;
         this.authorizationService = authorizationService;
         this.subscriptionCache = subscriptionCache;
         this.eventTypeCache = eventTypeCache;
+        this.featureToggleService = featureToggleService;
         this.kafkaRecordDeserializer = kafkaRecordDeserializer;
     }
 
@@ -102,26 +106,30 @@ public class EventStreamChecks {
      * Only applies to event types with category other than UNDEFINED.
      * 
      * @param event The event to check for misplacement
-     * @return true if the event is misplaced, false otherwise
+     * @return true if the event is misplaced and feature flag is enabled, false otherwise
      * @throws NakadiRuntimeException if metadata parsing fails
      */
-    public boolean isMisplacedEvent(final ConsumedEvent event) {
-        final String expectedEventTypeName = event.getPosition().getEventType();
-        if (eventTypeCache.getEventType(expectedEventTypeName).getCategory() != EventCategory.UNDEFINED) {
-            try {
-                final String actualEventTypeName = kafkaRecordDeserializer.getEventTypeName(event.getEvent());
-                if (!expectedEventTypeName.equals(actualEventTypeName)) {
-                    LOG.warn("Consumed event for event type '{}', but expected '{}' (at position {}), topic id: {}",
-                            actualEventTypeName, expectedEventTypeName, event.getPosition(),
-                            event.getConsumerTags().get(HeaderTag.DEBUG_PUBLISHER_TOPIC_ID));
-                    return true;
+    public boolean shouldSkipMisplacedEvent(final ConsumedEvent event) {
+        if (featureToggleService.isFeatureEnabled(Feature.SKIP_MISPLACED_EVENTS)) {
+            final String expectedEventTypeName = event.getPosition().getEventType();
+            if (eventTypeCache.getEventType(expectedEventTypeName).getCategory() != EventCategory.UNDEFINED) {
+                try {
+                    final String actualEventTypeName = kafkaRecordDeserializer.getEventTypeName(event.getEvent());
+                    if (!expectedEventTypeName.equals(actualEventTypeName)) {
+                        LOG.warn("Consumed event for event type '{}', but expected '{}' (at position {}), topic id: {}",
+                                actualEventTypeName, expectedEventTypeName, event.getPosition(),
+                                event.getConsumerTags().get(HeaderTag.DEBUG_PUBLISHER_TOPIC_ID));
+                        return true;
+                    }
+                } catch (final IOException e) {
+                    throw new NakadiRuntimeException(
+                            String.format("Failed to parse metadata to check for misplaced" +
+                                            " event in '%s' at position %s",
+                                    expectedEventTypeName, event.getPosition()),
+                            e);
                 }
-            } catch (final IOException e) {
-                throw new NakadiRuntimeException(
-                        String.format("Failed to parse metadata to check for misplaced event in '%s' at position %s",
-                                expectedEventTypeName, event.getPosition()),
-                        e);
             }
+            return false;
         }
         return false;
     }

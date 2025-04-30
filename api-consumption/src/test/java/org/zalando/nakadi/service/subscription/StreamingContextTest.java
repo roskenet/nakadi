@@ -250,6 +250,7 @@ public class StreamingContextTest {
                         schemaProvider
                 ),
                 mock(SubscriptionCache.class),
+                featureToggleService,
                 etCache
         );
 
@@ -281,7 +282,6 @@ public class StreamingContextTest {
                 .setEventStreamChecks(eventStreamCheck)
                 .setKafkaPollTimeout(0)
                 .setParameters(spMock)
-                .setFeatureToggleService(featureToggleService)
                 .build();
 
         final String noMetadataEvent = "{}";

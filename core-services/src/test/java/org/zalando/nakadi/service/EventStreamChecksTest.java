@@ -7,10 +7,10 @@ import org.zalando.nakadi.domain.ConsumedEvent;
 import org.zalando.nakadi.domain.EventCategory;
 import org.zalando.nakadi.domain.EventOwnerHeader;
 import org.zalando.nakadi.domain.EventType;
+import org.zalando.nakadi.domain.Feature;
 import org.zalando.nakadi.domain.NakadiCursor;
 import org.zalando.nakadi.domain.Timeline;
 import org.zalando.nakadi.exceptions.runtime.NakadiRuntimeException;
-import org.zalando.nakadi.mapper.NakadiRecordMapper;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.repository.kafka.KafkaRecordDeserializer;
 import org.zalando.nakadi.utils.TestUtils;
@@ -30,15 +30,15 @@ import static org.zalando.nakadi.domain.HeaderTag.DEBUG_PUBLISHER_TOPIC_ID;
 public class EventStreamChecksTest {
 
     private final EventTypeCache eventTypeCache = mock(EventTypeCache.class);
+    private final FeatureToggleService featureToggleService = mock(FeatureToggleService.class);
+    private final KafkaRecordDeserializer deserializer = mock(KafkaRecordDeserializer.class);
 
     private final EventStreamChecks eventStreamChecks = new EventStreamChecks(
             mock(BlacklistService.class),
             mock(AuthorizationService.class),
-            new KafkaRecordDeserializer(
-                    mock(NakadiRecordMapper.class),
-                    mock(SchemaProviderService.class)
-            ),
+            deserializer,
             mock(SubscriptionCache.class),
+            featureToggleService,
             eventTypeCache
     );
 
@@ -56,7 +56,7 @@ public class EventStreamChecksTest {
     }
 
     @Test
-    public void testIsMisplacedEventWhenEventTypeDoesntMatches() {
+    public void testShouldSkipMisplacedEventWhenEventTypeDoesntMatches() {
 
         final byte[] event = ("{\"metadata\": {"
                 + "\"event_type\": \"this.is-wrong\","
@@ -67,14 +67,34 @@ public class EventStreamChecksTest {
         final EventType mockEventType = mock(EventType.class);
         when(eventTypeCache.getEventType("correct.event-type")).thenReturn(mockEventType);
         when(mockEventType.getCategory()).thenReturn(EventCategory.BUSINESS);
+        when(featureToggleService.isFeatureEnabled(Feature.SKIP_MISPLACED_EVENTS)).thenReturn(Boolean.TRUE);
 
-        final boolean result = eventStreamChecks.isMisplacedEvent(newConsumedEvent(event));
+        final boolean result = eventStreamChecks.shouldSkipMisplacedEvent(newConsumedEvent(event));
 
         assertTrue(result, "Event should be misplaced because event type doesn't match");
     }
 
     @Test
-    public void testIsMisplacedEventWhenDeserializerThrowsIOException() throws IOException {
+    public void testShouldSkipMisplacedEventWhenEventTypeDoesntMatchesButFlagisFalse() {
+
+        final byte[] event = ("{\"metadata\": {"
+                + "\"event_type\": \"this.is-wrong\","
+                + "\"occurred_at\": \"2024-10-10T15:42:03.746Z\","
+                + "\"received_at\": \"2024-10-10T15:42:03.747Z\""
+                + " }}").getBytes();
+
+        final EventType mockEventType = mock(EventType.class);
+        when(eventTypeCache.getEventType("correct.event-type")).thenReturn(mockEventType);
+        when(mockEventType.getCategory()).thenReturn(EventCategory.BUSINESS);
+        when(featureToggleService.isFeatureEnabled(Feature.SKIP_MISPLACED_EVENTS)).thenReturn(Boolean.FALSE);
+
+        final boolean result = eventStreamChecks.shouldSkipMisplacedEvent(newConsumedEvent(event));
+
+        assertFalse(result, "Event should not be misplaced because event type doesn't match but flag is false");
+    }
+
+    @Test
+    public void testShouldSkipMisplacedEventWhenDeserializerThrowsIOException() throws IOException {
         final byte[] event = ("{\"metadata\": {"
                 + "\"event_type\": \"correct.event-type\","
                 + "\"occurred_at\": \"2024-10-10T15:42:03.746Z\","
@@ -82,22 +102,14 @@ public class EventStreamChecksTest {
                 + "}}").getBytes();
 
         final EventType mockEventType = mock(EventType.class);
+
         when(eventTypeCache.getEventType("correct.event-type")).thenReturn(mockEventType);
         when(mockEventType.getCategory()).thenReturn(EventCategory.BUSINESS);
-
-        final KafkaRecordDeserializer deserializer = mock(KafkaRecordDeserializer.class);
+        when(featureToggleService.isFeatureEnabled(Feature.SKIP_MISPLACED_EVENTS)).thenReturn(Boolean.TRUE);
         when(deserializer.getEventTypeName(event)).thenThrow(new IOException("Failed to deserialize"));
 
-        final EventStreamChecks eventStreamChecksWithMockedDeserializer = new EventStreamChecks(
-                mock(BlacklistService.class),
-                mock(AuthorizationService.class),
-                deserializer,
-                mock(SubscriptionCache.class),
-                eventTypeCache
-        );
-
         final Exception exception = assertThrows(NakadiRuntimeException.class, () ->
-                eventStreamChecksWithMockedDeserializer.isMisplacedEvent(newConsumedEvent(event))
+                eventStreamChecks.shouldSkipMisplacedEvent(newConsumedEvent(event))
         );
 
         assertEquals(
@@ -109,7 +121,7 @@ public class EventStreamChecksTest {
     }
 
     @Test
-    public void testIsMisplacedEventWhenCategoryIsUndefined() {
+    public void testIsMisplacedEventWhenCategoryShouldSkipUndefined() {
         final byte[] event = ("{\"metadata\": {"
                 + "\"event_type\": \"correct.event-type\","
                 + "\"occurred_at\": \"2024-10-10T15:42:03.746Z\","
@@ -118,15 +130,16 @@ public class EventStreamChecksTest {
 
         final EventType mockEventType = mock(EventType.class);
         when(eventTypeCache.getEventType("correct.event-type")).thenReturn(mockEventType);
+        when(featureToggleService.isFeatureEnabled(Feature.SKIP_MISPLACED_EVENTS)).thenReturn(Boolean.TRUE);
         when(mockEventType.getCategory()).thenReturn(EventCategory.UNDEFINED);
 
-        final boolean result = eventStreamChecks.isMisplacedEvent(newConsumedEvent(event));
+        final boolean result = eventStreamChecks.shouldSkipMisplacedEvent(newConsumedEvent(event));
 
         assertFalse(result, "Event should not be misplaced when category is UNDEFINED");
     }
 
     @Test
-    public void testIsMisplacedEventWhenEventTypeMatchesCorrectly() throws IOException {
+    public void testShouldSkipMisplacedEventWhenEventTypeMatchesCorrectly() throws IOException {
         final byte[] event = ("{\"metadata\": {"
                 + "\"event_type\": \"correct.event-type\","
                 + "\"occurred_at\": \"2024-10-10T15:42:03.746Z\","
@@ -135,20 +148,12 @@ public class EventStreamChecksTest {
 
         final EventType mockEventType = mock(EventType.class);
         when(eventTypeCache.getEventType("correct.event-type")).thenReturn(mockEventType);
+        when(featureToggleService.isFeatureEnabled(Feature.SKIP_MISPLACED_EVENTS)).thenReturn(Boolean.TRUE);
         when(mockEventType.getCategory()).thenReturn(EventCategory.BUSINESS);
 
-        final KafkaRecordDeserializer deserializer = mock(KafkaRecordDeserializer.class);
         when(deserializer.getEventTypeName(event)).thenReturn("correct.event-type");
 
-        final EventStreamChecks eventStreamChecksWithMockedDeserializer = new EventStreamChecks(
-                mock(BlacklistService.class),
-                mock(AuthorizationService.class),
-                deserializer,
-                mock(SubscriptionCache.class),
-                eventTypeCache
-        );
-
-        final boolean result = eventStreamChecksWithMockedDeserializer.isMisplacedEvent(newConsumedEvent(event));
+        final boolean result = eventStreamChecks.shouldSkipMisplacedEvent(newConsumedEvent(event));
 
         assertFalse(result, "Event should not be misplaced when event type matches correctly");
     }

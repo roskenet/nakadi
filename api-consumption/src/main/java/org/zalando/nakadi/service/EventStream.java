@@ -190,7 +190,7 @@ public class EventStream {
     private boolean shouldEventBeDiscarded(final ConsumedEvent evt) {
         return evt.getConsumerTags().containsKey(HeaderTag.CONSUMER_SUBSCRIPTION_ID)
                 || shouldEventBeFilteredBecauseOfTestProjectId(config.getTestDataFilter(), evt)
-                || eventStreamChecks.isMisplacedEvent(evt)
+                || eventStreamChecks.shouldSkipMisplacedEvent(evt)
                 || eventStreamChecks.isConsumptionBlocked(evt);
     }
 

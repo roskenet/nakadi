@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.zalando.nakadi.annotations.validation.DeadLetterAnnotationValidator;
 import org.zalando.nakadi.domain.ConsumedEvent;
-import org.zalando.nakadi.domain.Feature;
 import org.zalando.nakadi.domain.HeaderTag;
 import org.zalando.nakadi.domain.NakadiCursor;
 import org.zalando.nakadi.domain.Subscription;
@@ -22,7 +21,6 @@ import org.zalando.nakadi.service.CursorTokenService;
 import org.zalando.nakadi.service.EventStreamChecks;
 import org.zalando.nakadi.service.EventStreamWriter;
 import org.zalando.nakadi.service.EventTypeChangeListener;
-import org.zalando.nakadi.service.FeatureToggleService;
 import org.zalando.nakadi.service.publishing.EventPublisher;
 import org.zalando.nakadi.service.subscription.autocommit.AutocommitSupport;
 import org.zalando.nakadi.service.subscription.model.Session;
@@ -79,7 +77,6 @@ public class StreamingContext implements SubscriptionStreamer {
     private ZkSubscription<List<String>> sessionListSubscription;
     private Closeable authorizationCheckSubscription;
 
-    private final FeatureToggleService featureToggleService;
     private boolean sessionRegistered;
     private boolean zkClientClosed;
 
@@ -112,7 +109,6 @@ public class StreamingContext implements SubscriptionStreamer {
         this.streamMemoryLimitBytes = builder.streamMemoryLimitBytes;
         this.cursorOperationsService = builder.cursorOperationsService;
         this.kpiCollector = builder.kpiCollector;
-        this.featureToggleService = builder.featureToggleService;
         this.deadLetterQueueEventTypeName = builder.deadLetterQueueEventTypeName;
         this.eventPublisher = builder.eventPublisher;
         this.uuidGenerator = builder.uuidGenerator;
@@ -308,8 +304,7 @@ public class StreamingContext implements SubscriptionStreamer {
     }
 
     public boolean isConsumptionBlocked(final ConsumedEvent event) {
-        if (featureToggleService.isFeatureEnabled(Feature.SKIP_MISPLACED_EVENTS)
-            && eventStreamChecks.isMisplacedEvent(event)) {
+        if (eventStreamChecks.shouldSkipMisplacedEvent(event)) {
                 return true;
         }
         if (shouldEventBeFilteredBecauseOfTestProjectId(parameters.getTestDataFilter(), event)) {
@@ -418,7 +413,6 @@ public class StreamingContext implements SubscriptionStreamer {
         private CursorOperationsService cursorOperationsService;
         private long streamMemoryLimitBytes;
         private ConsumptionKpiCollector kpiCollector;
-        private FeatureToggleService featureToggleService;
         private String deadLetterQueueEventTypeName;
         private EventPublisher eventPublisher;
         private UUIDGenerator uuidGenerator;
@@ -520,11 +514,6 @@ public class StreamingContext implements SubscriptionStreamer {
 
         public Builder setKpiCollector(final ConsumptionKpiCollector kpiCollector) {
             this.kpiCollector = kpiCollector;
-            return this;
-        }
-
-        public Builder setFeatureToggleService(final FeatureToggleService featureToggleService) {
-            this.featureToggleService = featureToggleService;
             return this;
         }
 

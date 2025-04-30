@@ -126,7 +126,6 @@ public class SubscriptionStreamerFactory {
                 .setKpiCollector(consumptionKpiCollectorFactory.createForHiLA(
                         subscription.getId(), streamParameters.getConsumingClient()))
                 .setCursorOperationsService(cursorOperationsService)
-                .setFeatureToggleService(featureToggleService)
                 .setEventPublisher(eventPublisher)
                 .setDeadLetterQueueEventTypeName(deadLetterQueueEventTypeName)
                 .setUuidGenerator(uuidGenerator)
