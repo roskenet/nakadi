@@ -1,7 +1,5 @@
 package org.zalando.nakadi.view;
 
-import com.fasterxml.jackson.databind.JsonNode;
-
 import java.util.Objects;
 
 public class EvalFilterResponse {
@@ -36,7 +34,7 @@ public class EvalFilterResponse {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        EvalFilterResponse that = (EvalFilterResponse) o;
+        final EvalFilterResponse that = (EvalFilterResponse) o;
         return result == that.result && Objects.equals(parsedFilter, that.parsedFilter);
     }
 

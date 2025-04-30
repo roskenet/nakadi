@@ -35,7 +35,7 @@ public class EvalFilterRequest {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        EvalFilterRequest that = (EvalFilterRequest) o;
+        final EvalFilterRequest that = (EvalFilterRequest) o;
         return Objects.equals(event, that.event) && Objects.equals(filter, that.filter);
     }
 
