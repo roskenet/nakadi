@@ -1,33 +1,15 @@
 package org.zalando.nakadi.controller;
 
-import com.google.common.collect.ImmutableList;
 import org.json.JSONObject;
 import org.junit.Test;
-import org.mockito.Mockito;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.zalando.nakadi.config.SecuritySettings;
 import org.zalando.nakadi.controller.advice.NakadiProblemExceptionHandler;
-import org.zalando.nakadi.domain.Timeline;
-import org.zalando.nakadi.domain.storage.Storage;
-import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
-import org.zalando.nakadi.security.ClientResolver;
-import org.zalando.nakadi.service.publishing.NakadiAuditLogPublisher;
-import org.zalando.nakadi.service.timeline.TimelineService;
 import org.zalando.nakadi.utils.TestUtils;
-import org.zalando.nakadi.view.TimelineView;
-
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
-
-import static org.mockito.Mockito.when;
-import static org.zalando.nakadi.config.SecuritySettings.AuthMode.OFF;
 
 
 public class DebugControllerTest {
