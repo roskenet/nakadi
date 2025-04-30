@@ -15,6 +15,7 @@ import org.zalando.nakadi.view.EvalFilterResponse;
 import org.zalando.nakadi.view.TimelineRequest;
 import org.zalando.nakadisqlexecutor.streams.EventsWrapper;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -29,21 +30,69 @@ public class DebugController {
                                         final NativeWebRequest request)
             throws AccessDeniedException, TimelineException, TopicRepositoryException, InconsistentStateException,
             RepositoryProblemException {
-        final byte[] eventBytes = evalFilterRequest.getEvent().toString().getBytes();
         try {
+            final byte[] eventBytes = evalFilterRequest.getEvent().toString().getBytes();
             final Library library = new Library();
-            final Criterion criterion = library.parseExpression(evalFilterRequest.getFilter());
-            Function<EventsWrapper, Boolean> compiledPredicate = library.compilePredicate(criterion);
             final EventsWrapper predicateInput = library.singletonInput(eventBytes);
-            final Boolean result = compiledPredicate.apply(predicateInput);
+
+            // TODO use Problem class for error responses
+            Criterion criterion;
+            Function<EventsWrapper, Boolean> compiledPredicate;
+            final Boolean result;
+            try {
+                criterion = library.parseExpression(evalFilterRequest.getFilter());
+            } catch (final SqlParserException e) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                        "error", "SQL_PARSER_ERROR",
+                        "message", "filter expression could not be parsed",
+                        "caused_by", Map.of(
+                                "exception", e.getClass().getName(),
+                                "message", e.getMessage())
+                ));
+            } catch (final Exception e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                        "error", "SQL_PARSER_UNEXPECTED_ERROR",
+                        "message", "an unexpected error occurred while parsing the filter expression",
+                        "caused_by", Map.of(
+                                "exception", e.getClass().getName(),
+                                "message", e.getMessage())
+                ));
+            }
+            try {
+                compiledPredicate = library.compilePredicate(criterion);
+            } catch (final Exception e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                        "error", "FILTER_COMPILATION_ERROR",
+                        "message", "filter expression could not be compiled",
+                        "caused_by", Map.of(
+                                "exception", e.getClass().getName(),
+                                "message", e.getMessage())
+                ));
+            }
+            try {
+                result = compiledPredicate.apply(predicateInput);
+            } catch (final Exception e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                        "error", "FILTER_EVALUATION_ERROR",
+                        "message", "evaluation of filter expression on the event resulted in an exception",
+                        "caused_by", Map.of(
+                                "exception", e.getClass().getName(),
+                                "message", e.getMessage())
+                ));
+            }
 
             final EvalFilterResponse response = new EvalFilterResponse();
+            response.setParsedFilter(criterion.toString());
             response.setResult(result);
             return ResponseEntity.status(HttpStatus.OK).body(response);
-        } catch (final SqlParserException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         } catch (final Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error", "INTERNAL_SERVER_ERROR",
+                    "message", "something unexpected went wrong",
+                    "caused_by", Map.of(
+                            "exception", e.getClass().getName(),
+                            "message", e.getMessage())
+            ));
         }
     }
 
