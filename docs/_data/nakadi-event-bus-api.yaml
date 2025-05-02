@@ -2197,6 +2197,113 @@ paths:
           schema:
             $ref: '#/definitions/AvroSchema'
 
+  /debug/eval-filter:
+    post:
+      tags:
+        - debug-api
+      description: |
+        Accepts a JSON event and a filter expression and returns a boolean result.
+        Can be used to simulate the behavior of the filters that are applicable to all the event streaming endpoints.
+        
+        NOTE: Currently the event is available under the table alias `e`. We hope to hope to remove this restriction in the near future.
+      parameters:
+        - name: request
+          in: body
+          schema:
+            description: Request body for evaluating a filter expression.
+            type: object
+            properties:
+              filter:
+                type: string
+                example: "e.metadata.published_by LIKE 'order-processor-v%'"
+              event:
+                type: object
+                example: |
+                    {
+                        "metadata": {
+                            "published_by": "order-processor-v2",
+                            "event_type": "order-processor-v2.order.created",
+                            "occurred_at": "2015-12-19T16:39:57-08:00"
+                        },
+                        "data": {
+                            "order_id": 123456,
+                            "customer_id": 654321
+                        }
+                    }
+            required:
+              - event
+              - filter
+          required: true
+      responses:
+        '200':
+          description: The result of applying the filter on the event.
+          schema:
+            type: object
+            properties:
+              result:
+                type: boolean
+                description: |
+                  Result of evaluating the filter expression against the event.
+                  True means that the event would be accepted by the filter and thus sent to the consumer.
+                example: true
+              parsed_filter:
+                type: string
+                description: |
+                  The stringified AST of the filter expression. May be useful to debug misbehaving filters.
+                example: "(e.metadata.published_by LIKE 'order-processor-v%')"
+        '400':
+          description: Filter expression could not be parsed or evaluated
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                description: |
+                  The type of error that occurred while parsing or evaluating the filter expression.
+                  
+                  - SQL_PARSER_ERROR: known failure mode of the SQL parser
+                  - SQL_PARSER_UNEXPECTED_ERROR: unexpected failure mode of the SQL parser
+                  - FILTER_COMPILATION_ERROR: an error occured when compiling the parsed AST into a Java function
+                  - FILTER_EVALUATION_ERROR: the compiled Java function threw an exception when running on the event
+                enum:
+                  - SQL_PARSER_ERROR
+                  - SQL_PARSER_UNEXPECTED_ERROR
+                  - FILTER_COMPILATION_ERROR
+                  - FILTER_EVALUATION_ERROR
+              message:
+                type: string
+                example: "filter expression could not be parsed"
+              caused_by:
+                type: object
+                properties:
+                  exception:
+                    type: string
+                    example: "org.zalando.aruha.nakadisql.parser.nsql.SqlParserException"
+                  message:
+                    type: string
+                    example: "Unexpected token at position 5"
+        '500':
+          description: Internal server error
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                enum:
+                  - INTERNAL_SERVER_ERROR
+              message:
+                type: string
+                example: "something unexpected went wrong"
+              caused_by:
+                type: object
+                properties:
+                  exception:
+                    type: string
+                    example: "java.lang.NullPointerException"
+                  message:
+                    type: string
+                    example: "Cannot invoke method on null object"
+
 # ################################### #
 #                                     #
 #             Definitions             #
