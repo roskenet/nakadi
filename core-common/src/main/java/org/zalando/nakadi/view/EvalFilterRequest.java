@@ -1,19 +1,19 @@
 package org.zalando.nakadi.view;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.util.Objects;
 
 public class EvalFilterRequest {
 
-    private JsonNode event;
+    private ObjectNode event;
     private String filter;
 
-    public JsonNode getEvent() {
+    public ObjectNode getEvent() {
         return event;
     }
 
-    public EvalFilterRequest setEvent(final JsonNode event) {
+    public EvalFilterRequest setEvent(final ObjectNode event) {
         this.event = event;
         return this;
     }
