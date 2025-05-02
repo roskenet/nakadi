@@ -2200,17 +2200,20 @@ paths:
   /debug/eval-filter:
     post:
       tags:
-        - debug
+        - debug-api
       description: |
         Accepts a JSON event and a filter expression and returns a boolean result.
         Can be used to simulate the behavior of the filters that are applicable to all the event streaming endpoints.
       parameters:
-        - name: eval_filter_request
+        - name: request
           in: body
           schema:
             description: Request body for evaluating a filter expression.
             type: object
             properties:
+              filter:
+                type: string
+                example: "e.metadata.published_by LIKE 'order-processor-v%'"
               event:
                 type: object
                 example: |
@@ -2225,10 +2228,6 @@ paths:
                             "customer_id": 654321
                         }
                     }
-              filter:
-                type: string
-                example: |
-                  e.metadata.published_by LIKE 'order-processor-v%'
             required:
               - event
               - filter
@@ -2249,8 +2248,59 @@ paths:
                 type: string
                 description: |
                   The stringified AST of the filter expression. May be useful to debug misbehaving filters.
-                example: |
-                  (e.metadata.published_by LIKE 'order-processor-v%')
+                example: "(e.metadata.published_by LIKE 'order-processor-v%')"
+        '400':
+          description: Filter expression could not be parsed or evaluated
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                description: |
+                  The type of error that occurred while parsing or evaluating the filter expression.
+                  
+                  - SQL_PARSER_ERROR: known failure mode of the SQL parser
+                  - SQL_PARSER_UNEXPECTED_ERROR: unexpected failure mode of the SQL parser
+                  - FILTER_COMPILATION_ERROR: an error occured when compiling the parsed AST into a Java function
+                  - FILTER_EVALUATION_ERROR: the compiled Java function threw an exception when running on the event
+                enum:
+                  - SQL_PARSER_ERROR
+                  - SQL_PARSER_UNEXPECTED_ERROR
+                  - FILTER_COMPILATION_ERROR
+                  - FILTER_EVALUATION_ERROR
+              message:
+                type: string
+                example: "filter expression could not be parsed"
+              caused_by:
+                type: object
+                properties:
+                  exception:
+                    type: string
+                    example: "org.zalando.aruha.nakadisql.parser.nsql.SqlParserException"
+                  message:
+                    type: string
+                    example: "Unexpected token at position 5"
+        '500':
+          description: Internal server error
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                enum:
+                  - INTERNAL_SERVER_ERROR
+              message:
+                type: string
+                example: "something unexpected went wrong"
+              caused_by:
+                type: object
+                properties:
+                  exception:
+                    type: string
+                    example: "java.lang.NullPointerException"
+                  message:
+                    type: string
+                    example: "Cannot invoke method on null object"
 
 # ################################### #
 #                                     #

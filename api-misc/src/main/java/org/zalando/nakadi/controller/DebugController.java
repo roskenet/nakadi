@@ -47,19 +47,19 @@ public class DebugController {
                 return reportError(HttpStatus.BAD_REQUEST,
                         "SQL_PARSER_ERROR", "filter expression could not be parsed", e);
             } catch (final Exception e) {
-                return reportError(HttpStatus.INTERNAL_SERVER_ERROR, "SQL_PARSER_UNEXPECTED_ERROR",
+                return reportError(HttpStatus.BAD_REQUEST, "SQL_PARSER_UNEXPECTED_ERROR",
                         "an unexpected error occurred while parsing the filter expression", e);
             }
             try {
                 compiledPredicate = library.compilePredicate(criterion);
             } catch (final Exception e) {
-                return reportError(HttpStatus.INTERNAL_SERVER_ERROR, "FILTER_COMPILATION_ERROR",
+                return reportError(HttpStatus.BAD_REQUEST, "FILTER_COMPILATION_ERROR",
                         "filter expression could not be compiled", e);
             }
             try {
                 result = compiledPredicate.apply(predicateInput);
             } catch (final Exception e) {
-                return reportError(HttpStatus.INTERNAL_SERVER_ERROR, "FILTER_EVALUATION_ERROR",
+                return reportError(HttpStatus.BAD_REQUEST, "FILTER_EVALUATION_ERROR",
                         "evaluation of filter expression on the event resulted in an exception", e);
             }
 
