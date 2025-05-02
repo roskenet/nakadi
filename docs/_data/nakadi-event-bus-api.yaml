@@ -2204,6 +2204,8 @@ paths:
       description: |
         Accepts a JSON event and a filter expression and returns a boolean result.
         Can be used to simulate the behavior of the filters that are applicable to all the event streaming endpoints.
+        
+        NOTE: Currently the event is available under the table alias `e`. We hope to hope to remove this restriction in the near future.
       parameters:
         - name: request
           in: body
