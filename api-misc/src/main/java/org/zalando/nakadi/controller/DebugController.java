@@ -30,9 +30,7 @@ public class DebugController {
 
     @RequestMapping(method = RequestMethod.POST, value = "/eval-filter")
     public ResponseEntity<?> testFilter(@RequestBody final EvalFilterRequest evalFilterRequest,
-                                        final NativeWebRequest request)
-            throws AccessDeniedException, TimelineException, TopicRepositoryException, InconsistentStateException,
-            RepositoryProblemException {
+                                        final NativeWebRequest request) {
         try {
             final byte[] eventBytes = evalFilterRequest.getEvent().toString().getBytes();
             final FilterExpressionCompiler library = new FilterExpressionCompiler();
