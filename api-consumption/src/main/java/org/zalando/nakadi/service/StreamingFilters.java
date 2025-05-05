@@ -2,6 +2,10 @@ package org.zalando.nakadi.service;
 
 import org.zalando.nakadi.domain.ConsumedEvent;
 import org.zalando.nakadi.domain.TestDataFilter;
+import org.zalando.nakadi.filterexpression.FilterExpressionCompiler;
+import org.zalando.nakadisqlexecutor.streams.EventsWrapper;
+
+import java.util.function.Function;
 
 public class StreamingFilters {
 
@@ -17,6 +21,18 @@ public class StreamingFilters {
             return true;
         }
         return false;
+    }
+
+    public static boolean shouldEventBeFilteredBecauseOfFilter(
+            final Function<EventsWrapper, Boolean> filterPredicate,
+            final ConsumedEvent event) {
+        if (null == filterPredicate) {
+            return false;
+        } else {
+            byte[] eventData = event.getEvent();
+            final EventsWrapper eventsWrapper = FilterExpressionCompiler.singletonInput(eventData);
+            return !filterPredicate.apply(eventsWrapper);
+        }
     }
 
 }
