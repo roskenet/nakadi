@@ -348,17 +348,20 @@ public class EventStreamController {
     }
 
     private static Function<EventsWrapper, Boolean> buildFilterPredicateFromSubmittedFilter(final String filter) {
-        if (filter == null || filter.isEmpty()) {
+        if (filter == null) {
             return null;
+        }
+        if (filter.trim().isEmpty()) {
+            throw new InvalidFilterException(filter, "Filter cannot be empty");
         }
         try {
             final Criterion criterion = new FilterExpressionCompiler().parseExpression(filter);
             return new FilterExpressionCompiler()
                     .compilePredicate(criterion);
         } catch (SqlParserException e) {
-            throw new InvalidFilterException();
+            throw new InvalidFilterException(filter, "Could not parse SQL expression.");
         } catch (Exception e) {
-            throw new InvalidFilterException();
+            throw new InvalidFilterException(filter, "Could not compile SQL expression.");
         }
     }
 
