@@ -337,19 +337,13 @@ public class EventStreamControllerTest {
         responseBody.writeTo(outputStream);
 
         final EventStreamConfig streamConfig = configCaptor.getValue();
-        assertThat(
-                streamConfig,
-                equalTo(EventStreamConfig
-                        .builder()
-                        .withCursors(ImmutableList.of(
-                                NakadiCursor.of(timeline, "0", "000000000000000000")))
-                        .withBatchLimit(1)
-                        .withStreamLimit(2)
-                        .withBatchTimeout(3)
-                        .withStreamTimeout(4)
-                        .withStreamKeepAliveLimit(5)
-                        .build()
-                ));
+        assertThat(streamConfig.getCursors(), equalTo(ImmutableList.of(
+                NakadiCursor.of(timeline, "0", "000000000000000000"))));
+        assertThat(streamConfig.getBatchLimit(), equalTo(1));
+        assertThat(streamConfig.getStreamLimit(), equalTo(2));
+        assertThat(streamConfig.getBatchTimeout(), equalTo(3));
+        assertThat(streamConfig.getStreamTimeout(), equalTo(4));
+        assertThat(streamConfig.getStreamKeepAliveLimit(), equalTo(5));
 
         assertThat(statusCaptor.getValue(), equalTo(HttpStatus.OK.value()));
         assertThat(contentTypeCaptor.getValue(), equalTo("application/x-json-stream"));
@@ -512,18 +506,19 @@ public class EventStreamControllerTest {
 
     protected StreamingResponseBody createStreamingResponseBody() throws IOException {
         return controller.streamEvents(TEST_EVENT_TYPE_NAME, 1, 0, 0, 0, 0,
-                null, null, responseMock, FULL_ACCESS_CLIENT);
+                null, null, null, responseMock, FULL_ACCESS_CLIENT);
     }
 
     private StreamingResponseBody createStreamingResponseBody(final Client client) throws Exception {
         return controller.streamEvents(
-                TEST_EVENT_TYPE_NAME, 1, 2, 3, 4, 5, null,
+                TEST_EVENT_TYPE_NAME, 1, 2, 3, 4, 5,
+                null, null,
                 "[{\"partition\":\"0\",\"offset\":\"000000000000000000\"}]", responseMock, client);
     }
 
     private StreamingResponseBody createStreamingResponseBody(final String cursorsStr) throws Exception {
         return controller.streamEvents(TEST_EVENT_TYPE_NAME, 1, 2, 3, 4,
-                5, null, cursorsStr, responseMock, FULL_ACCESS_CLIENT);
+                5, null, null, cursorsStr, responseMock, FULL_ACCESS_CLIENT);
     }
 
     private StreamingResponseBody createStreamingResponseBody(final Integer batchLimit,
@@ -533,7 +528,7 @@ public class EventStreamControllerTest {
                                                               final Integer streamKeepAliveLimit,
                                                               final String cursorsStr) {
         return controller.streamEvents(TEST_EVENT_TYPE_NAME, batchLimit, streamLimit, batchTimeout, streamTimeout,
-                streamKeepAliveLimit, null, cursorsStr, responseMock, FULL_ACCESS_CLIENT);
+                streamKeepAliveLimit, null, null, cursorsStr, responseMock, FULL_ACCESS_CLIENT);
     }
 
 }

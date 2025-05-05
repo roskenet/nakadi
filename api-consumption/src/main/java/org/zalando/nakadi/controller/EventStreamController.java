@@ -247,7 +247,8 @@ public class EventStreamController {
                     authorizationValidator.authorizeEventTypeView(eventType);
                     authorizeStreamRead(eventTypeName);
 
-                    Function<EventsWrapper, Boolean> filterPredicate = buildFilterPredicateFromSubmittedFilter(filter);
+                    final Function<EventsWrapper, Boolean> filterPredicate =
+                            buildFilterPredicateFromSubmittedFilter(filter);
 
                     // validate parameters
                     final EventStreamConfig streamConfig = EventStreamConfig.builder()
@@ -346,12 +347,12 @@ public class EventStreamController {
         };
     }
 
-    private static Function<EventsWrapper, Boolean> buildFilterPredicateFromSubmittedFilter(String filter) {
+    private static Function<EventsWrapper, Boolean> buildFilterPredicateFromSubmittedFilter(final String filter) {
         if (filter == null || filter.isEmpty()) {
             return null;
         }
         try {
-            Criterion criterion = new FilterExpressionCompiler().parseExpression(filter);
+            final Criterion criterion = new FilterExpressionCompiler().parseExpression(filter);
             return new FilterExpressionCompiler()
                     .compilePredicate(criterion);
         } catch (SqlParserException e) {

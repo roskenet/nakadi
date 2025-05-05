@@ -1,15 +1,20 @@
 package org.zalando.nakadi.service.subscription;
 
+import org.zalando.aruha.nakadisql.api.criteria.Criterion;
+import org.zalando.aruha.nakadisql.parser.nsql.SqlParserException;
 import org.zalando.nakadi.domain.EventTypePartition;
 import org.zalando.nakadi.domain.TestDataFilter;
 import org.zalando.nakadi.exceptions.runtime.InvalidStreamParametersException;
+import org.zalando.nakadi.filterexpression.FilterExpressionCompiler;
 import org.zalando.nakadi.security.Client;
 import org.zalando.nakadi.service.EventStreamConfig;
 import org.zalando.nakadi.view.UserStreamParameters;
+import org.zalando.nakadisqlexecutor.streams.EventsWrapper;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.IntStream;
 
 public class StreamParameters {
@@ -52,6 +57,8 @@ public class StreamParameters {
 
     private final TestDataFilter testDataFilter;
 
+    private final Function<EventsWrapper, Boolean> filterPredicate;
+
     private StreamParameters(
             final UserStreamParameters userParameters,
             final long maxCommitTimeout,
@@ -81,6 +88,17 @@ public class StreamParameters {
         }
         this.commitTimeoutMillis = TimeUnit.SECONDS.toMillis(commitTimeout == 0 ? maxCommitTimeout : commitTimeout);
         this.testDataFilter = userParameters.getTestDataFilter().orElse(TestDataFilter.LIVE);
+        this.filterPredicate = userParameters.getFilter().map(f -> filterExpressionToPredicate(f)).orElse(null);
+    }
+
+    private Function<EventsWrapper, Boolean> filterExpressionToPredicate(final String filter) {
+        try {
+            final FilterExpressionCompiler filterExpressionCompiler = new FilterExpressionCompiler();
+            final Criterion ast = filterExpressionCompiler.parseExpression(filter);
+            return filterExpressionCompiler.compilePredicate(ast);
+        } catch (SqlParserException e) {
+            throw new InvalidStreamParametersException(e.getMessage());
+        }
     }
 
     public long getMessagesAllowedToSend(final long limit, final long sentSoFar) {
@@ -111,5 +129,9 @@ public class StreamParameters {
 
     public TestDataFilter getTestDataFilter() {
         return testDataFilter;
+    }
+
+    public Function<EventsWrapper, Boolean> getFilterPredicate() {
+        return filterPredicate;
     }
 }

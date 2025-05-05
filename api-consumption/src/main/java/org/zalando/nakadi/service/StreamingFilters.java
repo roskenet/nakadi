@@ -29,7 +29,7 @@ public class StreamingFilters {
         if (null == filterPredicate) {
             return false;
         } else {
-            byte[] eventData = event.getEvent();
+            final byte[] eventData = event.getEvent();
             final EventsWrapper eventsWrapper = FilterExpressionCompiler.singletonInput(eventData);
             return !filterPredicate.apply(eventsWrapper);
         }

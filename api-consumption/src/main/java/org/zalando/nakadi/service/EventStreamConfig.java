@@ -41,7 +41,8 @@ public class EventStreamConfig {
     private EventStreamConfig(final List<NakadiCursor> cursors, final int batchLimit,
                               final int streamLimit, final int batchTimeout, final int streamTimeout,
                               final int streamKeepAliveLimit, final String etName, final Client consumingClient,
-                              final long maxMemoryUsageBytes, final TestDataFilter testDataFilter, final Function<EventsWrapper, Boolean> filterPredicate) {
+                              final long maxMemoryUsageBytes, final TestDataFilter testDataFilter,
+                              final Function<EventsWrapper, Boolean> filterPredicate) {
         this.cursors = cursors;
         this.batchLimit = batchLimit;
         this.streamLimit = streamLimit;
@@ -101,9 +102,19 @@ public class EventStreamConfig {
 
     @Override
     public String toString() {
-        return "EventStreamConfig{cursors=" + cursors + ", batchLimit=" + batchLimit
-                + ", streamLimit=" + streamLimit + ", batchTimeout=" + batchTimeout + ", streamTimeout=" + streamTimeout
-                + ", streamKeepAliveLimit=" + streamKeepAliveLimit + '}';
+        return "EventStreamConfig{" +
+                "cursors=" + cursors +
+                ", batchLimit=" + batchLimit +
+                ", streamLimit=" + streamLimit +
+                ", batchTimeout=" + batchTimeout +
+                ", streamTimeout=" + streamTimeout +
+                ", streamKeepAliveLimit=" + streamKeepAliveLimit +
+                ", etName='" + etName + '\'' +
+                ", consumingClient=" + consumingClient +
+                ", maxMemoryUsageBytes=" + maxMemoryUsageBytes +
+                ", testDataFilter=" + testDataFilter +
+                ", filterPredicate=" + filterPredicate +
+                '}';
     }
 
     public static Builder builder() {
@@ -208,7 +219,8 @@ public class EventStreamConfig {
                 throw new InvalidLimitException("batch_limit can't be lower than 1");
             }
             return new EventStreamConfig(cursors, batchLimit, streamLimit, batchTimeout, streamTimeout,
-                    streamKeepAliveLimit, etName, consumingClient, maxMemoryUsageBytes, testDataFilter, filterPredicate);
+                    streamKeepAliveLimit, etName, consumingClient, maxMemoryUsageBytes, testDataFilter,
+                    filterPredicate);
         }
 
     }

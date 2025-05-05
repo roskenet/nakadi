@@ -32,6 +32,8 @@ public class UserStreamParameters {
 
     private final Optional<TestDataFilter> testDataFilter;
 
+    private final Optional<String> filter;
+
     @JsonCreator
     public UserStreamParameters(@JsonProperty("batch_limit") @Nullable final Integer batchLimit,
                                 @JsonProperty("stream_limit") @Nullable final Long streamLimit,
@@ -42,7 +44,8 @@ public class UserStreamParameters {
                                 @JsonProperty("max_uncommitted_events") @Nullable final Integer maxUncommittedEvents,
                                 @JsonProperty("partitions") @Nullable final List<EventTypePartition> partitions,
                                 @JsonProperty("commit_timeout") @Nullable final Long commitTimeoutSeconds,
-                                @JsonProperty("test_data_filter") @Nullable final TestDataFilter testDataFilter) {
+                                @JsonProperty("test_data_filter") @Nullable final TestDataFilter testDataFilter,
+                                @JsonProperty("filter") @Nullable final String filter) {
         this.batchLimit = Optional.ofNullable(batchLimit);
         this.streamLimit = Optional.ofNullable(streamLimit);
         this.batchTimespan = Optional.ofNullable(batchTimespan);
@@ -53,6 +56,7 @@ public class UserStreamParameters {
         this.partitions = partitions == null ? ImmutableList.of() : partitions;
         this.commitTimeoutSeconds = Optional.ofNullable(commitTimeoutSeconds);
         this.testDataFilter = Optional.ofNullable(testDataFilter);
+        this.filter = Optional.ofNullable(filter);
     }
 
     public Optional<Integer> getBatchLimit() {
@@ -93,5 +97,9 @@ public class UserStreamParameters {
 
     public Optional<TestDataFilter> getTestDataFilter() {
         return testDataFilter;
+    }
+
+    public Optional<String> getFilter() {
+        return filter;
     }
 }
