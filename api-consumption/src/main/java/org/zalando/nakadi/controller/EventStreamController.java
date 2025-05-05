@@ -74,6 +74,7 @@ import java.util.stream.Collectors;
 
 import static org.zalando.nakadi.metrics.MetricUtils.metricNameFor;
 import static org.zalando.nakadi.metrics.MetricUtils.metricNameForLoLAOpenConnections;
+import static org.zalando.nakadi.service.subscription.StreamParameters.filterExpressionToPredicate;
 import static org.zalando.problem.Status.BAD_REQUEST;
 import static org.zalando.problem.Status.FORBIDDEN;
 import static org.zalando.problem.Status.INTERNAL_SERVER_ERROR;
@@ -248,7 +249,7 @@ public class EventStreamController {
                     authorizeStreamRead(eventTypeName);
 
                     final Function<EventsWrapper, Boolean> filterPredicate =
-                            buildFilterPredicateFromSubmittedFilter(filter);
+                            filterExpressionToPredicate(filter);
 
                     // validate parameters
                     final EventStreamConfig streamConfig = EventStreamConfig.builder()
@@ -345,24 +346,6 @@ public class EventStreamController {
                 }
             }
         };
-    }
-
-    private static Function<EventsWrapper, Boolean> buildFilterPredicateFromSubmittedFilter(final String filter) {
-        if (filter == null) {
-            return null;
-        }
-        if (filter.trim().isEmpty()) {
-            throw new InvalidFilterException(filter, "Filter cannot be empty");
-        }
-        try {
-            final Criterion criterion = new FilterExpressionCompiler().parseExpression(filter);
-            return new FilterExpressionCompiler()
-                    .compilePredicate(criterion);
-        } catch (SqlParserException e) {
-            throw new InvalidFilterException(filter, "Could not parse SQL expression.");
-        } catch (Exception e) {
-            throw new InvalidFilterException(filter, "Could not compile SQL expression.");
-        }
     }
 
     /**

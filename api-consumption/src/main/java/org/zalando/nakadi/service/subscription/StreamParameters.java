@@ -4,6 +4,7 @@ import org.zalando.aruha.nakadisql.api.criteria.Criterion;
 import org.zalando.aruha.nakadisql.parser.nsql.SqlParserException;
 import org.zalando.nakadi.domain.EventTypePartition;
 import org.zalando.nakadi.domain.TestDataFilter;
+import org.zalando.nakadi.exceptions.runtime.InvalidFilterException;
 import org.zalando.nakadi.exceptions.runtime.InvalidStreamParametersException;
 import org.zalando.nakadi.filterexpression.FilterExpressionCompiler;
 import org.zalando.nakadi.security.Client;
@@ -91,13 +92,21 @@ public class StreamParameters {
         this.filterPredicate = userParameters.getFilter().map(f -> filterExpressionToPredicate(f)).orElse(null);
     }
 
-    private Function<EventsWrapper, Boolean> filterExpressionToPredicate(final String filter) {
+    public static Function<EventsWrapper, Boolean> filterExpressionToPredicate(final String filter) {
+        if (filter == null) {
+            return null;
+        }
+        if (filter.trim().isEmpty()) {
+            throw new InvalidFilterException(filter, "Filter cannot be empty");
+        }
         try {
-            final FilterExpressionCompiler filterExpressionCompiler = new FilterExpressionCompiler();
-            final Criterion ast = filterExpressionCompiler.parseExpression(filter);
-            return filterExpressionCompiler.compilePredicate(ast);
+            final Criterion criterion = new FilterExpressionCompiler().parseExpression(filter);
+            return new FilterExpressionCompiler()
+                    .compilePredicate(criterion);
         } catch (SqlParserException e) {
-            throw new InvalidStreamParametersException(e.getMessage());
+            throw new InvalidFilterException(filter, "Could not parse SQL expression.");
+        } catch (Exception e) {
+            throw new InvalidFilterException(filter, "Could not compile SQL expression.");
         }
     }
 
