@@ -189,11 +189,11 @@ public class EventStream {
     }
 
     private boolean shouldEventBeDiscarded(final ConsumedEvent evt) {
-        return evt.getConsumerTags().containsKey(HeaderTag.CONSUMER_SUBSCRIPTION_ID)
+        return eventStreamChecks.shouldSkipMisplacedEvent(evt)
+                || evt.getConsumerTags().containsKey(HeaderTag.CONSUMER_SUBSCRIPTION_ID)
+                || eventStreamChecks.isConsumptionBlocked(evt)
                 || shouldEventBeFilteredBecauseOfTestProjectId(config.getTestDataFilter(), evt)
-                || shouldEventBeFilteredBecauseOfFilter(config.getFilterPredicate(), evt)
-                || eventStreamChecks.shouldSkipMisplacedEvent(evt)
-                || eventStreamChecks.isConsumptionBlocked(evt);
+                || shouldEventBeFilteredBecauseOfFilter(config.getFilterPredicate(), evt);
     }
 
     private boolean isMemoryLimitReached(final long memoryUsed) {
