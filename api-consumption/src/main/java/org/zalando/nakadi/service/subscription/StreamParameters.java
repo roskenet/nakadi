@@ -5,7 +5,6 @@ import org.zalando.nakadi.domain.TestDataFilter;
 import org.zalando.nakadi.exceptions.runtime.InvalidStreamParametersException;
 import org.zalando.nakadi.security.Client;
 import org.zalando.nakadi.service.EventStreamConfig;
-import org.zalando.nakadi.service.StreamingFilters;
 import org.zalando.nakadi.view.UserStreamParameters;
 import org.zalando.nakadisqlexecutor.streams.EventsWrapper;
 
