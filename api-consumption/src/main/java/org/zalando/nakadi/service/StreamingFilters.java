@@ -1,8 +1,11 @@
 package org.zalando.nakadi.service;
 
+import org.zalando.aruha.nakadisql.api.criteria.Criterion;
+import org.zalando.aruha.nakadisql.parser.nsql.SqlParserException;
 import org.zalando.nakadi.domain.ConsumedEvent;
 import org.zalando.nakadi.domain.TestDataFilter;
 import org.zalando.nakadi.exceptions.runtime.FilterEvaluationException;
+import org.zalando.nakadi.exceptions.runtime.InvalidFilterException;
 import org.zalando.nakadi.filterexpression.FilterExpressionCompiler;
 import org.zalando.nakadisqlexecutor.streams.EventsWrapper;
 
@@ -37,6 +40,24 @@ public class StreamingFilters {
             } catch (Exception e) {
                 throw new FilterEvaluationException(e, event.getPosition());
             }
+        }
+    }
+
+    public static Function<EventsWrapper, Boolean> filterExpressionToPredicate(final String filter) {
+        if (filter == null) {
+            return null;
+        }
+        if (filter.trim().isEmpty()) {
+            throw new InvalidFilterException(filter, "Filter cannot be empty");
+        }
+        try {
+            final Criterion criterion = new FilterExpressionCompiler().parseExpression(filter);
+            return new FilterExpressionCompiler()
+                    .compilePredicate(criterion);
+        } catch (SqlParserException e) {
+            throw new InvalidFilterException(filter, "Could not parse SQL expression.");
+        } catch (Exception e) {
+            throw new InvalidFilterException(filter, "Could not compile SQL expression.");
         }
     }
 

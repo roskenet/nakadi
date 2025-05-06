@@ -1,14 +1,11 @@
 package org.zalando.nakadi.service.subscription;
 
-import org.zalando.aruha.nakadisql.api.criteria.Criterion;
-import org.zalando.aruha.nakadisql.parser.nsql.SqlParserException;
 import org.zalando.nakadi.domain.EventTypePartition;
 import org.zalando.nakadi.domain.TestDataFilter;
-import org.zalando.nakadi.exceptions.runtime.InvalidFilterException;
 import org.zalando.nakadi.exceptions.runtime.InvalidStreamParametersException;
-import org.zalando.nakadi.filterexpression.FilterExpressionCompiler;
 import org.zalando.nakadi.security.Client;
 import org.zalando.nakadi.service.EventStreamConfig;
+import org.zalando.nakadi.service.StreamingFilters;
 import org.zalando.nakadi.view.UserStreamParameters;
 import org.zalando.nakadisqlexecutor.streams.EventsWrapper;
 
@@ -17,6 +14,8 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.IntStream;
+
+import static org.zalando.nakadi.service.StreamingFilters.filterExpressionToPredicate;
 
 public class StreamParameters {
     /**
@@ -90,24 +89,6 @@ public class StreamParameters {
         this.commitTimeoutMillis = TimeUnit.SECONDS.toMillis(commitTimeout == 0 ? maxCommitTimeout : commitTimeout);
         this.testDataFilter = userParameters.getTestDataFilter().orElse(TestDataFilter.LIVE);
         this.filterPredicate = userParameters.getFilter().map(f -> filterExpressionToPredicate(f)).orElse(null);
-    }
-
-    public static Function<EventsWrapper, Boolean> filterExpressionToPredicate(final String filter) {
-        if (filter == null) {
-            return null;
-        }
-        if (filter.trim().isEmpty()) {
-            throw new InvalidFilterException(filter, "Filter cannot be empty");
-        }
-        try {
-            final Criterion criterion = new FilterExpressionCompiler().parseExpression(filter);
-            return new FilterExpressionCompiler()
-                    .compilePredicate(criterion);
-        } catch (SqlParserException e) {
-            throw new InvalidFilterException(filter, "Could not parse SQL expression.");
-        } catch (Exception e) {
-            throw new InvalidFilterException(filter, "Could not compile SQL expression.");
-        }
     }
 
     public long getMessagesAllowedToSend(final long limit, final long sentSoFar) {

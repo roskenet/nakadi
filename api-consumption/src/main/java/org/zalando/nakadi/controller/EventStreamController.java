@@ -71,7 +71,7 @@ import java.util.stream.Collectors;
 
 import static org.zalando.nakadi.metrics.MetricUtils.metricNameFor;
 import static org.zalando.nakadi.metrics.MetricUtils.metricNameForLoLAOpenConnections;
-import static org.zalando.nakadi.service.subscription.StreamParameters.filterExpressionToPredicate;
+import static org.zalando.nakadi.service.StreamingFilters.filterExpressionToPredicate;
 import static org.zalando.problem.Status.BAD_REQUEST;
 import static org.zalando.problem.Status.FORBIDDEN;
 import static org.zalando.problem.Status.INTERNAL_SERVER_ERROR;
