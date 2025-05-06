@@ -524,6 +524,7 @@ paths:
         - $ref: '#/parameters/StreamTimeout'
         - $ref: '#/parameters/StreamKeepAliveLimit'
         - $ref: '#/parameters/TestDataFilter'
+        - $ref: '#/parameters/Filter'
         - name: X-Flow-Id
           in: header
           description: |
@@ -1467,6 +1468,7 @@ paths:
         - $ref: '#/parameters/StreamKeepAliveLimit'
         - $ref: '#/parameters/CommitTimeout'
         - $ref: '#/parameters/TestDataFilter'
+        - $ref: '#/parameters/Filter'
         - name: X-Flow-Id
           in: header
           description: |
@@ -1645,6 +1647,12 @@ paths:
                 type: string
                 enum: ['TEST', 'LIVE', 'LIVE_AND_TEST']
                 default: 'LIVE'
+              filter:
+                description: |
+                  Allows you to specify a SQL-like filter to filter the events you wish to receive.
+                  See https://nakadi.docs.zalando.net/nakadi-event-broker/server-side-filtering/
+                type: string
+                example: "e.metadata.published_by LIKE 'order-service-v%'"
         - $ref: '#/parameters/SubscriptionId'
         - name: X-Flow-Id
           in: header
@@ -3855,3 +3863,13 @@ parameters:
     enum: ['TEST', 'LIVE', 'LIVE_AND_TEST']
     default: 'LIVE'
     required: false
+
+  Filter:
+      name: filter
+      in: query
+      description: |
+          Allows you to specify a SQL-like filter to filter the events you wish to receive.
+          See https://nakadi.docs.zalando.net/nakadi-event-broker/server-side-filtering/
+      type: string
+      example: "e.metadata.published_by LIKE 'order-service-v%'"
+      required: false
