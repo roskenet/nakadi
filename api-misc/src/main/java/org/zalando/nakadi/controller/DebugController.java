@@ -39,10 +39,6 @@ public class DebugController {
             final Criterion criterion;
             final Function<EventsWrapper, Boolean> compiledPredicate;
             final Boolean result;
-            if (evalFilterRequest.getSsfLang() == null) {
-                return reportError(HttpStatus.BAD_REQUEST, "MISSING_FILTER_LANG",
-                        "Missing ssf_lang. Must be set to 'sql_v1'", null);
-            }
             if (!evalFilterRequest.getSsfLang().equals("sql_v1")) {
                 return reportError(HttpStatus.BAD_REQUEST, "INVALID_FILTER_LANG",
                         "Invalid ssf_lang. Must be set to sql_v1", null);
