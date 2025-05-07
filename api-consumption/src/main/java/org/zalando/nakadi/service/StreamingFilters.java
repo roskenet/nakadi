@@ -6,6 +6,7 @@ import org.zalando.nakadi.domain.ConsumedEvent;
 import org.zalando.nakadi.domain.TestDataFilter;
 import org.zalando.nakadi.exceptions.runtime.FilterEvaluationException;
 import org.zalando.nakadi.exceptions.runtime.InvalidFilterException;
+import org.zalando.nakadi.exceptions.runtime.InvalidFilterLangException;
 import org.zalando.nakadi.exceptions.runtime.MissingFilterLangException;
 import org.zalando.nakadi.filterexpression.FilterExpressionCompiler;
 import org.zalando.nakadisqlexecutor.streams.EventsWrapper;
@@ -55,7 +56,7 @@ public class StreamingFilters {
             throw new MissingFilterLangException();
         }
         if (!lang.equals("sql_v1")) {
-            throw new InvalidFilterException(filter, "Unsupported filter language: " + lang);
+            throw new InvalidFilterLangException(lang);
         }
         try {
             final Criterion criterion = new FilterExpressionCompiler().parseExpression(filter);
