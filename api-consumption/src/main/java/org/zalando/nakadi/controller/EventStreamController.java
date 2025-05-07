@@ -30,7 +30,10 @@ import org.zalando.nakadi.domain.storage.Storage;
 import org.zalando.nakadi.exceptions.runtime.AccessDeniedException;
 import org.zalando.nakadi.exceptions.runtime.InternalNakadiException;
 import org.zalando.nakadi.exceptions.runtime.InvalidCursorException;
+import org.zalando.nakadi.exceptions.runtime.InvalidFilterException;
+import org.zalando.nakadi.exceptions.runtime.InvalidFilterLangException;
 import org.zalando.nakadi.exceptions.runtime.InvalidLimitException;
+import org.zalando.nakadi.exceptions.runtime.MissingFilterLangException;
 import org.zalando.nakadi.exceptions.runtime.NoConnectionSlotsException;
 import org.zalando.nakadi.exceptions.runtime.NoSuchEventTypeException;
 import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableException;
@@ -50,6 +53,7 @@ import org.zalando.nakadi.service.timeline.HighLevelConsumer;
 import org.zalando.nakadi.service.timeline.TimelineService;
 import org.zalando.nakadi.util.MDCUtils;
 import org.zalando.nakadi.view.Cursor;
+import org.zalando.nakadisqlexecutor.streams.EventsWrapper;
 import org.zalando.problem.Problem;
 import org.zalando.problem.StatusType;
 
@@ -64,10 +68,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.zalando.nakadi.metrics.MetricUtils.metricNameFor;
 import static org.zalando.nakadi.metrics.MetricUtils.metricNameForLoLAOpenConnections;
+import static org.zalando.nakadi.service.StreamingFilters.filterExpressionToPredicate;
 import static org.zalando.problem.Status.BAD_REQUEST;
 import static org.zalando.problem.Status.FORBIDDEN;
 import static org.zalando.problem.Status.INTERNAL_SERVER_ERROR;
@@ -195,6 +201,8 @@ public class EventStreamController {
             @Nullable
             @RequestParam(value = "stream_keep_alive_limit", required = false) final Integer streamKeepAliveLimit,
             @Nullable @RequestParam(value = "test_data_filter", required = false) final TestDataFilter testDataFilter,
+            @Nullable @RequestParam(value = "ssf_expr", required = false) final String ssfFilter,
+            @Nullable @RequestParam(value = "ssf_lang", required = false) final String ssfLang,
             @Nullable @RequestHeader(name = "X-nakadi-cursors", required = false) final String cursorsStr,
             final HttpServletResponse response, final Client client) {
         final MDCUtils.Context requestContext = MDCUtils.getContext();
@@ -240,6 +248,9 @@ public class EventStreamController {
                     authorizationValidator.authorizeEventTypeView(eventType);
                     authorizeStreamRead(eventTypeName);
 
+                    final Function<EventsWrapper, Boolean> filterPredicate =
+                            filterExpressionToPredicate(ssfFilter, ssfLang);
+
                     // validate parameters
                     final EventStreamConfig streamConfig = EventStreamConfig.builder()
                             .withBatchLimit(batchLimit)
@@ -252,6 +263,7 @@ public class EventStreamController {
                             .withCursors(getStreamingStart(eventType, cursorsStr))
                             .withMaxMemoryUsageBytes(maxMemoryUsageBytes)
                             .withTestDataFilter(Optional.ofNullable(testDataFilter).orElse(TestDataFilter.LIVE))
+                            .withFilterPredicate(filterPredicate)
                             .build();
 
                     consumerCounter = metricRegistry.counter(metricNameFor(eventTypeName, CONSUMERS_COUNT_METRIC_NAME));
@@ -305,6 +317,12 @@ public class EventStreamController {
                     writeProblemResponse(response, outputStream, INTERNAL_SERVER_ERROR, e.getMessage());
                 } catch (final InvalidCursorException e) {
                     writeProblemResponse(response, outputStream, PRECONDITION_FAILED, e.getMessage());
+                } catch (final InvalidFilterLangException e) {
+                    writeProblemResponse(response, outputStream, BAD_REQUEST, e.getMessage());
+                } catch (final MissingFilterLangException e) {
+                    writeProblemResponse(response, outputStream, BAD_REQUEST, e.getMessage());
+                } catch (final InvalidFilterException e) {
+                    writeProblemResponse(response, outputStream, BAD_REQUEST, e.getMessage());
                 } catch (final AccessDeniedException e) {
                     writeProblemResponse(response, outputStream, FORBIDDEN, e.explain());
                 } catch (final Exception e) {

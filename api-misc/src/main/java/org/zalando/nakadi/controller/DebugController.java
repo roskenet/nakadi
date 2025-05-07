@@ -1,5 +1,7 @@
 package org.zalando.nakadi.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,6 +16,7 @@ import org.zalando.nakadi.view.EvalFilterRequest;
 import org.zalando.nakadi.view.EvalFilterResponse;
 import org.zalando.nakadisqlexecutor.streams.EventsWrapper;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -22,6 +25,8 @@ import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 @RestController
 @RequestMapping(value = "/debug", produces = APPLICATION_JSON_VALUE)
 public class DebugController {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DebugController.class);
 
     @RequestMapping(method = RequestMethod.POST, value = "/eval-filter")
     public ResponseEntity<?> testFilter(@RequestBody final EvalFilterRequest evalFilterRequest,
@@ -34,8 +39,16 @@ public class DebugController {
             final Criterion criterion;
             final Function<EventsWrapper, Boolean> compiledPredicate;
             final Boolean result;
+            if (!evalFilterRequest.getSsfLang().equals("sql_v1")) {
+                return reportError(HttpStatus.BAD_REQUEST, "INVALID_FILTER_LANG",
+                        "Invalid ssf_lang. Must be set to sql_v1", null);
+            }
+            if (evalFilterRequest.getSsfExpr().trim().isEmpty()) {
+                return reportError(HttpStatus.BAD_REQUEST, "SSF_EXPR_EMPTY",
+                        "Invalid ssf_expr. Must be non empty expression", null);
+            }
             try {
-                criterion = library.parseExpression(evalFilterRequest.getFilter());
+                criterion = library.parseExpression(evalFilterRequest.getSsfExpr());
             } catch (final SqlParserException e) {
                 return reportError(HttpStatus.BAD_REQUEST,
                         "SQL_PARSER_ERROR", "filter expression could not be parsed", e);
@@ -61,6 +74,7 @@ public class DebugController {
             response.setResult(result);
             return ResponseEntity.status(HttpStatus.OK).body(response);
         } catch (final Exception e) {
+            LOG.error("Unexpected error", e.getMessage(), e);
             return reportError(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR",
                     "something unexpected went wrong", e);
         }
@@ -69,13 +83,16 @@ public class DebugController {
     private ResponseEntity<?> reportError(
             final HttpStatus httpStatus, final String error, final String message, final Exception e) {
         // TODO use Problem class for error responses
-        return ResponseEntity.status(httpStatus).body(Map.of(
-                "error", error,
-                "message", message,
-                "caused_by", Map.of(
-                        "exception", e.getClass().getName(),
-                        "message", e.getMessage())
-        ));
+        final Map<String, Object> responseMap = new HashMap();
+        responseMap.put("error", error);
+        responseMap.put("message", message);
+        if (e != null) {
+            final Map<String, Object> causedBy = new HashMap();
+            causedBy.put("exception", e.getClass().getName());
+            causedBy.put("message", e.getMessage());
+            responseMap.put("caused_by", causedBy);
+        }
+        return ResponseEntity.status(httpStatus).body(responseMap);
     }
 
 }

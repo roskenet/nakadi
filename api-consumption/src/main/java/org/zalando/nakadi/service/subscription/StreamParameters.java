@@ -6,11 +6,15 @@ import org.zalando.nakadi.exceptions.runtime.InvalidStreamParametersException;
 import org.zalando.nakadi.security.Client;
 import org.zalando.nakadi.service.EventStreamConfig;
 import org.zalando.nakadi.view.UserStreamParameters;
+import org.zalando.nakadisqlexecutor.streams.EventsWrapper;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.IntStream;
+
+import static org.zalando.nakadi.service.StreamingFilters.filterExpressionToPredicate;
 
 public class StreamParameters {
     /**
@@ -52,6 +56,8 @@ public class StreamParameters {
 
     private final TestDataFilter testDataFilter;
 
+    private final Function<EventsWrapper, Boolean> filterPredicate;
+
     private StreamParameters(
             final UserStreamParameters userParameters,
             final long maxCommitTimeout,
@@ -81,6 +87,9 @@ public class StreamParameters {
         }
         this.commitTimeoutMillis = TimeUnit.SECONDS.toMillis(commitTimeout == 0 ? maxCommitTimeout : commitTimeout);
         this.testDataFilter = userParameters.getTestDataFilter().orElse(TestDataFilter.LIVE);
+        this.filterPredicate = filterExpressionToPredicate(
+                userParameters.getSsfExpr().orElse(null),
+                userParameters.getSsfLang().orElse(null));
     }
 
     public long getMessagesAllowedToSend(final long limit, final long sentSoFar) {
@@ -111,5 +120,9 @@ public class StreamParameters {
 
     public TestDataFilter getTestDataFilter() {
         return testDataFilter;
+    }
+
+    public Function<EventsWrapper, Boolean> getFilterPredicate() {
+        return filterPredicate;
     }
 }

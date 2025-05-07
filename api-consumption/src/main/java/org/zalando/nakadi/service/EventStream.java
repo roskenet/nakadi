@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 
 import static java.lang.System.currentTimeMillis;
 import static java.util.function.Function.identity;
+import static org.zalando.nakadi.service.StreamingFilters.shouldEventBeFilteredBecauseOfFilter;
 import static org.zalando.nakadi.service.StreamingFilters.shouldEventBeFilteredBecauseOfTestProjectId;
 
 public class EventStream {
@@ -188,10 +189,11 @@ public class EventStream {
     }
 
     private boolean shouldEventBeDiscarded(final ConsumedEvent evt) {
-        return evt.getConsumerTags().containsKey(HeaderTag.CONSUMER_SUBSCRIPTION_ID)
+        return eventStreamChecks.shouldSkipMisplacedEvent(evt)
+                || evt.getConsumerTags().containsKey(HeaderTag.CONSUMER_SUBSCRIPTION_ID)
+                || eventStreamChecks.isConsumptionBlocked(evt)
                 || shouldEventBeFilteredBecauseOfTestProjectId(config.getTestDataFilter(), evt)
-                || eventStreamChecks.shouldSkipMisplacedEvent(evt)
-                || eventStreamChecks.isConsumptionBlocked(evt);
+                || shouldEventBeFilteredBecauseOfFilter(config.getFilterPredicate(), evt);
     }
 
     private boolean isMemoryLimitReached(final long memoryUsed) {

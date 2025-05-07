@@ -129,7 +129,7 @@ public class EventStreamReadingAT extends BaseAT {
         kafkaHelper.writeMultipleMessageToPartition(TEST_PARTITION, topicName, dummyEventGenerator, eventsPushed);
 
         // ACT //
-        final Response response = readEvents(Optional.empty());
+        final Response response = readEvents(Optional.empty(), Optional.empty());
 
         // ASSERT //
         response.then().statusCode(HttpStatus.OK.value()).header(HttpHeaders.TRANSFER_ENCODING, "chunked");
@@ -365,13 +365,13 @@ public class EventStreamReadingAT extends BaseAT {
 
     @Test(timeout = 10000)
     public void whenReadEventsForBlockedConsumerThen403() throws Exception {
-        readEvents(Optional.empty())
+        readEvents(Optional.empty(), Optional.empty())
                 .then()
                 .statusCode(HttpStatus.OK.value());
 
         SettingsControllerAT.blacklist(eventType.getName(), BlacklistService.Type.CONSUMER_ET);
         try {
-            TestUtils.waitFor(() -> readEvents(Optional.empty())
+            TestUtils.waitFor(() -> readEvents(Optional.empty(), Optional.empty())
                     .then()
                     .statusCode(403)
                     .body("detail", Matchers.equalTo("Application or event type is blocked")), 1000, 200);
@@ -379,12 +379,12 @@ public class EventStreamReadingAT extends BaseAT {
             SettingsControllerAT.whitelist(eventType.getName(), BlacklistService.Type.CONSUMER_ET);
         }
 
-        readEvents(Optional.empty())
+        readEvents(Optional.empty(), Optional.empty())
                 .then()
                 .statusCode(HttpStatus.OK.value());
     }
 
-    private Response readEvents(final Optional<TestDataFilter> testDataFilter) {
+    private Response readEvents(final Optional<TestDataFilter> testDataFilter, final Optional<String> ssfFilter) {
         final RequestSpecification builder = given()
                 .header(new Header("X-nakadi-cursors", xNakadiCursors))
                 .param("batch_limit", "5")
@@ -392,6 +392,9 @@ public class EventStreamReadingAT extends BaseAT {
                 .param("batch_flush_timeout", "2");
 
         testDataFilter.ifPresent(filter -> builder.param("test_data_filter", filter.toString()));
+        ssfFilter.ifPresent(filter -> builder
+                .param("ssf_expr", filter)
+                .param("ssf_lang", "sql_v1"));
 
         return builder.when().get(streamEndpoint);
     }
@@ -567,7 +570,7 @@ public class EventStreamReadingAT extends BaseAT {
                 .statusCode(200);
 
         // ACT //
-        final Response response = readEvents(Optional.empty());
+        final Response response = readEvents(Optional.empty(), Optional.empty());
 
         // ASSERT //
         response.then().statusCode(HttpStatus.OK.value()).header(HttpHeaders.TRANSFER_ENCODING, "chunked");
@@ -622,7 +625,7 @@ public class EventStreamReadingAT extends BaseAT {
                 .statusCode(200);
 
         // ACT //
-        final Response response = readEvents(Optional.of(TestDataFilter.LIVE_AND_TEST));
+        final Response response = readEvents(Optional.of(TestDataFilter.LIVE_AND_TEST), Optional.empty());
 
         // ASSERT //
         response.then().statusCode(HttpStatus.OK.value()).header(HttpHeaders.TRANSFER_ENCODING, "chunked");
@@ -640,6 +643,61 @@ public class EventStreamReadingAT extends BaseAT {
                 responseBars
         );
     }
+
+    @Test(timeout = 10000)
+    @SuppressWarnings("unchecked")
+    public void whenUseFilterThenReceiveOnlyMatchingEvents() {
+        // ARRANGE //
+        // push events to one of the partitions
+        given()
+                .body("[" +
+                        "{" +
+                        "\"metadata\":{" +
+                        "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a0\"," +
+                        "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"" +
+                        "}," +
+                        "\"foo\": \"bar_01\"" +
+                        "}," +
+                        "{" +
+                        "\"metadata\":{" +
+                        "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a1\"," +
+                        "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"" +
+                        "}," +
+                        "\"foo\": \"baz_02\"" +
+                        "}," +
+                        "{" +
+                        "\"metadata\":{" +
+                        "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a2\"," +
+                        "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"" +
+                        "}," +
+                        "\"foo\": \"bar_03\"" +
+                        "}" +
+                        "]")
+                .contentType(ContentType.JSON)
+                .post(MessageFormat.format("/event-types/{0}/events", eventType.getName()))
+                .then()
+                .statusCode(200);
+
+        // ACT //
+        final Response response = readEvents(Optional.empty(), Optional.of("e.foo LIKE 'bar_%'"));
+
+        // ASSERT //
+        response.then().statusCode(HttpStatus.OK.value()).header(HttpHeaders.TRANSFER_ENCODING, "chunked");
+
+        final String body = response.print();
+
+        final List<JsonNode> batches = deserializeBatchesJsonNode(body);
+        final Set<String> responseBars = batches.stream()
+                .map(b -> extractBars(b))
+                .flatMap(Set::stream)
+                .collect(Collectors.toSet());
+
+        Assert.assertEquals(
+                Set.of("bar_01", "bar_03"), // receive all the events starting with bar_
+                responseBars
+        );
+    }
+
 
     private static String createStreamEndpointUrl(final String eventType) {
         return format("/event-types/{0}/events", eventType);

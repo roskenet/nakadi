@@ -4,11 +4,13 @@ import org.zalando.nakadi.domain.NakadiCursor;
 import org.zalando.nakadi.domain.TestDataFilter;
 import org.zalando.nakadi.exceptions.runtime.InvalidLimitException;
 import org.zalando.nakadi.security.Client;
+import org.zalando.nakadisqlexecutor.streams.EventsWrapper;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.Immutable;
 import java.util.List;
 import java.util.Random;
+import java.util.function.Function;
 
 @Immutable
 public class EventStreamConfig {
@@ -34,10 +36,13 @@ public class EventStreamConfig {
 
     private final TestDataFilter testDataFilter;
 
+    private final Function<EventsWrapper, Boolean> filterPredicate;
+
     private EventStreamConfig(final List<NakadiCursor> cursors, final int batchLimit,
                               final int streamLimit, final int batchTimeout, final int streamTimeout,
                               final int streamKeepAliveLimit, final String etName, final Client consumingClient,
-                              final long maxMemoryUsageBytes, final TestDataFilter testDataFilter) {
+                              final long maxMemoryUsageBytes, final TestDataFilter testDataFilter,
+                              final Function<EventsWrapper, Boolean> filterPredicate) {
         this.cursors = cursors;
         this.batchLimit = batchLimit;
         this.streamLimit = streamLimit;
@@ -48,6 +53,7 @@ public class EventStreamConfig {
         this.consumingClient= consumingClient;
         this.maxMemoryUsageBytes = maxMemoryUsageBytes;
         this.testDataFilter = testDataFilter;
+        this.filterPredicate = filterPredicate;
     }
 
     public List<NakadiCursor> getCursors() {
@@ -90,38 +96,25 @@ public class EventStreamConfig {
         return testDataFilter;
     }
 
+    public Function<EventsWrapper,Boolean> getFilterPredicate() {
+        return filterPredicate;
+    }
+
     @Override
     public String toString() {
-        return "EventStreamConfig{cursors=" + cursors + ", batchLimit=" + batchLimit
-                + ", streamLimit=" + streamLimit + ", batchTimeout=" + batchTimeout + ", streamTimeout=" + streamTimeout
-                + ", streamKeepAliveLimit=" + streamKeepAliveLimit + '}';
-    }
-
-    @Override
-    public boolean equals(final Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-
-        final EventStreamConfig that = (EventStreamConfig) o;
-
-        return batchLimit == that.batchLimit && streamLimit == that.streamLimit && batchTimeout == that.batchTimeout
-                && streamTimeout == that.streamTimeout && streamKeepAliveLimit == that.streamKeepAliveLimit
-                && cursors.equals(that.cursors);
-    }
-
-    @Override
-    public int hashCode() {
-        int result = cursors.hashCode();
-        result = 31 * result + batchLimit;
-        result = 31 * result + streamLimit;
-        result = 31 * result + batchTimeout;
-        result = 31 * result + streamTimeout;
-        result = 31 * result + streamKeepAliveLimit;
-        return result;
+        return "EventStreamConfig{" +
+                "cursors=" + cursors +
+                ", batchLimit=" + batchLimit +
+                ", streamLimit=" + streamLimit +
+                ", batchTimeout=" + batchTimeout +
+                ", streamTimeout=" + streamTimeout +
+                ", streamKeepAliveLimit=" + streamKeepAliveLimit +
+                ", etName='" + etName + '\'' +
+                ", consumingClient=" + consumingClient +
+                ", maxMemoryUsageBytes=" + maxMemoryUsageBytes +
+                ", testDataFilter=" + testDataFilter +
+                ", filterPredicate=" + filterPredicate +
+                '}';
     }
 
     public static Builder builder() {
@@ -144,6 +137,7 @@ public class EventStreamConfig {
         private String etName;
         private Client consumingClient;
         private TestDataFilter testDataFilter;
+        private Function<EventsWrapper, Boolean> filterPredicate;
 
         public Builder withCursors(final List<NakadiCursor> cursors) {
             this.cursors = cursors;
@@ -211,6 +205,11 @@ public class EventStreamConfig {
             return this;
         }
 
+        public Builder withFilterPredicate(final Function<EventsWrapper, Boolean> filterPredicate) {
+            this.filterPredicate = filterPredicate;
+            return this;
+        }
+
         public EventStreamConfig build() throws InvalidLimitException {
             if (streamLimit != 0 && streamLimit < batchLimit) {
                 throw new InvalidLimitException("stream_limit can't be lower than batch_limit");
@@ -220,7 +219,8 @@ public class EventStreamConfig {
                 throw new InvalidLimitException("batch_limit can't be lower than 1");
             }
             return new EventStreamConfig(cursors, batchLimit, streamLimit, batchTimeout, streamTimeout,
-                    streamKeepAliveLimit, etName, consumingClient, maxMemoryUsageBytes, testDataFilter);
+                    streamKeepAliveLimit, etName, consumingClient, maxMemoryUsageBytes, testDataFilter,
+                    filterPredicate);
         }
 
     }
