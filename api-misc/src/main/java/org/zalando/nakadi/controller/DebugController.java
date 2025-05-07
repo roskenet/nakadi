@@ -81,7 +81,7 @@ public class DebugController {
     private ResponseEntity<?> reportError(
             final HttpStatus httpStatus, final String error, final String message, final Exception e) {
         // TODO use Problem class for error responses
-        Map<String, Object> responseMap = Map.of(
+        final Map<String, Object> responseMap = Map.of(
                 "error", error,
                 "message", message
         );
