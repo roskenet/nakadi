@@ -392,7 +392,9 @@ public class EventStreamReadingAT extends BaseAT {
                 .param("batch_flush_timeout", "2");
 
         testDataFilter.ifPresent(filter -> builder.param("test_data_filter", filter.toString()));
-        ssfFilter.ifPresent(filter -> builder.param("filter", filter));
+        ssfFilter.ifPresent(filter -> builder
+                .param("ssf_expr", filter)
+                .param("ssf_lang", "sql_v1"));
 
         return builder.when().get(streamEndpoint);
     }
