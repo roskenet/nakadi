@@ -207,14 +207,15 @@ public class SubscriptionStreamController {
                     streamKeepAliveLimit,
             @Nullable @RequestParam(value = "commit_timeout", required = false) final Long commitTimeout,
             @Nullable @RequestParam(value = "test_data_filter", required = false) final TestDataFilter testDataFilter,
-            @Nullable @RequestParam(value = "filter", required = false) final String filter,
+            @Nullable @RequestParam(value = "ssf_expr", required = false) final String ssfExpr,
+            @Nullable @RequestParam(value = "ssf_lang", required = false) final String ssfLang,
             @RequestHeader(name = "Accept", required = false,
                     defaultValue = "application/x-json-stream") final String acceptHeader,
             final HttpServletResponse response, final Client client) {
 
         final UserStreamParameters userParameters = new UserStreamParameters(batchLimit, streamLimit, batchTimespan,
                 batchTimeout, streamTimeout, streamKeepAliveLimit, maxUncommittedEvents, ImmutableList.of(),
-                commitTimeout, testDataFilter, filter);
+                commitTimeout, testDataFilter, ssfExpr, ssfLang);
 
         final StreamParameters streamParameters = StreamParameters.of(userParameters,
                 nakadiSettings.getMaxCommitTimeout(), client);
