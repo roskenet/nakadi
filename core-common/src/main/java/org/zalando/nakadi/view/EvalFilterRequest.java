@@ -3,21 +3,30 @@ package org.zalando.nakadi.view;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import javax.annotation.Nonnull;
+import javax.annotation.concurrent.Immutable;
+import javax.validation.constraints.NotNull;
 import java.util.Objects;
 
+@Immutable
 public class EvalFilterRequest {
 
-    @Nonnull
+    @NotNull
     private ObjectNode event;
 
-    @Nonnull
-    @JsonProperty("ssf_expr")
+    @NotNull
     private String ssfExpr;
 
-    @Nonnull
-    @JsonProperty("ssf_lang")
+    @NotNull
     private String ssfLang;
+
+    public EvalFilterRequest(
+            @JsonProperty("event") final ObjectNode event,
+            @JsonProperty("ssf_expr") final String ssfExpr,
+            @JsonProperty("ssf_lang") final String ssfLang) {
+        this.event = event;
+        this.ssfExpr = ssfExpr;
+        this.ssfLang = ssfLang;
+    }
 
     @Override
     public boolean equals(final Object o) {

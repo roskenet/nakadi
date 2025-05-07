@@ -42,7 +42,7 @@ public class DebugController {
                 return reportError(HttpStatus.BAD_REQUEST, "INVALID_FILTER_LANG",
                         "Invalid ssf_lang. Must be set to sql_v1", null);
             }
-            if (!evalFilterRequest.getSsfExpr().trim().isEmpty()) {
+            if (evalFilterRequest.getSsfExpr().trim().isEmpty()) {
                 return reportError(HttpStatus.BAD_REQUEST, "SSF_EXPR_EMPTY",
                         "Invalid ssf_expr. Must be non empty expression", null);
             }
