@@ -524,7 +524,8 @@ paths:
         - $ref: '#/parameters/StreamTimeout'
         - $ref: '#/parameters/StreamKeepAliveLimit'
         - $ref: '#/parameters/TestDataFilter'
-        - $ref: '#/parameters/Filter'
+        - $ref: '#/parameters/SSFExpr'
+        - $ref: '#/parameters/SSFLang'
         - name: X-Flow-Id
           in: header
           description: |
@@ -1468,7 +1469,8 @@ paths:
         - $ref: '#/parameters/StreamKeepAliveLimit'
         - $ref: '#/parameters/CommitTimeout'
         - $ref: '#/parameters/TestDataFilter'
-        - $ref: '#/parameters/Filter'
+        - $ref: '#/parameters/SSFExpr'
+        - $ref: '#/parameters/SSFLang'
         - name: X-Flow-Id
           in: header
           description: |
@@ -1647,12 +1649,27 @@ paths:
                 type: string
                 enum: ['TEST', 'LIVE', 'LIVE_AND_TEST']
                 default: 'LIVE'
-              filter:
+              ssf_expr:
                 description: |
-                  Allows you to specify a SQL-like filter to filter the events you wish to receive.
-                  See https://nakadi.docs.zalando.net/nakadi-event-broker/server-side-filtering/
+                    Allows you to specify an expression that is used to restrict the events that you receive.
+                    
+                    Must be paired with `ssf_lang` parameter.
+                    
+                    See https://nakadi.docs.zalando.net/nakadi-event-broker/server-side-filtering/
                 type: string
                 example: "e.metadata.published_by LIKE 'order-service-v%'"
+              ssf_lang:
+                description: |
+                    Allows you to specify the language used to evaluate the filter in `ssf_expr`.
+                    
+                    Currently only `sql_v1` is supported which supports the same expressions allowed
+                    in the WHERE clause of Nakadi-SQL queries.
+                    
+                    Must be specified whenever `ssf_expr` is supplied.
+                    See https://nakadi.docs.zalando.net/nakadi-event-broker/server-side-filtering/
+                type: string
+                enum: ["sql_v1"]
+                example: "sql_v1"
         - $ref: '#/parameters/SubscriptionId'
         - name: X-Flow-Id
           in: header
@@ -3864,12 +3881,31 @@ parameters:
     default: 'LIVE'
     required: false
 
-  Filter:
-      name: filter
+  SSFExpr:
+      name: ssf_expr
       in: query
       description: |
-          Allows you to specify a SQL-like filter to filter the events you wish to receive.
+          Allows you to specify an expression that is used to restrict the events that you receive.
+        
+          Must be paired with `ssf_lang` parameter.
+        
           See https://nakadi.docs.zalando.net/nakadi-event-broker/server-side-filtering/
       type: string
       example: "e.metadata.published_by LIKE 'order-service-v%'"
       required: false
+
+  SSFLang:
+    name: ssf_lang
+    in: query
+    description: |
+      Allows you to specify the language used to evaluate the filter in `ssf_expr`.
+      
+      Currently only `sql_v1` is supported which supports the same expressions allowed
+      in the WHERE clause of Nakadi-SQL queries.
+      
+      Must be specified whenever `ssf_expr` is supplied.
+      See https://nakadi.docs.zalando.net/nakadi-event-broker/server-side-filtering/
+    type: string
+    enum: ["sql_v1"]
+    example: "sql_v1"
+    required: false
