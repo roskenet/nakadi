@@ -83,7 +83,7 @@ public class DebugController {
         // TODO use Problem class for error responses
         Map<String, Object> responseMap = Map.of(
                 "error", error,
-                "message", message,
+                "message", message
         );
         if (e != null) {
             responseMap.put("caused_by", Map.of(
