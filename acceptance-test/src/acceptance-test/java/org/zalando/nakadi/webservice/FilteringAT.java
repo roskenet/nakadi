@@ -95,7 +95,8 @@ public class FilteringAT extends RealEnvironmentAT {
         // only events that start with bar_
         final Set<String> expectedEIDsDefault = getEventEids(event1, event3, event4);
         final List<NameValuePair> parameters = List.of(
-                new BasicNameValuePair("filter", "e.foo LIKE 'bar_%'"));
+                new BasicNameValuePair("ssf_expr", "e.foo LIKE 'bar_%'"),
+                new BasicNameValuePair("ssf_lang", "sql_v1"));
         final String getParams = URLEncodedUtils.format(parameters, "UTF-8");
         testEventsFlow(expectedEIDsDefault, getParams, Optional.empty());
     }
@@ -105,7 +106,10 @@ public class FilteringAT extends RealEnvironmentAT {
     public void testLiveAndTestConfigurationProvidedToPostEndpoint() throws IOException {
         // LIVE_AND_TEST CONFIGURATION over POST
         final Set<String> expectedEIDsDefault = getEventEids(event1, event3, event4);
-        testEventsFlow(expectedEIDsDefault, "", Optional.of("{\"filter\": \"e.foo LIKE 'bar_%'\"}"));
+        final JSONObject body = new JSONObject();
+        body.put("ssf_expr", "e.foo LIKE 'bar_%'");
+        body.put("ssf_lang", "sql_v1");
+        testEventsFlow(expectedEIDsDefault, "", Optional.of(body.toString()));
     }
 
     private void testEventsFlow(

@@ -87,7 +87,9 @@ public class StreamParameters {
         }
         this.commitTimeoutMillis = TimeUnit.SECONDS.toMillis(commitTimeout == 0 ? maxCommitTimeout : commitTimeout);
         this.testDataFilter = userParameters.getTestDataFilter().orElse(TestDataFilter.LIVE);
-        this.filterPredicate = userParameters.getFilter().map(f -> filterExpressionToPredicate(f)).orElse(null);
+        this.filterPredicate = filterExpressionToPredicate(
+                userParameters.getSsfExpr().orElse(null),
+                userParameters.getSsfLang().orElse(null));
     }
 
     public long getMessagesAllowedToSend(final long limit, final long sentSoFar) {

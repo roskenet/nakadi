@@ -32,7 +32,9 @@ public class UserStreamParameters {
 
     private final Optional<TestDataFilter> testDataFilter;
 
-    private final Optional<String> filter;
+    private final Optional<String> ssfExpr;
+
+    private final Optional<String> ssfLang;
 
     @JsonCreator
     public UserStreamParameters(@JsonProperty("batch_limit") @Nullable final Integer batchLimit,
@@ -45,7 +47,8 @@ public class UserStreamParameters {
                                 @JsonProperty("partitions") @Nullable final List<EventTypePartition> partitions,
                                 @JsonProperty("commit_timeout") @Nullable final Long commitTimeoutSeconds,
                                 @JsonProperty("test_data_filter") @Nullable final TestDataFilter testDataFilter,
-                                @JsonProperty("filter") @Nullable final String filter) {
+                                @JsonProperty("ssf_expr") @Nullable final String ssfExpr,
+                                @JsonProperty("ssf_lang") @Nullable final String ssfLang) {
         this.batchLimit = Optional.ofNullable(batchLimit);
         this.streamLimit = Optional.ofNullable(streamLimit);
         this.batchTimespan = Optional.ofNullable(batchTimespan);
@@ -56,7 +59,8 @@ public class UserStreamParameters {
         this.partitions = partitions == null ? ImmutableList.of() : partitions;
         this.commitTimeoutSeconds = Optional.ofNullable(commitTimeoutSeconds);
         this.testDataFilter = Optional.ofNullable(testDataFilter);
-        this.filter = Optional.ofNullable(filter);
+        this.ssfExpr = Optional.ofNullable(ssfExpr);
+        this.ssfLang = Optional.ofNullable(ssfLang);
     }
 
     public Optional<Integer> getBatchLimit() {
@@ -99,7 +103,11 @@ public class UserStreamParameters {
         return testDataFilter;
     }
 
-    public Optional<String> getFilter() {
-        return filter;
+    public Optional<String> getSsfExpr() {
+        return ssfExpr;
+    }
+
+    public Optional<String> getSsfLang() {
+        return ssfLang;
     }
 }
