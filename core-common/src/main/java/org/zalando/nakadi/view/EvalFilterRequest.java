@@ -20,10 +20,14 @@ public class EvalFilterRequest {
     private String ssfLang;
 
     @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        EvalFilterRequest that = (EvalFilterRequest) o;
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        final EvalFilterRequest that = (EvalFilterRequest) o;
         return event.equals(that.event) && ssfExpr.equals(that.ssfExpr) && ssfLang.equals(that.ssfLang);
     }
 
@@ -36,7 +40,7 @@ public class EvalFilterRequest {
         return event;
     }
 
-    public EvalFilterRequest setEvent(ObjectNode event) {
+    public EvalFilterRequest setEvent(final ObjectNode event) {
         this.event = event;
         return this;
     }
@@ -45,7 +49,7 @@ public class EvalFilterRequest {
         return ssfExpr;
     }
 
-    public EvalFilterRequest setSsfExpr(String ssfExpr) {
+    public EvalFilterRequest setSsfExpr(final String ssfExpr) {
         this.ssfExpr = ssfExpr;
         return this;
     }
@@ -54,7 +58,7 @@ public class EvalFilterRequest {
         return ssfLang;
     }
 
-    public EvalFilterRequest setSsfLang(String ssfLang) {
+    public EvalFilterRequest setSsfLang(final String ssfLang) {
         this.ssfLang = ssfLang;
         return this;
     }
