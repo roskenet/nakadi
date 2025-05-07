@@ -1,5 +1,7 @@
 package org.zalando.nakadi.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,6 +16,7 @@ import org.zalando.nakadi.view.EvalFilterRequest;
 import org.zalando.nakadi.view.EvalFilterResponse;
 import org.zalando.nakadisqlexecutor.streams.EventsWrapper;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -22,6 +25,8 @@ import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 @RestController
 @RequestMapping(value = "/debug", produces = APPLICATION_JSON_VALUE)
 public class DebugController {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DebugController.class);
 
     @RequestMapping(method = RequestMethod.POST, value = "/eval-filter")
     public ResponseEntity<?> testFilter(@RequestBody final EvalFilterRequest evalFilterRequest,
@@ -73,6 +78,7 @@ public class DebugController {
             response.setResult(result);
             return ResponseEntity.status(HttpStatus.OK).body(response);
         } catch (final Exception e) {
+            LOG.error("Unexpected error", e.getMessage(), e);
             return reportError(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR",
                     "something unexpected went wrong", e);
         }
@@ -81,14 +87,14 @@ public class DebugController {
     private ResponseEntity<?> reportError(
             final HttpStatus httpStatus, final String error, final String message, final Exception e) {
         // TODO use Problem class for error responses
-        final Map<String, Object> responseMap = Map.of(
-                "error", error,
-                "message", message
-        );
+        final Map<String, Object> responseMap = new HashMap();
+        responseMap.put("error", error);
+        responseMap.put("message", message);
         if (e != null) {
-            responseMap.put("caused_by", Map.of(
-                    "exception", e.getClass().getName(),
-                    "message", e.getMessage()));
+            final Map<String, Object> causedBy = new HashMap();
+            causedBy.put("exception", e.getClass().getName());
+            causedBy.put("message", e.getMessage());
+            responseMap.put("caused_by", causedBy);
         }
         return ResponseEntity.status(httpStatus).body(responseMap);
     }
