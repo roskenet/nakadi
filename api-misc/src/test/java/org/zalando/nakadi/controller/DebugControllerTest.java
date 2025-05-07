@@ -30,7 +30,8 @@ public class DebugControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(new JSONObject()
                                 .put("event", new JSONObject().put("full_name", "Joe Black"))
-                                .put("filter", "e.full_name LIKE 'Joe%'")
+                                .put("ssf_expr", "e.full_name LIKE 'Joe%'")
+                                .put("ssf_lang", "sql_v1")
                                 .toString()))
                 .andExpect(MockMvcResultMatchers.status().isOk())
                 .andExpect(MockMvcResultMatchers.content().json("{\"result\": true}"));
@@ -42,7 +43,8 @@ public class DebugControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(new JSONObject()
                                 .put("event", new JSONObject().put("full_name", "Bugs Bunny"))
-                                .put("filter", "e.full_name LIKE 'Joe%'")
+                                .put("ssf_expr", "e.full_name LIKE 'Joe%'")
+                                .put("ssf_lang", "sql_v1")
                                 .toString()))
                 .andExpect(MockMvcResultMatchers.status().isOk())
                 .andExpect(MockMvcResultMatchers.content().json("{\"result\": false}"));
