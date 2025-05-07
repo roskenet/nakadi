@@ -34,8 +34,20 @@ public class DebugController {
             final Criterion criterion;
             final Function<EventsWrapper, Boolean> compiledPredicate;
             final Boolean result;
+            if (evalFilterRequest.getSsfLang() == null) {
+                return reportError(HttpStatus.BAD_REQUEST, "MISSING_FILTER_LANG",
+                        "Missing ssf_lang. Must be set to 'sql_v1'", null);
+            }
+            if (!evalFilterRequest.getSsfLang().equals("sql_v1")) {
+                return reportError(HttpStatus.BAD_REQUEST, "INVALID_FILTER_LANG",
+                        "Invalid ssf_lang. Must be set to sql_v1", null);
+            }
+            if (!evalFilterRequest.getSsfExpr().trim().isEmpty()) {
+                return reportError(HttpStatus.BAD_REQUEST, "SSF_EXPR_EMPTY",
+                        "Invalid ssf_expr. Must be non empty expression", null);
+            }
             try {
-                criterion = library.parseExpression(evalFilterRequest.getFilter());
+                criterion = library.parseExpression(evalFilterRequest.getSsfExpr());
             } catch (final SqlParserException e) {
                 return reportError(HttpStatus.BAD_REQUEST,
                         "SQL_PARSER_ERROR", "filter expression could not be parsed", e);
@@ -69,13 +81,16 @@ public class DebugController {
     private ResponseEntity<?> reportError(
             final HttpStatus httpStatus, final String error, final String message, final Exception e) {
         // TODO use Problem class for error responses
-        return ResponseEntity.status(httpStatus).body(Map.of(
+        Map<String, Object> responseMap = Map.of(
                 "error", error,
                 "message", message,
-                "caused_by", Map.of(
-                        "exception", e.getClass().getName(),
-                        "message", e.getMessage())
-        ));
+        );
+        if (e != null) {
+            responseMap.put("caused_by", Map.of(
+                    "exception", e.getClass().getName(),
+                    "message", e.getMessage()));
+        }
+        return ResponseEntity.status(httpStatus).body(responseMap);
     }
 
 }

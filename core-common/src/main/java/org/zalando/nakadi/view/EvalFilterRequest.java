@@ -1,47 +1,61 @@
 package org.zalando.nakadi.view;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import javax.annotation.Nonnull;
 import java.util.Objects;
 
 public class EvalFilterRequest {
 
+    @Nonnull
     private ObjectNode event;
-    private String filter;
+
+    @Nonnull
+    @JsonProperty("ssf_expr")
+    private String ssfExpr;
+
+    @Nonnull
+    @JsonProperty("ssf_lang")
+    private String ssfLang;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        EvalFilterRequest that = (EvalFilterRequest) o;
+        return event.equals(that.event) && ssfExpr.equals(that.ssfExpr) && ssfLang.equals(that.ssfLang);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(event, ssfExpr, ssfLang);
+    }
 
     public ObjectNode getEvent() {
         return event;
     }
 
-    public EvalFilterRequest setEvent(final ObjectNode event) {
+    public EvalFilterRequest setEvent(ObjectNode event) {
         this.event = event;
         return this;
     }
 
-    public String getFilter() {
-        return filter;
+    public String getSsfExpr() {
+        return ssfExpr;
     }
 
-    public EvalFilterRequest setFilter(final String filter) {
-        this.filter = filter;
+    public EvalFilterRequest setSsfExpr(String ssfExpr) {
+        this.ssfExpr = ssfExpr;
         return this;
     }
 
-    @Override
-    public boolean equals(final Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        final EvalFilterRequest that = (EvalFilterRequest) o;
-        return Objects.equals(event, that.event) && Objects.equals(filter, that.filter);
+    public String getSsfLang() {
+        return ssfLang;
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(event, filter);
+    public EvalFilterRequest setSsfLang(String ssfLang) {
+        this.ssfLang = ssfLang;
+        return this;
     }
-
 }

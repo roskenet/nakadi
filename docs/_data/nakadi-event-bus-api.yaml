@@ -2228,7 +2228,7 @@ paths:
         - debug-api
       description: |
         Accepts a JSON event and a filter expression and returns a boolean result.
-        Can be used to simulate the behavior of the filters that are applicable to all the event streaming endpoints.
+        Can be used to simulate the behavior of the filters that are applicable to all the event streaming endpoints (`?ssf_expr=...&ssf_lang=...`).
         
         NOTE: Currently the event is available under the table alias `e`. We hope to hope to remove this restriction in the near future.
       parameters:
@@ -2238,9 +2238,27 @@ paths:
             description: Request body for evaluating a filter expression.
             type: object
             properties:
-              filter:
+              ssf_expr:
+                description: |
+                  Allows you to specify an expression that is used to restrict the events that you receive.
+                  
+                  Must be paired with `ssf_lang` parameter.
+                  
+                  See https://nakadi.docs.zalando.net/nakadi-event-broker/server-side-filtering/
                 type: string
-                example: "e.metadata.published_by LIKE 'order-processor-v%'"
+                example: "e.metadata.published_by LIKE 'order-service-v%'"
+              ssf_lang:
+                description: |
+                  Allows you to specify the language used to evaluate the filter in `ssf_expr`.
+                  
+                  Currently only `sql_v1` is supported which supports the same expressions allowed
+                  in the WHERE clause of Nakadi-SQL queries.
+                  
+                  Must be specified whenever `ssf_expr` is supplied.
+                  See https://nakadi.docs.zalando.net/nakadi-event-broker/server-side-filtering/
+                type: string
+                enum: ["sql_v1"]
+                example: "sql_v1"
               event:
                 type: object
                 example:
