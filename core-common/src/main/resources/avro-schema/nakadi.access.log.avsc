@@ -54,7 +54,8 @@
     },
     {
       "name": "body",
-      "type": "bytes"
+      "type": "bytes",
+      "default": ""
     }
   ]
 }
