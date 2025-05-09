@@ -354,7 +354,7 @@ public class LoggingFilter extends OncePerRequestFilter {
          *
          * @param in the input stream to be wrapped
          */
-        public CapturingInputStream(InputStream in) {
+        public CapturingInputStream(final InputStream in) {
             super(checkNotNull(in));
             os = new ByteArrayOutputStream();
         }
@@ -385,7 +385,7 @@ public class LoggingFilter extends OncePerRequestFilter {
         // the default implementation of skip would now allow us to capture the skipped bytes
         @Override
         public long skip(final long n) throws IOException {
-            int remaining = (int) n; // ¯\_(ツ)_/¯
+            final int remaining = (int) n; // ¯\_(ツ)_/¯
             final byte[] b = new byte[1024];
             while (remaining > 0) {
                 this.read(b, 0, Math.min(remaining, b.length));
