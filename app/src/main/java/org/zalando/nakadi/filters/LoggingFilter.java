@@ -157,11 +157,13 @@ public class LoggingFilter extends OncePerRequestFilter {
                                     final HttpServletResponse response, final FilterChain filterChain)
             throws IOException, ServletException {
 
-        final boolean isBodyCapturingEnabled = featureToggleService.isFeatureEnabled(Feature.ACCESS_LOG_CAPTURE_REQ_BODY);
+        final boolean isBodyCapturingEnabled = featureToggleService
+                .isFeatureEnabled(Feature.ACCESS_LOG_CAPTURE_REQ_BODY);
         final long startTime = System.currentTimeMillis();
         final RequestWrapper requestWrapper = new RequestWrapper(request, isBodyCapturingEnabled);
         final ResponseWrapper responseWrapper = new ResponseWrapper(response);
-        final RequestLogInfo requestLogInfo = new RequestLogInfo(requestWrapper, responseWrapper, startTime, isBodyCapturingEnabled);
+        final RequestLogInfo requestLogInfo = new RequestLogInfo(
+                requestWrapper, responseWrapper, startTime, isBodyCapturingEnabled);
         try {
             filterChain.doFilter(requestWrapper, responseWrapper);
             if (request.isAsyncStarted()) {
@@ -243,7 +245,7 @@ public class LoggingFilter extends OncePerRequestFilter {
     // ====================================================================================================
     private static class RequestWrapper extends HttpServletRequestWrapper {
 
-        private CountingInputStreamWrapper inputStreamWrapper;
+        private NakadiInputStreamWrapper inputStreamWrapper;
         private boolean captureBody;
 
         RequestWrapper(final HttpServletRequest request, final boolean captureBody) {
@@ -268,20 +270,20 @@ public class LoggingFilter extends OncePerRequestFilter {
         @Override
         public ServletInputStream getInputStream() throws IOException {
             if (inputStreamWrapper == null) {
-                inputStreamWrapper = new CountingInputStreamWrapper(super.getInputStream(), captureBody);
+                inputStreamWrapper = new NakadiInputStreamWrapper(super.getInputStream(), captureBody);
             }
             return inputStreamWrapper;
         }
     }
 
-    private static class CountingInputStreamWrapper extends ServletInputStream {
+    private static class NakadiInputStreamWrapper extends ServletInputStream {
 
         private final ServletInputStream originalInputStream;
         private final CountingInputStream countingInputStream;
         private final CapturingInputStream capturingInputStream;
         private final InputStream finalInputStream;
 
-        CountingInputStreamWrapper(final ServletInputStream originalInputStream, final boolean captureBody) {
+        NakadiInputStreamWrapper(final ServletInputStream originalInputStream, final boolean captureBody) {
             this.originalInputStream = originalInputStream;
             this.countingInputStream = new CountingInputStream(originalInputStream);
             this.capturingInputStream = captureBody ? new CapturingInputStream(countingInputStream) : null;
@@ -343,7 +345,7 @@ public class LoggingFilter extends OncePerRequestFilter {
     }
 
     // mostly based on com.google.common.io.CountingInputStream
-    public final static class CapturingInputStream extends FilterInputStream {
+    public static final class CapturingInputStream extends FilterInputStream {
 
         private final ByteArrayOutputStream os;
 
@@ -364,7 +366,7 @@ public class LoggingFilter extends OncePerRequestFilter {
 
         @Override
         public int read() throws IOException {
-            int result = in.read();
+            final int result = in.read();
             if (result != -1) {
                 os.write(result);
             }
@@ -372,8 +374,8 @@ public class LoggingFilter extends OncePerRequestFilter {
         }
 
         @Override
-        public int read(byte[] b, int off, int len) throws IOException {
-            int result = in.read(b, off, len);
+        public int read(final byte[] b, final int off, final int len) throws IOException {
+            final int result = in.read(b, off, len);
             if (result != -1) {
                 os.write(b, off, result);
             }
@@ -382,11 +384,11 @@ public class LoggingFilter extends OncePerRequestFilter {
 
         // the default implementation of skip would now allow us to capture the skipped bytes
         @Override
-        public long skip(long n) throws IOException {
+        public long skip(final long n) throws IOException {
             int remaining = (int) n; // ¯\_(ツ)_/¯
             final byte[] b = new byte[1024];
             while (remaining > 0) {
-                this.read(b, 0, remaining);
+                this.read(b, 0, Math.min(remaining, b.length));
             }
             return n;
         }
