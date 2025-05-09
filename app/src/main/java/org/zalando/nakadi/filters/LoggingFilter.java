@@ -40,6 +40,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 public class LoggingFilter extends OncePerRequestFilter {
 
+    private static final Logger LOG = LoggerFactory.getLogger(LoggingFilter.class.getName());
+
     // We are using empty log name, cause it is used only for access log and we do not care about class name
     private static final Logger ACCESS_LOGGER = LoggerFactory.getLogger("ACCESS_LOG");
     private final NakadiKpiPublisher nakadiKpiPublisher;
@@ -67,9 +69,10 @@ public class LoggingFilter extends OncePerRequestFilter {
         private final String contentEncoding;
         private final String acceptEncoding;
         private final long requestStartedAt;
+        private final boolean isBodyCapturingEnabled;
 
         private RequestLogInfo(final RequestWrapper requestWrapper, final ResponseWrapper responseWrapper,
-                               final long requestStartedAt) {
+                               final long requestStartedAt, final boolean isBodyCapturingEnabled) {
 
             this.requestWrapper = requestWrapper;
             this.responseWrapper = responseWrapper;
@@ -85,10 +88,15 @@ public class LoggingFilter extends OncePerRequestFilter {
                     requestWrapper.getHeader(HttpHeaders.ACCEPT_ENCODING)).orElse("-");
 
             this.requestStartedAt = requestStartedAt;
+            this.isBodyCapturingEnabled = isBodyCapturingEnabled;
         }
 
         private long getRequestLength() {
             return requestWrapper.getInputStreamBytesCount();
+        }
+
+        private void forceConsumptionOfInputBytes() throws IOException {
+            requestWrapper.forceInputStreamConsumption();
         }
 
         private byte[] getRequestCapturedBytes() {
@@ -155,7 +163,7 @@ public class LoggingFilter extends OncePerRequestFilter {
         final long startTime = System.currentTimeMillis();
         final RequestWrapper requestWrapper = new RequestWrapper(request, isBodyCapturingEnabled);
         final ResponseWrapper responseWrapper = new ResponseWrapper(response);
-        final RequestLogInfo requestLogInfo = new RequestLogInfo(requestWrapper, responseWrapper, startTime);
+        final RequestLogInfo requestLogInfo = new RequestLogInfo(requestWrapper, responseWrapper, startTime, isBodyCapturingEnabled);
         try {
             filterChain.doFilter(requestWrapper, responseWrapper);
             if (request.isAsyncStarted()) {
@@ -186,11 +194,16 @@ public class LoggingFilter extends OncePerRequestFilter {
         return featureToggleService.isFeatureEnabled(Feature.ACCESS_LOG_ENABLED);
     }
 
-    // TODO force the consumption of all the unconsumed bytes
-    // just because the handler didn't process some of the bytes doesn't mean we should not report them
     private void logToKpiPublisher(final RequestLogInfo requestLogInfo, final int statusCode, final Long timeSpentMs) {
-        Supplier<SpecificRecord> eventSupplier = () -> {
-            var builder = NakadiAccessLog.newBuilder()
+        if (requestLogInfo.isBodyCapturingEnabled) {
+            try {
+                // just because the handler didn't process some of the bytes doesn't mean we should not report them
+                requestLogInfo.forceConsumptionOfInputBytes();
+            } catch (IOException e) {
+                LOG.error("Failed to force consumption of input bytes", e);
+            }
+        }
+        nakadiKpiPublisher.publish(() -> NakadiAccessLog.newBuilder()
                     .setMethod(requestLogInfo.method)
                     .setPath(requestLogInfo.path)
                     .setQuery(requestLogInfo.query)
@@ -203,10 +216,8 @@ public class LoggingFilter extends OncePerRequestFilter {
                     .setResponseTimeMs(timeSpentMs)
                     .setBody(ByteBuffer.wrap(requestLogInfo.getRequestCapturedBytes()))
                     .setRequestLength(requestLogInfo.getRequestLength())
-                    .setResponseLength(requestLogInfo.getResponseLength());
-            return builder.build();
-        };
-        nakadiKpiPublisher.publish(eventSupplier);
+                    .setResponseLength(requestLogInfo.getResponseLength())
+                    .build());
     }
 
     private void logToAccessLog(final RequestLogInfo requestLogInfo, final int statusCode, final Long timeSpentMs) {
@@ -252,6 +263,12 @@ public class LoggingFilter extends OncePerRequestFilter {
             return inputStreamWrapper != null ? inputStreamWrapper.getCount() : 0;
         }
 
+        void forceInputStreamConsumption() throws IOException {
+            if (inputStreamWrapper != null) {
+                inputStreamWrapper.forceInputStreamConsumption();
+            }
+        }
+
         byte[] getInputStreamCapturedBytes() {
             return inputStreamWrapper != null ? inputStreamWrapper.getCaptured() : new byte[] {};
         }
@@ -281,6 +298,13 @@ public class LoggingFilter extends OncePerRequestFilter {
 
         long getCount() {
             return countingInputStream.getCount();
+        }
+
+        void forceInputStreamConsumption() throws IOException {
+            final byte[] buff = new byte[1024];
+            while (read(buff, 0, buff.length) != -1) {
+                ;
+            }
         }
 
         byte[] getCaptured() {
@@ -362,6 +386,17 @@ public class LoggingFilter extends OncePerRequestFilter {
                 os.write(b, off, result);
             }
             return result;
+        }
+
+        // the default implementation of skip would now allow us to capture the skipped bytes
+        @Override
+        public long skip(long n) throws IOException {
+            int remaining = (int) n; // ¯\_(ツ)_/¯
+            final byte[] b = new byte[1024];
+            while (remaining > 0) {
+                this.read(b, 0, remaining);
+            }
+            return n;
         }
 
         @Override
