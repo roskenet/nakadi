@@ -204,20 +204,20 @@ public class LoggingFilter extends OncePerRequestFilter {
             }
         }
         nakadiKpiPublisher.publish(() -> NakadiAccessLog.newBuilder()
-                    .setMethod(requestLogInfo.method)
-                    .setPath(requestLogInfo.path)
-                    .setQuery(requestLogInfo.query)
-                    .setUserAgent(requestLogInfo.userAgent)
-                    .setApp(requestLogInfo.user)
-                    .setAppHashed(nakadiKpiPublisher.hash(requestLogInfo.user))
-                    .setContentEncoding(requestLogInfo.contentEncoding)
-                    .setAcceptEncoding(requestLogInfo.acceptEncoding)
-                    .setStatusCode(statusCode)
-                    .setResponseTimeMs(timeSpentMs)
-                    .setBody(ByteBuffer.wrap(requestLogInfo.getRequestCapturedBytes()))
-                    .setRequestLength(requestLogInfo.getRequestLength())
-                    .setResponseLength(requestLogInfo.getResponseLength())
-                    .build());
+                .setMethod(requestLogInfo.method)
+                .setPath(requestLogInfo.path)
+                .setQuery(requestLogInfo.query)
+                .setUserAgent(requestLogInfo.userAgent)
+                .setApp(requestLogInfo.user)
+                .setAppHashed(nakadiKpiPublisher.hash(requestLogInfo.user))
+                .setContentEncoding(requestLogInfo.contentEncoding)
+                .setAcceptEncoding(requestLogInfo.acceptEncoding)
+                .setStatusCode(statusCode)
+                .setResponseTimeMs(timeSpentMs)
+                .setBody(ByteBuffer.wrap(requestLogInfo.getRequestCapturedBytes()))
+                .setRequestLength(requestLogInfo.getRequestLength())
+                .setResponseLength(requestLogInfo.getResponseLength())
+                .build());
     }
 
     private void logToAccessLog(final RequestLogInfo requestLogInfo, final int statusCode, final Long timeSpentMs) {
