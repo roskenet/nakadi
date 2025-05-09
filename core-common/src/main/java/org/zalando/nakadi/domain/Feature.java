@@ -16,6 +16,7 @@ public enum Feature {
     REPARTITIONING("repartitioning"),
     EVENT_OWNER_SELECTOR_AUTHZ("event_owner_selector_authz"),
     ACCESS_LOG_ENABLED("access_log_enabled"),
+    ACCESS_LOG_CAPTURE_REQ_BODY("access_log_capture_req_body"),
     TOKEN_SUBSCRIPTIONS_ITERATION("token_subscription_iteration"),
     RETURN_BODY_ON_CREATE_UPDATE_EVENT_TYPE("return_body_on_create_update_event_type"),
     VALIDATE_SUBSCRIPTION_OWNING_APPLICATION("validate_subscription_owning_app"),

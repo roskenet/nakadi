@@ -1,7 +1,9 @@
 package org.zalando.nakadi.filters;
 
+import com.google.common.base.Supplier;
 import com.google.common.io.CountingInputStream;
 import com.google.common.io.CountingOutputStream;
+import org.apache.avro.specific.SpecificRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -27,8 +29,14 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpServletResponseWrapper;
+import java.io.ByteArrayOutputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.Optional;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 public class LoggingFilter extends OncePerRequestFilter {
 
@@ -81,6 +89,10 @@ public class LoggingFilter extends OncePerRequestFilter {
 
         private long getRequestLength() {
             return requestWrapper.getInputStreamBytesCount();
+        }
+
+        private byte[] getRequestCapturedBytes() {
+            return requestWrapper.getInputStreamCapturedBytes();
         }
 
         private long getResponseLength() {
@@ -139,8 +151,9 @@ public class LoggingFilter extends OncePerRequestFilter {
                                     final HttpServletResponse response, final FilterChain filterChain)
             throws IOException, ServletException {
 
+        final boolean isBodyCapturingEnabled = featureToggleService.isFeatureEnabled(Feature.ACCESS_LOG_CAPTURE_REQ_BODY);
         final long startTime = System.currentTimeMillis();
-        final RequestWrapper requestWrapper = new RequestWrapper(request);
+        final RequestWrapper requestWrapper = new RequestWrapper(request, isBodyCapturingEnabled);
         final ResponseWrapper responseWrapper = new ResponseWrapper(response);
         final RequestLogInfo requestLogInfo = new RequestLogInfo(requestWrapper, responseWrapper, startTime);
         try {
@@ -173,22 +186,27 @@ public class LoggingFilter extends OncePerRequestFilter {
         return featureToggleService.isFeatureEnabled(Feature.ACCESS_LOG_ENABLED);
     }
 
+    // TODO force the consumption of all the unconsumed bytes
+    // just because the handler didn't process some of the bytes doesn't mean we should not report them
     private void logToKpiPublisher(final RequestLogInfo requestLogInfo, final int statusCode, final Long timeSpentMs) {
-
-        nakadiKpiPublisher.publish(() -> NakadiAccessLog.newBuilder()
-                .setMethod(requestLogInfo.method)
-                .setPath(requestLogInfo.path)
-                .setQuery(requestLogInfo.query)
-                .setUserAgent(requestLogInfo.userAgent)
-                .setApp(requestLogInfo.user)
-                .setAppHashed(nakadiKpiPublisher.hash(requestLogInfo.user))
-                .setContentEncoding(requestLogInfo.contentEncoding)
-                .setAcceptEncoding(requestLogInfo.acceptEncoding)
-                .setStatusCode(statusCode)
-                .setResponseTimeMs(timeSpentMs)
-                .setRequestLength(requestLogInfo.getRequestLength())
-                .setResponseLength(requestLogInfo.getResponseLength())
-                .build());
+        Supplier<SpecificRecord> eventSupplier = () -> {
+            var builder = NakadiAccessLog.newBuilder()
+                    .setMethod(requestLogInfo.method)
+                    .setPath(requestLogInfo.path)
+                    .setQuery(requestLogInfo.query)
+                    .setUserAgent(requestLogInfo.userAgent)
+                    .setApp(requestLogInfo.user)
+                    .setAppHashed(nakadiKpiPublisher.hash(requestLogInfo.user))
+                    .setContentEncoding(requestLogInfo.contentEncoding)
+                    .setAcceptEncoding(requestLogInfo.acceptEncoding)
+                    .setStatusCode(statusCode)
+                    .setResponseTimeMs(timeSpentMs)
+                    .setBody(ByteBuffer.wrap(requestLogInfo.getRequestCapturedBytes()))
+                    .setRequestLength(requestLogInfo.getRequestLength())
+                    .setResponseLength(requestLogInfo.getResponseLength());
+            return builder.build();
+        };
+        nakadiKpiPublisher.publish(eventSupplier);
     }
 
     private void logToAccessLog(final RequestLogInfo requestLogInfo, final int statusCode, final Long timeSpentMs) {
@@ -213,23 +231,35 @@ public class LoggingFilter extends OncePerRequestFilter {
                 (requestLogInfo.path.endsWith("/events") || requestLogInfo.path.endsWith("/events/"));
     }
 
+    private boolean isStreamingPostRequest(final RequestLogInfo requestLogInfo) {
+        return requestLogInfo.path != null && "POST".equals(requestLogInfo.method) &&
+                requestLogInfo.path.startsWith("/event-types/") &&
+                (requestLogInfo.path.endsWith("/events") || requestLogInfo.path.endsWith("/events/"));
+    }
+
     // ====================================================================================================
     private static class RequestWrapper extends HttpServletRequestWrapper {
 
         private CountingInputStreamWrapper inputStreamWrapper;
+        private boolean captureBody;
 
-        RequestWrapper(final HttpServletRequest request) {
+        RequestWrapper(final HttpServletRequest request, final boolean captureBody) {
             super(request);
+            this.captureBody = captureBody;
         }
 
         long getInputStreamBytesCount() {
             return inputStreamWrapper != null ? inputStreamWrapper.getCount() : 0;
         }
 
+        byte[] getInputStreamCapturedBytes() {
+            return inputStreamWrapper != null ? inputStreamWrapper.getCaptured() : new byte[] {};
+        }
+
         @Override
         public ServletInputStream getInputStream() throws IOException {
             if (inputStreamWrapper == null) {
-                inputStreamWrapper = new CountingInputStreamWrapper(super.getInputStream());
+                inputStreamWrapper = new CountingInputStreamWrapper(super.getInputStream(), captureBody);
             }
             return inputStreamWrapper;
         }
@@ -239,34 +269,45 @@ public class LoggingFilter extends OncePerRequestFilter {
 
         private final ServletInputStream originalInputStream;
         private final CountingInputStream countingInputStream;
+        private final CapturingInputStream capturingInputStream;
+        private final InputStream finalInputStream;
 
-        CountingInputStreamWrapper(final ServletInputStream originalInputStream) {
+        CountingInputStreamWrapper(final ServletInputStream originalInputStream, final boolean captureBody) {
             this.originalInputStream = originalInputStream;
             this.countingInputStream = new CountingInputStream(originalInputStream);
+            this.capturingInputStream = captureBody ? new CapturingInputStream(countingInputStream) : null;
+            this.finalInputStream = capturingInputStream != null ? capturingInputStream : countingInputStream;
         }
 
         long getCount() {
             return countingInputStream.getCount();
         }
 
+        byte[] getCaptured() {
+            if (capturingInputStream == null) {
+                throw new IllegalStateException("Invoked getCaptured() when capturingInputStream is null");
+            }
+            return capturingInputStream.getCaptured();
+        }
+
         @Override
         public int read() throws IOException {
-            return countingInputStream.read();
+            return finalInputStream.read();
         }
 
         @Override
         public int read(final byte[] b) throws IOException {
-            return countingInputStream.read(b);
+            return finalInputStream.read(b);
         }
 
         @Override
         public int read(final byte[] b, final int off, final int len) throws IOException {
-            return countingInputStream.read(b, off, len);
+            return finalInputStream.read(b, off, len);
         }
 
         @Override
         public void close() throws IOException {
-            countingInputStream.close();
+            finalInputStream.close();
         }
 
         @Override
@@ -283,6 +324,51 @@ public class LoggingFilter extends OncePerRequestFilter {
         public void setReadListener(final ReadListener listener) {
             originalInputStream.setReadListener(listener);
         }
+    }
+
+    // mostly based on com.google.common.io.CountingInputStream
+    public final static class CapturingInputStream extends FilterInputStream {
+
+        private final ByteArrayOutputStream os;
+
+        /**
+         * Wraps another input stream, collecting the bytes read.
+         *
+         * @param in the input stream to be wrapped
+         */
+        public CapturingInputStream(InputStream in) {
+            super(checkNotNull(in));
+            os = new ByteArrayOutputStream();
+        }
+
+        /** Returns the number of bytes read. */
+        public byte[] getCaptured() {
+            return os.toByteArray();
+        }
+
+        @Override
+        public int read() throws IOException {
+            int result = in.read();
+            if (result != -1) {
+                os.write(result);
+            }
+            return result;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            int result = in.read(b, off, len);
+            if (result != -1) {
+                os.write(b, off, result);
+            }
+            return result;
+        }
+
+        @Override
+        public boolean markSupported() {
+            return false;
+        }
+
     }
 
     // ====================================================================================================
@@ -356,4 +442,5 @@ public class LoggingFilter extends OncePerRequestFilter {
             originalOutputStream.setWriteListener(listener);
         }
     }
+
 }

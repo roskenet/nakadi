@@ -51,6 +51,10 @@
     {
       "name": "response_length",
       "type": "long"
+    },
+    {
+      "name": "body",
+      "type": "bytes"
     }
   ]
 }
