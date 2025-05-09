@@ -44,6 +44,9 @@ public class WebConfig extends WebMvcConfigurationSupport {
     @Value("${nakadi.stream.timeoutMs}")
     private long nakadiStreamTimeout;
 
+    @Value("${nakadi.accessLog.logReqBody:false}")
+    private boolean accessLogLogReqBody;
+
     @Autowired
     private ObjectMapper objectMapper;
 
@@ -135,7 +138,7 @@ public class WebConfig extends WebMvcConfigurationSupport {
     @Bean
     public FilterRegistrationBean loggingFilter() {
         return createFilterRegistrationBean(
-                new LoggingFilter(nakadiKpiPublisher, authorizationService, featureToggleService),
+                new LoggingFilter(nakadiKpiPublisher, authorizationService, featureToggleService, accessLogLogReqBody),
                 20);
     }
 

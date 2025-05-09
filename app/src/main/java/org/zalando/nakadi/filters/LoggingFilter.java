@@ -45,13 +45,16 @@ public class LoggingFilter extends OncePerRequestFilter {
     private final NakadiKpiPublisher nakadiKpiPublisher;
     private final AuthorizationService authorizationService;
     private final FeatureToggleService featureToggleService;
+    private final boolean isBodyCapturingEnabled;
 
     public LoggingFilter(final NakadiKpiPublisher nakadiKpiPublisher,
                          final AuthorizationService authorizationService,
-                         final FeatureToggleService featureToggleService) {
+                         final FeatureToggleService featureToggleService,
+                         final boolean isBodyCapturingEnabled) {
         this.nakadiKpiPublisher = nakadiKpiPublisher;
         this.authorizationService = authorizationService;
         this.featureToggleService = featureToggleService;
+        this.isBodyCapturingEnabled = isBodyCapturingEnabled;
     }
 
     private class RequestLogInfo {
@@ -157,8 +160,6 @@ public class LoggingFilter extends OncePerRequestFilter {
                                     final HttpServletResponse response, final FilterChain filterChain)
             throws IOException, ServletException {
 
-        final boolean isBodyCapturingEnabled = featureToggleService
-                .isFeatureEnabled(Feature.ACCESS_LOG_CAPTURE_REQ_BODY);
         final long startTime = System.currentTimeMillis();
         final RequestWrapper requestWrapper = new RequestWrapper(request, isBodyCapturingEnabled);
         final ResponseWrapper responseWrapper = new ResponseWrapper(response);
