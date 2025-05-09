@@ -1,9 +1,7 @@
 package org.zalando.nakadi.filters;
 
-import com.google.common.base.Supplier;
 import com.google.common.io.CountingInputStream;
 import com.google.common.io.CountingOutputStream;
-import org.apache.avro.specific.SpecificRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -237,12 +235,6 @@ public class LoggingFilter extends OncePerRequestFilter {
     }
 
     private boolean isPublishingRequest(final RequestLogInfo requestLogInfo) {
-        return requestLogInfo.path != null && "POST".equals(requestLogInfo.method) &&
-                requestLogInfo.path.startsWith("/event-types/") &&
-                (requestLogInfo.path.endsWith("/events") || requestLogInfo.path.endsWith("/events/"));
-    }
-
-    private boolean isStreamingPostRequest(final RequestLogInfo requestLogInfo) {
         return requestLogInfo.path != null && "POST".equals(requestLogInfo.method) &&
                 requestLogInfo.path.startsWith("/event-types/") &&
                 (requestLogInfo.path.endsWith("/events") || requestLogInfo.path.endsWith("/events/"));
