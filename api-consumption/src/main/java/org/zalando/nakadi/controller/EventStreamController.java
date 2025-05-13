@@ -33,6 +33,7 @@ import org.zalando.nakadi.exceptions.runtime.InvalidCursorException;
 import org.zalando.nakadi.exceptions.runtime.InvalidFilterException;
 import org.zalando.nakadi.exceptions.runtime.InvalidFilterLangException;
 import org.zalando.nakadi.exceptions.runtime.InvalidLimitException;
+import org.zalando.nakadi.exceptions.runtime.MissingFilterException;
 import org.zalando.nakadi.exceptions.runtime.MissingFilterLangException;
 import org.zalando.nakadi.exceptions.runtime.NoConnectionSlotsException;
 import org.zalando.nakadi.exceptions.runtime.NoSuchEventTypeException;
@@ -320,6 +321,8 @@ public class EventStreamController {
                 } catch (final InvalidFilterLangException e) {
                     writeProblemResponse(response, outputStream, BAD_REQUEST, e.getMessage());
                 } catch (final MissingFilterLangException e) {
+                    writeProblemResponse(response, outputStream, BAD_REQUEST, e.getMessage());
+                } catch (final MissingFilterException e) {
                     writeProblemResponse(response, outputStream, BAD_REQUEST, e.getMessage());
                 } catch (final InvalidFilterException e) {
                     writeProblemResponse(response, outputStream, BAD_REQUEST, e.getMessage());

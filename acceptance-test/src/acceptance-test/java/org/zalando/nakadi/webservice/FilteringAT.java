@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.CREATED;
 import static org.springframework.http.HttpStatus.OK;
 import static org.zalando.nakadi.domain.SubscriptionBase.InitialPosition.BEGIN;
@@ -71,6 +72,69 @@ public class FilteringAT extends RealEnvironmentAT {
                         .withEventType(eventTypeNameBusiness)
                         .withStartFrom(BEGIN).buildSubscriptionBase();
         subscription = createSubscription(jsonRequestSpec(), subscriptionToCreate);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test(timeout = 15000)
+    public void testPost400() {
+        // missing ssf_expr
+        jsonRequestSpec()
+                .body("{ \"ssf_lang\": \"sql_v1\" }")
+                .when()
+                .post("/subscriptions/" + subscription.getId() + "/events")
+                .then()
+                .statusCode(BAD_REQUEST.value());
+        // missing ssf_lang
+        jsonRequestSpec()
+                .body("{ \"ssf_expr\": \"e.foo LIKE 'bar_%'\" }")
+                .when()
+                .post("/subscriptions/" + subscription.getId() + "/events")
+                .then()
+                .statusCode(BAD_REQUEST.value());
+        // invalid ssf_lang
+        jsonRequestSpec()
+                .body("{ \"ssf_lang\": \"prolog_v1000\", \"ssf_expr\": \"e.foo LIKE 'bar_%'\" }")
+                .when()
+                .post("/subscriptions/" + subscription.getId() + "/events")
+                .then()
+                .statusCode(BAD_REQUEST.value());
+        // malformed ssf_expr
+        jsonRequestSpec()
+                .body("{ \"ssf_lang\": \"sql_v1\", \"ssf_expr\": \"e.foo UNLIKE 'bar_%'\" }")
+                .when()
+                .post("/subscriptions/" + subscription.getId() + "/events")
+                .then()
+                .statusCode(BAD_REQUEST.value());
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test(timeout = 15000)
+    public void testGet400() {
+        // missing ssf_expr
+        jsonRequestSpec()
+                .when()
+                .get("/subscriptions/" + subscription.getId() + "/events?ssf_lang=sql_v1")
+                .then()
+                .statusCode(BAD_REQUEST.value());
+        // missing ssf_lang
+        jsonRequestSpec()
+                .body("{ \"ssf_expr\": \"e.foo LIKE 'bar_%'\" }")
+                .when()
+                .get("/subscriptions/" + subscription.getId() + "/events?ssf_expr=e.foo%20IS%20NULL")
+                .then()
+                .statusCode(BAD_REQUEST.value());
+        // invalid ssf_lang
+        jsonRequestSpec()
+                .when()
+                .get("/subscriptions/" + subscription.getId() + "/events?ssf_lang=prolog_v1000&ssf_expr=e.foo%20IS%20NULL")
+                .then()
+                .statusCode(BAD_REQUEST.value());
+        // malformed ssf_expr
+        jsonRequestSpec()
+                .when()
+                .get("/subscriptions/" + subscription.getId() + "/events?ssf_lang=prolog_v1000&ssf_expr=e.foo%20IS%20DULL")
+                .then()
+                .statusCode(BAD_REQUEST.value());
     }
 
     @SuppressWarnings("unchecked")
@@ -148,6 +212,15 @@ public class FilteringAT extends RealEnvironmentAT {
                 .post("/event-types/" + eventTypeName + "/events")
                 .then()
                 .body(equalTo(""))
+                .statusCode(OK.value());
+    }
+
+    private void assertStatusCode(final String subscriptionId) {
+        jsonRequestSpec()
+                .body("{}")
+                .when()
+                .post("/subscriptions/" + subscriptionId + "/events")
+                .then()
                 .statusCode(OK.value());
     }
 
