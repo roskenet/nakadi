@@ -36,7 +36,6 @@ import org.zalando.nakadi.exceptions.runtime.UnprocessableEntityException;
 import org.zalando.nakadi.exceptions.runtime.ValidationException;
 import org.zalando.nakadi.problem.ValidationProblem;
 import org.zalando.problem.Problem;
-import org.zalando.problem.ProblemBuilder;
 import org.zalando.problem.spring.web.advice.ProblemHandling;
 
 import javax.annotation.Priority;

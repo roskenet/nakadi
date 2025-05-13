@@ -113,26 +113,29 @@ public class FilteringAT extends RealEnvironmentAT {
         // missing ssf_expr
         jsonRequestSpec()
                 .when()
-                .get("/subscriptions/" + subscription.getId() + "/events?ssf_lang=sql_v1")
+                .get("/subscriptions/" + subscription.getId() + "/events"
+                        + "?ssf_lang=sql_v1")
                 .then()
                 .statusCode(BAD_REQUEST.value());
         // missing ssf_lang
         jsonRequestSpec()
-                .body("{ \"ssf_expr\": \"e.foo LIKE 'bar_%'\" }")
                 .when()
-                .get("/subscriptions/" + subscription.getId() + "/events?ssf_expr=e.foo%20IS%20NULL")
+                .get("/subscriptions/" + subscription.getId() + "/events"
+                       + "?ssf_expr=e.foo%20IS%20NULL")
                 .then()
                 .statusCode(BAD_REQUEST.value());
         // invalid ssf_lang
         jsonRequestSpec()
                 .when()
-                .get("/subscriptions/" + subscription.getId() + "/events?ssf_lang=prolog_v1000&ssf_expr=e.foo%20IS%20NULL")
+                .get("/subscriptions/" + subscription.getId() + "/events"
+                        + "?ssf_lang=prolog_v1000&ssf_expr=e.foo%20IS%20NULL")
                 .then()
                 .statusCode(BAD_REQUEST.value());
         // malformed ssf_expr
         jsonRequestSpec()
                 .when()
-                .get("/subscriptions/" + subscription.getId() + "/events?ssf_lang=prolog_v1000&ssf_expr=e.foo%20IS%20DULL")
+                .get("/subscriptions/" + subscription.getId() + "/events"
+                        +"?ssf_lang=prolog_v1000&ssf_expr=e.foo%20IS%20DULL")
                 .then()
                 .statusCode(BAD_REQUEST.value());
     }

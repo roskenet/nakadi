@@ -1665,7 +1665,8 @@ paths:
                   Currently only `sql_v1` is supported which supports the same expressions allowed
                   in the WHERE clause of Nakadi-SQL queries.
                   
-                  Must be specified whenever `ssf_expr` is supplied.
+                  Must be paired with `ssf_expr` parameter.
+                  
                   See https://nakadi.docs.zalando.net/nakadi-event-broker/server-side-filtering/
                 type: string
                 enum: ["sql_v1"]
@@ -3906,7 +3907,7 @@ parameters:
       Allows you to specify an expression that is used to restrict the events that you receive.
     
       Must be paired with `ssf_lang` parameter.
-    
+      
       See https://nakadi.docs.zalando.net/nakadi-event-broker/server-side-filtering/
     type: string
     example: "e.metadata.published_by LIKE 'order-service-v%'"
@@ -3921,7 +3922,8 @@ parameters:
       Currently only `sql_v1` is supported which supports the same expressions allowed
       in the WHERE clause of Nakadi-SQL queries.
       
-      Must be specified whenever `ssf_expr` is supplied.
+      Must be paired with `ssf_expr` parameter.
+      
       See https://nakadi.docs.zalando.net/nakadi-event-broker/server-side-filtering/
     type: string
     enum: ["sql_v1"]
