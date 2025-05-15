@@ -403,7 +403,7 @@ public class EventStreamReadingAT extends BaseAT {
     public void testSSFBadRequests() {
         // missing ssf_lang
         given()
-                .param("ssf_expr", "e.foo LIKE 'bar_%'")
+                .param("ssf_expr", "foo LIKE 'bar_%'")
                 .get(streamEndpoint)
                 .then()
                 .statusCode(400);
@@ -416,14 +416,14 @@ public class EventStreamReadingAT extends BaseAT {
         // invalid ssf_lang
         given()
                 .param("ssf_lang", "prolog_v1000")
-                .param("ssf_expr", "e.foo LIKE 'bar_%'")
+                .param("ssf_expr", "foo LIKE 'bar_%'")
                 .get(streamEndpoint)
                 .then()
                 .statusCode(400);
         // invalid ssf_expr
         given()
                 .param("ssf_lang", "sql_v1")
-                .param("ssf_expr", "e.foo LUKE 'bar_%'")
+                .param("ssf_expr", "foo LUKE 'bar_%'")
                 .get(streamEndpoint)
                 .then()
                 .statusCode(400);
@@ -709,7 +709,7 @@ public class EventStreamReadingAT extends BaseAT {
                 .statusCode(200);
 
         // ACT //
-        final Response response = readEvents(Optional.empty(), Optional.of("e.foo LIKE 'bar_%'"));
+        final Response response = readEvents(Optional.empty(), Optional.of("foo LIKE 'bar_%'"));
 
         // ASSERT //
         response.then().statusCode(HttpStatus.OK.value()).header(HttpHeaders.TRANSFER_ENCODING, "chunked");
