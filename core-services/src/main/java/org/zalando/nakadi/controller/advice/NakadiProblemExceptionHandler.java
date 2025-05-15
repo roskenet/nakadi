@@ -18,8 +18,12 @@ import org.zalando.nakadi.exceptions.runtime.FeatureNotAvailableException;
 import org.zalando.nakadi.exceptions.runtime.ForbiddenOperationException;
 import org.zalando.nakadi.exceptions.runtime.IllegalClientIdException;
 import org.zalando.nakadi.exceptions.runtime.InternalNakadiException;
+import org.zalando.nakadi.exceptions.runtime.InvalidFilterException;
+import org.zalando.nakadi.exceptions.runtime.InvalidFilterLangException;
 import org.zalando.nakadi.exceptions.runtime.InvalidLimitException;
 import org.zalando.nakadi.exceptions.runtime.InvalidVersionNumberException;
+import org.zalando.nakadi.exceptions.runtime.MissingFilterException;
+import org.zalando.nakadi.exceptions.runtime.MissingFilterLangException;
 import org.zalando.nakadi.exceptions.runtime.NakadiBaseException;
 import org.zalando.nakadi.exceptions.runtime.NakadiRuntimeException;
 import org.zalando.nakadi.exceptions.runtime.NoEffectiveSchemaException;
@@ -124,6 +128,14 @@ public class NakadiProblemExceptionHandler implements ProblemHandling {
     @ExceptionHandler({InvalidLimitException.class, InvalidVersionNumberException.class,
             NoEffectiveSchemaException.class})
     public ResponseEntity<Problem> handleBadRequestResponses(final NakadiBaseException exception,
+                                                             final NativeWebRequest request) {
+        LOG.debug(exception.getMessage());
+        return create(Problem.valueOf(BAD_REQUEST, exception.getMessage()), request);
+    }
+
+    @ExceptionHandler({InvalidFilterException.class, InvalidFilterLangException.class,
+            MissingFilterException.class, MissingFilterLangException.class})
+    public ResponseEntity<Problem> handleFilterExceptions(final NakadiBaseException exception,
                                                              final NativeWebRequest request) {
         LOG.debug(exception.getMessage());
         return create(Problem.valueOf(BAD_REQUEST, exception.getMessage()), request);

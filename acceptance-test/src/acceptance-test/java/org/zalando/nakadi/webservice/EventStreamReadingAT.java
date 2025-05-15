@@ -399,6 +399,36 @@ public class EventStreamReadingAT extends BaseAT {
         return builder.when().get(streamEndpoint);
     }
 
+    @Test(timeout = 10000)
+    public void testSSFBadRequests() {
+        // missing ssf_lang
+        given()
+                .param("ssf_expr", "e.foo LIKE 'bar_%'")
+                .get(streamEndpoint)
+                .then()
+                .statusCode(400);
+        // missing ssf_expr
+        given()
+                .param("ssf_lang", "sql_v1")
+                .get(streamEndpoint)
+                .then()
+                .statusCode(400);
+        // invalid ssf_lang
+        given()
+                .param("ssf_lang", "prolog_v1000")
+                .param("ssf_expr", "e.foo LIKE 'bar_%'")
+                .get(streamEndpoint)
+                .then()
+                .statusCode(400);
+        // invalid ssf_expr
+        given()
+                .param("ssf_lang", "sql_v1")
+                .param("ssf_expr", "e.foo LUKE 'bar_%'")
+                .get(streamEndpoint)
+                .then()
+                .statusCode(400);
+    }
+
     @Ignore
     @Test(timeout = 10000)
     public void whenExceedMaxConsumersNumThen429() throws IOException, InterruptedException, ExecutionException {

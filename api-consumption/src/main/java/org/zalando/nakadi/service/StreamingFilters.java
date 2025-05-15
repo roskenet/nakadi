@@ -7,6 +7,7 @@ import org.zalando.nakadi.domain.TestDataFilter;
 import org.zalando.nakadi.exceptions.runtime.FilterEvaluationException;
 import org.zalando.nakadi.exceptions.runtime.InvalidFilterException;
 import org.zalando.nakadi.exceptions.runtime.InvalidFilterLangException;
+import org.zalando.nakadi.exceptions.runtime.MissingFilterException;
 import org.zalando.nakadi.exceptions.runtime.MissingFilterLangException;
 import org.zalando.nakadi.filterexpression.FilterExpressionCompiler;
 import org.zalando.nakadisqlexecutor.streams.EventsWrapper;
@@ -47,6 +48,9 @@ public class StreamingFilters {
 
     public static Function<EventsWrapper, Boolean> filterExpressionToPredicate(final String filter, final String lang) {
         if (filter == null) {
+            if (lang != null) {
+                throw new MissingFilterException();
+            }
             return null;
         }
         if (filter.trim().isEmpty()) {
