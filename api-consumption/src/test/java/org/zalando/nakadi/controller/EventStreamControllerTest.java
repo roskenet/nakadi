@@ -389,7 +389,9 @@ public class EventStreamControllerTest {
             }
             return null;
         }).when(eventStream).streamEvents(any());
-        when(eventStreamFactoryMock.createEventStream(any(), any(), any(), any(), any(), any())).thenReturn(eventStream);
+        when(eventStreamFactoryMock
+                .createEventStream(any(), any(), any(), any(), any(), any()))
+                .thenReturn(eventStream);
 
         // "connect" to the server
         final StreamingResponseBody responseBody = createStreamingResponseBody();
