@@ -31,7 +31,9 @@ public class EventStreamFactory {
     public EventStream createEventStream(final OutputStream outputStream,
                                          final HighLevelConsumer eventConsumer,
                                          final EventStreamConfig config,
-                                         final Meter bytesFlushedMeter)
+                                         final Meter bytesFlushedMeter,
+                                         final Meter ssfTotalEventsMeter,
+                                         final Meter ssfMatchedEventsMeter)
             throws InvalidCursorException {
 
         return new EventStream(
@@ -41,6 +43,8 @@ public class EventStreamFactory {
                 eventStreamChecks,
                 cursorConverter,
                 bytesFlushedMeter,
+                ssfTotalEventsMeter,
+                ssfMatchedEventsMeter,
                 eventStreamWriter,
                 kpiCollectorFactory.createForLoLA(config.getConsumingClient()));
     }

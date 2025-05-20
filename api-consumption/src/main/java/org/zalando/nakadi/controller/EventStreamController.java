@@ -68,6 +68,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -224,6 +225,7 @@ public class EventStreamController {
                     return;
                 }
 
+                final String streamId = UUID.randomUUID().toString();
                 Counter consumerCounter = null;
                 Counter appConnectionsCounter = null;
                 HighLevelConsumer eventConsumer = null;
@@ -286,10 +288,28 @@ public class EventStreamController {
 
                     final Meter bytesFlushedMeter = this.streamMetrics.meter(bytesFlushedMetricName);
 
+                    Meter ssfTotalEventsMeter = null;
+                    Meter ssfMatchedEventsMeter = null;
+                    if (filterPredicate != null) {
+                        final String ssfTotalEventsMetricName = MetricUtils.metricNameForLolaStream(
+                                client.getClientId(),
+                                eventTypeName,
+                                streamId,
+                                MetricUtils.SSF_EVENTS_TOTAL);
+                        ssfTotalEventsMeter = this.streamMetrics.meter(ssfTotalEventsMetricName);
+                        final String ssfMatchedEventsMetricName = MetricUtils.metricNameForLolaStream(
+                                client.getClientId(),
+                                eventTypeName,
+                                streamId,
+                                MetricUtils.SSF_EVENTS_MATCHED);
+                        ssfMatchedEventsMeter = this.streamMetrics.meter(ssfMatchedEventsMetricName);
+                    }
+
                     eventConsumer = timelineService.createEventConsumer(kafkaQuotaClientId);
 
                     eventStream = eventStreamFactory.createEventStream(
-                            outputStream, eventConsumer, streamConfig, bytesFlushedMeter);
+                            outputStream, eventConsumer, streamConfig,
+                            bytesFlushedMeter, ssfTotalEventsMeter, ssfMatchedEventsMeter);
 
                     outputStream.flush(); // Flush status code to client
 
@@ -339,6 +359,12 @@ public class EventStreamController {
                     if (appConnectionsCounter != null) {
                         appConnectionsCounter.dec();
                     }
+                    final String streamMetricPrefix = MetricUtils.metricNameForLolaStream(
+                            client.getClientId(),
+                            eventTypeName,
+                            streamId,
+                            null) + ".";
+                    this.streamMetrics.removeMatching((name, metric) -> name.startsWith(streamMetricPrefix));
                     if (eventStream != null) {
                         eventStream.close();
                     }

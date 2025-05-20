@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 
 import static java.lang.System.currentTimeMillis;
 import static java.util.function.Function.identity;
-import static org.zalando.nakadi.service.StreamingFilters.shouldEventBeFilteredBecauseOfFilter;
+import static org.zalando.nakadi.service.StreamingFilters.matchesSSFFilterPredicate;
 import static org.zalando.nakadi.service.StreamingFilters.shouldEventBeFilteredBecauseOfTestProjectId;
 
 public class EventStream {
@@ -35,6 +35,8 @@ public class EventStream {
     private final EventStreamConfig config;
     private final CursorConverter cursorConverter;
     private final Meter bytesFlushedMeter;
+    private final Meter ssfTotalEventsMeter;
+    private final Meter ssfMatchedEventsMeter;
     private final EventStreamWriter eventStreamWriter;
     private final ConsumptionKpiCollector kpiCollector;
     private final EventStreamChecks eventStreamChecks;
@@ -45,6 +47,8 @@ public class EventStream {
                        final EventStreamChecks eventStreamChecks,
                        final CursorConverter cursorConverter,
                        final Meter bytesFlushedMeter,
+                       final Meter ssfTotalEventsMeter,
+                       final Meter ssfMatchedEventsMeter,
                        final EventStreamWriter eventStreamWriter,
                        final ConsumptionKpiCollector kpiCollector) {
         this.eventConsumer = eventConsumer;
@@ -52,6 +56,8 @@ public class EventStream {
         this.config = config;
         this.cursorConverter = cursorConverter;
         this.bytesFlushedMeter = bytesFlushedMeter;
+        this.ssfTotalEventsMeter = ssfTotalEventsMeter;
+        this.ssfMatchedEventsMeter = ssfMatchedEventsMeter;
         this.eventStreamWriter = eventStreamWriter;
         this.eventStreamChecks = eventStreamChecks;
         this.kpiCollector = kpiCollector;
@@ -193,7 +199,20 @@ public class EventStream {
                 || evt.getConsumerTags().containsKey(HeaderTag.CONSUMER_SUBSCRIPTION_ID)
                 || eventStreamChecks.isConsumptionBlocked(evt)
                 || shouldEventBeFilteredBecauseOfTestProjectId(config.getTestDataFilter(), evt)
-                || shouldEventBeFilteredBecauseOfFilter(config.getFilterPredicate(), evt);
+                || !doesMatchSSFFilter(evt);
+    }
+
+    private boolean doesMatchSSFFilter(final ConsumedEvent evt) {
+        if (config.getFilterPredicate() == null) {
+            return true;
+        }
+        this.ssfTotalEventsMeter.mark();
+        if (matchesSSFFilterPredicate(config.getFilterPredicate(), evt)) {
+            this.ssfMatchedEventsMeter.mark();
+            return true;
+        } else {
+            return false;
+        }
     }
 
     private boolean isMemoryLimitReached(final long memoryUsed) {

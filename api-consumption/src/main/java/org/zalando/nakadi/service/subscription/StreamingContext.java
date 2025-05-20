@@ -43,7 +43,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static org.zalando.nakadi.service.StreamingFilters.shouldEventBeFilteredBecauseOfFilter;
 import static org.zalando.nakadi.service.StreamingFilters.shouldEventBeFilteredBecauseOfTestProjectId;
 
 public class StreamingContext implements SubscriptionStreamer {
@@ -311,10 +310,6 @@ public class StreamingContext implements SubscriptionStreamer {
         if (shouldEventBeFilteredBecauseOfTestProjectId(parameters.getTestDataFilter(), event)) {
             return true;
         }
-        if (shouldEventBeFilteredBecauseOfFilter(parameters.getFilterPredicate(), event)) {
-            return true;
-        }
-
         return !isConsumptionAllowedFromConsumerTags(event)
                 || eventStreamChecks.isConsumptionBlocked(event);
     }

@@ -30,19 +30,15 @@ public class StreamingFilters {
         return false;
     }
 
-    public static boolean shouldEventBeFilteredBecauseOfFilter(
-            final Function<EventsWrapper, Boolean> filterPredicate,
-            final ConsumedEvent event) {
-        if (null == filterPredicate) {
-            return false;
-        } else {
-            try {
-                final byte[] eventData = event.getEvent();
-                final EventsWrapper eventsWrapper = FilterExpressionCompiler.singletonInput(eventData);
-                return !filterPredicate.apply(eventsWrapper);
-            } catch (Exception e) {
-                throw new FilterEvaluationException(e, event.getPosition());
-            }
+    public static boolean matchesSSFFilterPredicate(
+        final Function<EventsWrapper, Boolean> filterPredicate,
+        final ConsumedEvent event) {
+        try {
+            final byte[] eventData = event.getEvent();
+            final EventsWrapper eventsWrapper = FilterExpressionCompiler.singletonInput(eventData);
+            return filterPredicate.apply(eventsWrapper);
+        } catch (Exception e) {
+            throw new FilterEvaluationException(e, event.getPosition());
         }
     }
 

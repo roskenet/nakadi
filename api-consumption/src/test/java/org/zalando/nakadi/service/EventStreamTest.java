@@ -66,7 +66,10 @@ public class EventStreamTest {
 
     private static final String TOPIC = UUID.randomUUID().toString();
     private static final byte[] DUMMY = "DUMMY".getBytes(UTF_8);
-    private static final Meter BYTES_FLUSHED_METER = new MetricRegistry().meter("mock");
+    private static final MetricRegistry METRIC_REGISTRY = new MetricRegistry();
+    private static final Meter BYTES_FLUSHED_METER = METRIC_REGISTRY.meter("mock");
+    private static final Meter SSF_TOTAL_EVENTS_METER = METRIC_REGISTRY.meter("mock2");
+    private static final Meter SSF_MATCHED_EVENTS_METER = METRIC_REGISTRY.meter("mock3");
 
     private static final Timeline TIMELINE = buildTimelineWithTopic(TOPIC);
     private static CursorConverter cursorConverter;
@@ -96,7 +99,8 @@ public class EventStreamTest {
         final OutputStream outputStreamMock = mock(OutputStream.class);
         final EventStream eventStream = new EventStream(
                 emptyConsumer(), outputStreamMock, config, mock(EventStreamChecks.class), cursorConverter,
-                BYTES_FLUSHED_METER, eventStreamWriter, mock(ConsumptionKpiCollector.class));
+                BYTES_FLUSHED_METER, SSF_TOTAL_EVENTS_METER, SSF_MATCHED_EVENTS_METER,
+                eventStreamWriter, mock(ConsumptionKpiCollector.class));
 
         final Thread thread = new Thread(() -> eventStream.streamEvents(() -> {
         }));
@@ -124,7 +128,8 @@ public class EventStreamTest {
                 .build();
         final EventStream eventStream = new EventStream(
                 emptyConsumer(), mock(OutputStream.class), config, mock(EventStreamChecks.class), cursorConverter,
-                BYTES_FLUSHED_METER, eventStreamWriter, mock(ConsumptionKpiCollector.class));
+                BYTES_FLUSHED_METER, SSF_TOTAL_EVENTS_METER, SSF_MATCHED_EVENTS_METER,
+                eventStreamWriter, mock(ConsumptionKpiCollector.class));
         final AtomicBoolean triggerAuthChange = new AtomicBoolean(false);
         final AtomicBoolean accessDeniedTriggered = new AtomicBoolean(false);
         final Thread thread = new Thread(() -> {
@@ -167,7 +172,8 @@ public class EventStreamTest {
                 .build();
         final EventStream eventStream = new EventStream(
                 emptyConsumer(), mock(OutputStream.class), config, mock(EventStreamChecks.class), cursorConverter,
-                BYTES_FLUSHED_METER, eventStreamWriter, mock(ConsumptionKpiCollector.class));
+                BYTES_FLUSHED_METER, SSF_TOTAL_EVENTS_METER, SSF_MATCHED_EVENTS_METER,
+                eventStreamWriter, mock(ConsumptionKpiCollector.class));
         eventStream.streamEvents(() -> {
         });
         // if something goes wrong - the test should fail with a timeout
@@ -183,8 +189,8 @@ public class EventStreamTest {
                 .withConsumingClient(mock(Client.class))
                 .build();
         final EventStream eventStream = new EventStream(endlessDummyConsumer(), mock(OutputStream.class), config,
-                mock(EventStreamChecks.class), cursorConverter, BYTES_FLUSHED_METER, eventStreamWriter,
-                mock(ConsumptionKpiCollector.class));
+                mock(EventStreamChecks.class), cursorConverter, BYTES_FLUSHED_METER, SSF_TOTAL_EVENTS_METER,
+                SSF_MATCHED_EVENTS_METER, eventStreamWriter, mock(ConsumptionKpiCollector.class));
         eventStream.streamEvents(() -> {
         });
         // if something goes wrong - the test should fail with a timeout
@@ -202,7 +208,8 @@ public class EventStreamTest {
                 .build();
         final EventStream eventStream = new EventStream(
                 emptyConsumer(), mock(OutputStream.class), config, mock(EventStreamChecks.class), cursorConverter,
-                BYTES_FLUSHED_METER, eventStreamWriter, mock(ConsumptionKpiCollector.class));
+                BYTES_FLUSHED_METER, SSF_TOTAL_EVENTS_METER, SSF_MATCHED_EVENTS_METER,
+                eventStreamWriter, mock(ConsumptionKpiCollector.class));
         eventStream.streamEvents(() -> {
         });
         // if something goes wrong - the test should fail with a timeout
@@ -223,6 +230,7 @@ public class EventStreamTest {
 
         final EventStream eventStream = new EventStream(
                 emptyConsumer(), out, config, mock(EventStreamChecks.class), cursorConverter, BYTES_FLUSHED_METER,
+                SSF_TOTAL_EVENTS_METER, SSF_MATCHED_EVENTS_METER,
                 eventStreamWriter, mock(ConsumptionKpiCollector.class));
         eventStream.streamEvents(() -> {
         });
@@ -250,7 +258,8 @@ public class EventStreamTest {
 
         final EventStream eventStream = new EventStream(
                 nCountDummyConsumerForPartition(12, "0"), out, config, mock(EventStreamChecks.class),
-                cursorConverter, BYTES_FLUSHED_METER, eventStreamWriter, mock(ConsumptionKpiCollector.class));
+                cursorConverter, BYTES_FLUSHED_METER, SSF_TOTAL_EVENTS_METER, SSF_MATCHED_EVENTS_METER,
+                eventStreamWriter, mock(ConsumptionKpiCollector.class));
         eventStream.streamEvents(() -> {
         });
 
@@ -288,7 +297,8 @@ public class EventStreamTest {
 
         final EventStream eventStream =
                 new EventStream(predefinedConsumer(events), out, config, mock(EventStreamChecks.class), cursorConverter,
-                        BYTES_FLUSHED_METER, eventStreamWriter, mock(ConsumptionKpiCollector.class));
+                        BYTES_FLUSHED_METER, SSF_TOTAL_EVENTS_METER, SSF_MATCHED_EVENTS_METER,
+                        eventStreamWriter, mock(ConsumptionKpiCollector.class));
         eventStream.streamEvents(() -> {
         });
 
@@ -339,7 +349,8 @@ public class EventStreamTest {
 
         final EventStream eventStream =
                 new EventStream(predefinedConsumer(events), out, config, mock(EventStreamChecks.class), cursorConverter,
-                        BYTES_FLUSHED_METER, eventStreamWriter, mock(ConsumptionKpiCollector.class));
+                        BYTES_FLUSHED_METER, SSF_TOTAL_EVENTS_METER, SSF_MATCHED_EVENTS_METER,
+                        eventStreamWriter, mock(ConsumptionKpiCollector.class));
         eventStream.streamEvents(() -> {
         });
 
