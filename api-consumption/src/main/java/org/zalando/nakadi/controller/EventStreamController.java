@@ -2,8 +2,6 @@ package org.zalando.nakadi.controller;
 
 import com.codahale.metrics.Counter;
 import com.codahale.metrics.Meter;
-import com.codahale.metrics.Metric;
-import com.codahale.metrics.MetricFilter;
 import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -310,7 +308,8 @@ public class EventStreamController {
                     eventConsumer = timelineService.createEventConsumer(kafkaQuotaClientId);
 
                     eventStream = eventStreamFactory.createEventStream(
-                            outputStream, eventConsumer, streamConfig, bytesFlushedMeter, ssfTotalEventsMeter, ssfMatchedEventsMeter);
+                            outputStream, eventConsumer, streamConfig,
+                            bytesFlushedMeter, ssfTotalEventsMeter, ssfMatchedEventsMeter);
 
                     outputStream.flush(); // Flush status code to client
 
