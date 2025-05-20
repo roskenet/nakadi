@@ -1,6 +1,8 @@
 package org.zalando.nakadi.service.subscription.state;
 
 import com.codahale.metrics.Meter;
+import com.codahale.metrics.Metric;
+import com.codahale.metrics.MetricFilter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.json.JSONArray;
@@ -28,6 +30,7 @@ import org.zalando.nakadi.service.timeline.HighLevelConsumer;
 import org.zalando.nakadi.view.Cursor;
 import org.zalando.nakadi.view.SubscriptionCursor;
 import org.zalando.nakadi.view.SubscriptionCursorWithoutToken;
+import org.zalando.nakadisqlexecutor.streams.EventsWrapper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -43,10 +46,12 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.groupingBy;
+import static org.zalando.nakadi.service.StreamingFilters.shouldEventBeFilteredBecauseOfFilter;
 
 class StreamingState extends State {
     private static final Logger LOG = LoggerFactory.getLogger(StreamingState.class);
@@ -66,11 +71,15 @@ class StreamingState extends State {
     private long sentEvents;
     private long batchesSent;
     private Meter bytesSentMeterPerSubscription;
+    private Meter ssfTotalEventsMetric;
+    private Meter ssfMatchedEventsMetric;
     // Uncommitted offsets are calculated right on exiting from Streaming state.
     private Map<EventTypePartition, NakadiCursor> uncommittedOffsets;
 
     private ZkSubscription<List<String>> streamCloseSubscription;
     private IdleStreamWatcher idleStreamWatcher;
+
+    private Function<EventsWrapper, Boolean> predicate;
     private boolean commitTimeoutReached = false;
 
     /**
@@ -97,11 +106,26 @@ class StreamingState extends State {
      */
     @Override
     public void onEnter() {
-        final String kafkaFlushedBytesMetricName = MetricUtils.metricNameForHiLAStream(
+        predicate = this.getParameters().getFilterPredicate();
+        final String kafkaFlushedBytesMetricName = MetricUtils.metricNameForHiLALink(
                 this.getContext().getParameters().getConsumingClient().getClientId(),
                 this.getContext().getSubscription().getId()
         );
         bytesSentMeterPerSubscription = this.getContext().getMetricRegistry().meter(kafkaFlushedBytesMetricName);
+        if (predicate != null) {
+            final String ssfTotalEventsMetricName = MetricUtils.metricNameForHiLAStream(
+                    this.getContext().getSubscription().getId(),
+                    this.getContext().getSessionId(),
+                    MetricUtils.SSF_EVENTS_TOTAL
+            );
+            final String ssfMatchedEventsMetricName = MetricUtils.metricNameForHiLAStream(
+                    this.getContext().getSubscription().getId(),
+                    this.getContext().getSessionId(),
+                    MetricUtils.SSF_EVENTS_MATCHED
+            );
+            ssfTotalEventsMetric = this.getContext().getMetricRegistry().meter(ssfTotalEventsMetricName);
+            ssfMatchedEventsMetric = this.getContext().getMetricRegistry().meter(ssfMatchedEventsMetricName);
+        }
 
         recreateTopologySubscription();
         addTask(() -> getContext().subscribeToSessionListChangeAndRebalance());
@@ -238,10 +262,24 @@ class StreamingState extends State {
         addTask(this::pollDataFromKafka);
     }
 
+    private boolean doesMatchSSFFilter(final ConsumedEvent event) {
+        if (predicate == null) {
+            return true;
+        }
+        this.ssfTotalEventsMetric.mark();
+        final boolean matches = !shouldEventBeFilteredBecauseOfFilter(predicate, event);
+        if (matches) {
+            this.ssfMatchedEventsMetric.mark();
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     private void rememberEvent(final ConsumedEvent event) {
         final PartitionData pd = offsets.get(event.getPosition().getEventTypePartition());
         if (null != pd) {
-            if (getContext().isConsumptionBlocked(event)) {
+            if (getContext().isConsumptionBlocked(event) || !doesMatchSSFFilter(event)) {
                 getContext().getAutocommitSupport().addSkippedEvent(event.getPosition());
             } else {
                 pd.addEvent(event);
@@ -581,6 +619,18 @@ class StreamingState extends State {
                 .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getSentOffset()));
 
         getContext().getKpiCollector().sendKpi();
+
+        //final String streamMetricPrefix = MetricUtils.metricNameForHiLAStream(
+        //        this.getContext().getSubscription().getId(),
+        //        this.getContext().getSessionId(),
+        //        null) + ".";
+        //this.getContext().getMetricRegistry().removeMatching(new MetricFilter() {
+        //    @Override
+        //    public boolean matches(String name, Metric metric) {
+        //        return name.startsWith(streamMetricPrefix);
+        //    }
+        //});
+
         logExtendedCommitInformation();
         if (null != topologyChangeSubscription) {
             try {
