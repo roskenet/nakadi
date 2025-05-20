@@ -98,7 +98,8 @@ public class EventStreamTest {
         final OutputStream outputStreamMock = mock(OutputStream.class);
         final EventStream eventStream = new EventStream(
                 emptyConsumer(), outputStreamMock, config, mock(EventStreamChecks.class), cursorConverter,
-                BYTES_FLUSHED_METER, SSF_TOTAL_EVENTS_METER, SSF_MATCHED_EVENTS_METER, eventStreamWriter, mock(ConsumptionKpiCollector.class));
+                BYTES_FLUSHED_METER, SSF_TOTAL_EVENTS_METER, SSF_MATCHED_EVENTS_METER,
+                eventStreamWriter, mock(ConsumptionKpiCollector.class));
 
         final Thread thread = new Thread(() -> eventStream.streamEvents(() -> {
         }));
@@ -126,7 +127,8 @@ public class EventStreamTest {
                 .build();
         final EventStream eventStream = new EventStream(
                 emptyConsumer(), mock(OutputStream.class), config, mock(EventStreamChecks.class), cursorConverter,
-                BYTES_FLUSHED_METER, SSF_TOTAL_EVENTS_METER, SSF_MATCHED_EVENTS_METER, eventStreamWriter, mock(ConsumptionKpiCollector.class));
+                BYTES_FLUSHED_METER, SSF_TOTAL_EVENTS_METER, SSF_MATCHED_EVENTS_METER,
+                eventStreamWriter, mock(ConsumptionKpiCollector.class));
         final AtomicBoolean triggerAuthChange = new AtomicBoolean(false);
         final AtomicBoolean accessDeniedTriggered = new AtomicBoolean(false);
         final Thread thread = new Thread(() -> {
@@ -169,7 +171,8 @@ public class EventStreamTest {
                 .build();
         final EventStream eventStream = new EventStream(
                 emptyConsumer(), mock(OutputStream.class), config, mock(EventStreamChecks.class), cursorConverter,
-                BYTES_FLUSHED_METER, SSF_TOTAL_EVENTS_METER, SSF_MATCHED_EVENTS_METER, eventStreamWriter, mock(ConsumptionKpiCollector.class));
+                BYTES_FLUSHED_METER, SSF_TOTAL_EVENTS_METER, SSF_MATCHED_EVENTS_METER,
+                eventStreamWriter, mock(ConsumptionKpiCollector.class));
         eventStream.streamEvents(() -> {
         });
         // if something goes wrong - the test should fail with a timeout
