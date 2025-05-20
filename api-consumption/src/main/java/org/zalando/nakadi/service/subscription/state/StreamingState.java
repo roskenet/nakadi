@@ -77,7 +77,7 @@ class StreamingState extends State {
     private ZkSubscription<List<String>> streamCloseSubscription;
     private IdleStreamWatcher idleStreamWatcher;
 
-    private Function<EventsWrapper, Boolean> predicate;
+    private Function<EventsWrapper, Boolean> filterPredicate;
     private boolean commitTimeoutReached = false;
 
     /**
@@ -104,13 +104,13 @@ class StreamingState extends State {
      */
     @Override
     public void onEnter() {
-        predicate = this.getParameters().getFilterPredicate();
+        filterPredicate = this.getParameters().getFilterPredicate();
         final String kafkaFlushedBytesMetricName = MetricUtils.metricNameForHiLALink(
                 this.getContext().getParameters().getConsumingClient().getClientId(),
                 this.getContext().getSubscription().getId()
         );
         bytesSentMeterPerSubscription = this.getContext().getMetricRegistry().meter(kafkaFlushedBytesMetricName);
-        if (predicate != null) {
+        if (filterPredicate != null) {
             final String ssfTotalEventsMetricName = MetricUtils.metricNameForHiLAStream(
                     this.getContext().getSubscription().getId(),
                     this.getContext().getSessionId(),
@@ -261,11 +261,11 @@ class StreamingState extends State {
     }
 
     private boolean doesMatchSSFFilter(final ConsumedEvent event) {
-        if (predicate == null) {
+        if (filterPredicate == null) {
             return true;
         }
         this.ssfTotalEventsMetric.mark();
-        final boolean matches = matchesSSFFilterPredicate(predicate, event);
+        final boolean matches = matchesSSFFilterPredicate(filterPredicate, event);
         if (matches) {
             this.ssfMatchedEventsMetric.mark();
             return true;
