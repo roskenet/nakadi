@@ -49,7 +49,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.groupingBy;
-import static org.zalando.nakadi.service.StreamingFilters.shouldEventBeFilteredBecauseOfFilter;
+import static org.zalando.nakadi.service.StreamingFilters.matchesSSFFilterPredicate;
 
 class StreamingState extends State {
     private static final Logger LOG = LoggerFactory.getLogger(StreamingState.class);
@@ -265,7 +265,7 @@ class StreamingState extends State {
             return true;
         }
         this.ssfTotalEventsMetric.mark();
-        final boolean matches = !shouldEventBeFilteredBecauseOfFilter(predicate, event);
+        final boolean matches = matchesSSFFilterPredicate(predicate, event);
         if (matches) {
             this.ssfMatchedEventsMetric.mark();
             return true;

@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 
 import static java.lang.System.currentTimeMillis;
 import static java.util.function.Function.identity;
-import static org.zalando.nakadi.service.StreamingFilters.shouldEventBeFilteredBecauseOfFilter;
+import static org.zalando.nakadi.service.StreamingFilters.matchesSSFFilterPredicate;
 import static org.zalando.nakadi.service.StreamingFilters.shouldEventBeFilteredBecauseOfTestProjectId;
 
 public class EventStream {
@@ -199,18 +199,18 @@ public class EventStream {
                 || evt.getConsumerTags().containsKey(HeaderTag.CONSUMER_SUBSCRIPTION_ID)
                 || eventStreamChecks.isConsumptionBlocked(evt)
                 || shouldEventBeFilteredBecauseOfTestProjectId(config.getTestDataFilter(), evt)
-                || shouldEventBeDiscardedBecauseOfFilter(evt);
+                || !doesMatchSSFFilter(evt);
     }
 
-    private boolean shouldEventBeDiscardedBecauseOfFilter(final ConsumedEvent evt) {
+    private boolean doesMatchSSFFilter(final ConsumedEvent evt) {
         if (config.getFilterPredicate() == null) {
-            return false;
+            return true;
         }
         this.ssfTotalEventsMeter.mark();
-        if (shouldEventBeFilteredBecauseOfFilter(config.getFilterPredicate(), evt)) {
+        if (matchesSSFFilterPredicate(config.getFilterPredicate(), evt)) {
+            this.ssfMatchedEventsMeter.mark();
             return true;
         } else {
-            this.ssfMatchedEventsMeter.mark();
             return false;
         }
     }
