@@ -618,16 +618,11 @@ class StreamingState extends State {
 
         getContext().getKpiCollector().sendKpi();
 
-        //final String streamMetricPrefix = MetricUtils.metricNameForHiLAStream(
-        //        this.getContext().getSubscription().getId(),
-        //        this.getContext().getSessionId(),
-        //        null) + ".";
-        //this.getContext().getMetricRegistry().removeMatching(new MetricFilter() {
-        //    @Override
-        //    public boolean matches(String name, Metric metric) {
-        //        return name.startsWith(streamMetricPrefix);
-        //    }
-        //});
+        final String streamMetricPrefix = MetricUtils.metricNameForHiLAStream(
+                this.getContext().getSubscription().getId(),
+                this.getContext().getSessionId(),
+                null) + ".";
+        this.getContext().getMetricRegistry().removeMatching((name, metric) -> name.startsWith(streamMetricPrefix));
 
         logExtendedCommitInformation();
         if (null != topologyChangeSubscription) {
