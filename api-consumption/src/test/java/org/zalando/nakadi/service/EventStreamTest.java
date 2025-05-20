@@ -66,9 +66,10 @@ public class EventStreamTest {
 
     private static final String TOPIC = UUID.randomUUID().toString();
     private static final byte[] DUMMY = "DUMMY".getBytes(UTF_8);
-    private static final Meter BYTES_FLUSHED_METER = new MetricRegistry().meter("mock");
-    private static final Meter SSF_TOTAL_EVENTS_METER = new MetricRegistry().meter("mock2");
-    private static final Meter SSF_MATCHED_EVENTS_METER = new MetricRegistry().meter("mock");
+    private static final MetricRegistry metricRegistry = new MetricRegistry();
+    private static final Meter BYTES_FLUSHED_METER = metricRegistry.meter("mock");
+    private static final Meter SSF_TOTAL_EVENTS_METER = metricRegistry.meter("mock2");
+    private static final Meter SSF_MATCHED_EVENTS_METER = metricRegistry.meter("mock3");
 
     private static final Timeline TIMELINE = buildTimelineWithTopic(TOPIC);
     private static CursorConverter cursorConverter;
