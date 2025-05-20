@@ -303,7 +303,7 @@ public class EventStreamController {
                                 client.getClientId(),
                                 eventTypeName,
                                 streamId,
-                                MetricUtils.SSF_EVENTS_TOTAL);
+                                MetricUtils.SSF_EVENTS_MATCHED);
                         ssfMatchedEventsMeter = this.streamMetrics.meter(ssfMatchedEventsMetricName);
                     }
 
@@ -360,12 +360,12 @@ public class EventStreamController {
                     if (appConnectionsCounter != null) {
                         appConnectionsCounter.dec();
                     }
-                    final String streamMetricPrefix = MetricUtils.metricNameForLolaStream(
-                            client.getClientId(),
-                            eventTypeName,
-                            streamId,
-                            null) + ".";
-                    this.streamMetrics.removeMatching((name, metric) -> name.startsWith(streamMetricPrefix));
+                    //final String streamMetricPrefix = MetricUtils.metricNameForLolaStream(
+                    //        client.getClientId(),
+                    //        eventTypeName,
+                    //        streamId,
+                    //        null) + ".";
+                    //this.streamMetrics.removeMatching((name, metric) -> name.startsWith(streamMetricPrefix));
                     if (eventStream != null) {
                         eventStream.close();
                     }

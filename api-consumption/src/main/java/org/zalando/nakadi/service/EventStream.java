@@ -210,7 +210,7 @@ public class EventStream {
         if (shouldEventBeFilteredBecauseOfFilter(config.getFilterPredicate(), evt)) {
             return true;
         } else {
-            this.ssfTotalEventsMeter.mark();
+            this.ssfMatchedEventsMeter.mark();
             return false;
         }
     }

@@ -33,8 +33,7 @@ public class EventStreamFactory {
                                          final EventStreamConfig config,
                                          final Meter bytesFlushedMeter,
                                          final Meter ssfTotalEventsMeter,
-                                         final Meter ssfMatchedEventsMeter
-                                         )
+                                         final Meter ssfMatchedEventsMeter)
             throws InvalidCursorException {
 
         return new EventStream(
