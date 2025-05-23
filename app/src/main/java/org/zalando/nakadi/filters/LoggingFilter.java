@@ -387,10 +387,13 @@ public class LoggingFilter extends OncePerRequestFilter {
         // the default implementation of skip would now allow us to capture the skipped bytes
         @Override
         public long skip(final long n) throws IOException {
-            final int remaining = (int) n; // ¯\_(ツ)_/¯
+            long remaining = n;
             final byte[] b = new byte[1024];
             while (remaining > 0) {
-                this.read(b, 0, Math.min(remaining, b.length));
+                // it is safe to cast to int since remaining is less than 1024
+                final int len = remaining >= b.length ? b.length : (int) remaining;
+                this.read(b, 0, len);
+                remaining -= len;
             }
             return n;
         }
