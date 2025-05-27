@@ -2,7 +2,6 @@ package org.zalando.nakadi.filters;
 
 import com.google.common.io.CountingInputStream;
 import com.google.common.io.CountingOutputStream;
-import static com.google.common.base.Preconditions.checkNotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -15,6 +14,7 @@ import org.zalando.nakadi.plugin.api.authz.Subject;
 import org.zalando.nakadi.service.FeatureToggleService;
 import org.zalando.nakadi.service.publishing.NakadiKpiPublisher;
 import org.zalando.nakadi.util.MDCUtils;
+
 import javax.servlet.AsyncEvent;
 import javax.servlet.AsyncListener;
 import javax.servlet.FilterChain;
@@ -33,6 +33,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Optional;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 public class LoggingFilter extends OncePerRequestFilter {
 
@@ -196,8 +198,7 @@ public class LoggingFilter extends OncePerRequestFilter {
     private void logToKpiPublisher(final RequestLogInfo requestLogInfo, final int statusCode, final Long timeSpentMs) {
         if (requestLogInfo.isBodyCapturingEnabled) {
             try {
-                // we should report the entire request body submitted by the user
-                // regardless of whether it was fully read by the handler or not
+                // just because the handler didn't process some of the bytes doesn't mean we should not report them
                 requestLogInfo.forceConsumptionOfInputBytes();
             } catch (IOException e) {
                 LOG.error("Failed to force consumption of input bytes", e);
@@ -214,9 +215,7 @@ public class LoggingFilter extends OncePerRequestFilter {
                 .setAcceptEncoding(requestLogInfo.acceptEncoding)
                 .setStatusCode(statusCode)
                 .setResponseTimeMs(timeSpentMs)
-                .setBody(requestLogInfo.isBodyCapturingEnabled
-                        ? ByteBuffer.wrap(requestLogInfo.getRequestCapturedBytes())
-                        : null)
+                .setBody(ByteBuffer.wrap(requestLogInfo.getRequestCapturedBytes()))
                 .setRequestLength(requestLogInfo.getRequestLength())
                 .setResponseLength(requestLogInfo.getResponseLength())
                 .build());

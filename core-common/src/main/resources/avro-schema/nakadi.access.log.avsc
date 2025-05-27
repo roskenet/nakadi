@@ -54,8 +54,8 @@
     },
     {
       "name": "body",
-      "type": ["null", "bytes"],
-      "default": null
+      "type": "bytes",
+      "default": ""
     }
   ]
 }
