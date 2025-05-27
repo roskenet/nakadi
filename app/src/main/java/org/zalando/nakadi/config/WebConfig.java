@@ -138,7 +138,8 @@ public class WebConfig extends WebMvcConfigurationSupport {
     @Bean
     public FilterRegistrationBean loggingFilter() {
         return createFilterRegistrationBean(
-                new LoggingFilter(nakadiKpiPublisher, authorizationService, featureToggleService, accessLogCaptureReqBody),
+                new LoggingFilter(nakadiKpiPublisher, authorizationService,
+                        featureToggleService, accessLogCaptureReqBody),
                 20);
     }
 
