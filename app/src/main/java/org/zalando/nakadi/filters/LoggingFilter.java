@@ -101,6 +101,9 @@ public class LoggingFilter extends OncePerRequestFilter {
         }
 
         private byte[] getRequestCapturedBytes() {
+            if (!isBodyCapturingEnabled) {
+                throw new IllegalStateException("getRequestCapturedBytes() called when isBodyCapturingEnabled is false");
+            }
             return requestWrapper.getInputStreamCapturedBytes();
         }
 
@@ -196,6 +199,7 @@ public class LoggingFilter extends OncePerRequestFilter {
     }
 
     private void logToKpiPublisher(final RequestLogInfo requestLogInfo, final int statusCode, final Long timeSpentMs) {
+        final byte[] requestBodyBytes;
         if (requestLogInfo.isBodyCapturingEnabled) {
             try {
                 // just because the handler didn't process some of the bytes doesn't mean we should not report them
@@ -203,6 +207,9 @@ public class LoggingFilter extends OncePerRequestFilter {
             } catch (IOException e) {
                 LOG.error("Failed to force consumption of input bytes", e);
             }
+            requestBodyBytes = requestLogInfo.getRequestCapturedBytes();
+        } else {
+            requestBodyBytes = new byte[] {};
         }
         nakadiKpiPublisher.publish(() -> NakadiAccessLog.newBuilder()
                 .setMethod(requestLogInfo.method)
@@ -215,7 +222,7 @@ public class LoggingFilter extends OncePerRequestFilter {
                 .setAcceptEncoding(requestLogInfo.acceptEncoding)
                 .setStatusCode(statusCode)
                 .setResponseTimeMs(timeSpentMs)
-                .setRequestBody(ByteBuffer.wrap(requestLogInfo.getRequestCapturedBytes()))
+                .setRequestBody(ByteBuffer.wrap(requestBodyBytes))
                 .setRequestLength(requestLogInfo.getRequestLength())
                 .setResponseLength(requestLogInfo.getResponseLength())
                 .build());
@@ -265,6 +272,9 @@ public class LoggingFilter extends OncePerRequestFilter {
         }
 
         byte[] getInputStreamCapturedBytes() {
+            if (!captureBody) {
+                throw new IllegalStateException("getInputStreamCapturedBytes() called when captureBody is false");
+            }
             return inputStreamWrapper != null ? inputStreamWrapper.getCaptured() : new byte[] {};
         }
 
