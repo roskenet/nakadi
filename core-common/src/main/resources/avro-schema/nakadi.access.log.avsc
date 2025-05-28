@@ -51,6 +51,11 @@
     {
       "name": "response_length",
       "type": "long"
+    },
+    {
+      "name": "request_body",
+      "type": "bytes",
+      "default": ""
     }
   ]
 }
