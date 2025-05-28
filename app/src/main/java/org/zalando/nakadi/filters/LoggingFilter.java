@@ -102,7 +102,8 @@ public class LoggingFilter extends OncePerRequestFilter {
 
         private byte[] getRequestCapturedBytes() {
             if (!isBodyCapturingEnabled) {
-                throw new IllegalStateException("getRequestCapturedBytes() called when isBodyCapturingEnabled is false");
+                throw new IllegalStateException(
+                        "getRequestCapturedBytes() called when isBodyCapturingEnabled is false");
             }
             return requestWrapper.getInputStreamCapturedBytes();
         }
