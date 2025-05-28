@@ -53,7 +53,7 @@
       "type": "long"
     },
     {
-      "name": "body",
+      "name": "request_body",
       "type": "bytes",
       "default": ""
     }

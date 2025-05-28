@@ -215,7 +215,7 @@ public class LoggingFilter extends OncePerRequestFilter {
                 .setAcceptEncoding(requestLogInfo.acceptEncoding)
                 .setStatusCode(statusCode)
                 .setResponseTimeMs(timeSpentMs)
-                .setBody(ByteBuffer.wrap(requestLogInfo.getRequestCapturedBytes()))
+                .setRequestBody(ByteBuffer.wrap(requestLogInfo.getRequestCapturedBytes()))
                 .setRequestLength(requestLogInfo.getRequestLength())
                 .setResponseLength(requestLogInfo.getResponseLength())
                 .build());
