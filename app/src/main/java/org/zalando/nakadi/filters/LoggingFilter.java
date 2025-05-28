@@ -386,15 +386,9 @@ public class LoggingFilter extends OncePerRequestFilter {
         // the default implementation of skip would now allow us to capture the skipped bytes
         @Override
         public long skip(final long n) throws IOException {
-            long remaining = n;
-            final byte[] b = new byte[1024];
-            while (remaining > 0) {
-                // it is safe to cast to int since remaining is less than 1024
-                final int len = remaining >= b.length ? b.length : (int) remaining;
-                this.read(b, 0, len);
-                remaining -= len;
-            }
-            return n;
+            // we don't provide an implementation since it's not used in Nakadi
+            throw new UnsupportedOperationException(
+                    "CapturingInputStream does not support skip operation");
         }
 
         @Override
