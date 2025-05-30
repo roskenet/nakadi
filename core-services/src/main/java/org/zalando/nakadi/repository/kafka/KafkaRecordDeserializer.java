@@ -9,7 +9,6 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.message.BinaryMessageDecoder;
 import org.apache.avro.message.RawMessageDecoder;
-import org.apache.avro.specific.SpecificData;
 import org.json.JSONObject;
 import org.springframework.stereotype.Component;
 import org.zalando.nakadi.generated.avro.Envelope;
@@ -91,7 +90,7 @@ public class KafkaRecordDeserializer implements RecordDeserializer {
                 event = decoder.decode(envelope.getPayload());
             } else {
                 final RawMessageDecoder<GenericRecord> decoder = RAW_DECODERS.computeIfAbsent(
-                        schema, (s) -> new RawMessageDecoder<>(SpecificData.get(), s)
+                        schema, (s) -> new RawMessageDecoder<>(GenericData.get(), s)
                 );
                 event = decoder.decode(envelope.getPayload());
             }
