@@ -111,9 +111,9 @@ public class MultiTimelineEventConsumer implements HighLevelConsumer {
                 timelinesChanged.set(true);
             }
             // filter out tombstones
-            if (event.getEvent() != null) {
-                filteredResult.add(event);
-            }
+//            if (event.getEvent() != null) {
+//                filteredResult.add(event);
+//            }
         }
         return filteredResult;
     }
@@ -129,6 +129,7 @@ public class MultiTimelineEventConsumer implements HighLevelConsumer {
         for (final LowLevelConsumer consumer : eventConsumers.values()) {
             final List<ConsumedEvent> partialResult = consumer.readEvents().stream()
                     .map(event -> new ConsumedEvent(
+                            event.getKey(),
                             event.getData(),
                             NakadiCursor.of(timelinesByTopic.get(
                                     event.getTopic()),

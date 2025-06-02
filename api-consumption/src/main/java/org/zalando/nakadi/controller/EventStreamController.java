@@ -241,6 +241,7 @@ public class EventStreamController {
             @Nullable @RequestParam(value = "test_data_filter", required = false) final TestDataFilter testDataFilter,
             @Nullable @RequestParam(value = "ssf_expr", required = false) final String ssfFilter,
             @Nullable @RequestParam(value = "ssf_lang", required = false) final String ssfLang,
+            @RequestParam(value = "receive_tombstones", required = false) final boolean receiveTombstones,
             @Nullable @RequestHeader(name = "X-nakadi-cursors", required = false) final String cursorsStr,
             final HttpServletResponse response, final Client client) {
         final MDCUtils.Context requestContext = MDCUtils.getContext();
@@ -303,6 +304,7 @@ public class EventStreamController {
                             .withMaxMemoryUsageBytes(maxMemoryUsageBytes)
                             .withTestDataFilter(Optional.ofNullable(testDataFilter).orElse(TestDataFilter.LIVE))
                             .withFilterPredicate(filterPredicate)
+                            .withReceiveTombstones(receiveTombstones)
                             .build();
 
                     consumerCounter = metricRegistry.counter(metricNameFor(eventTypeName, CONSUMERS_COUNT_METRIC_NAME));

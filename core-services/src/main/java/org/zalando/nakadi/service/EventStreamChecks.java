@@ -111,10 +111,19 @@ public class EventStreamChecks {
      */
     public boolean shouldSkipMisplacedEvent(final ConsumedEvent event) {
         if (featureToggleService.isFeatureEnabled(Feature.SKIP_MISPLACED_EVENTS)) {
-            final String expectedEventTypeName = event.getPosition().getEventType();
+           final String expectedEventTypeName = event.getPosition().getEventType();
             if (eventTypeCache.getEventType(expectedEventTypeName).getCategory() != EventCategory.UNDEFINED) {
                 try {
-                    final String actualEventTypeName = kafkaRecordDeserializer.getEventTypeName(event.getEvent());
+                    final String actualEventTypeName;
+                    // tombstone events are not expected to have any data payload, so we check kafka headers
+                    if (event.isTombstone()) {
+                        // TODO: what about events that were compacted before we published this header?
+                        actualEventTypeName = event.getConsumerTags().get(HeaderTag.PUBLISHED_EVENT_TYPE);
+                    }
+                    else {
+                        actualEventTypeName = kafkaRecordDeserializer.getEventTypeName(event.getEvent());
+                    }
+
                     if (!expectedEventTypeName.equals(actualEventTypeName)) {
                         LOG.warn("Consumed event for event type '{}', but expected '{}' (at position {}), topic id: {}",
                                 actualEventTypeName, expectedEventTypeName, event.getPosition(),

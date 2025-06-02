@@ -9,7 +9,8 @@ import java.util.stream.Stream;
 
 public enum HeaderTag {
     CONSUMER_SUBSCRIPTION_ID,
-    DEBUG_PUBLISHER_TOPIC_ID;
+    DEBUG_PUBLISHER_TOPIC_ID,
+    PUBLISHED_EVENT_TYPE;
 
     private static final Map<String, HeaderTag> STRING_TO_ENUM = HeaderTag.stream()
             .collect(Collectors.toMap(HeaderTag::name, Function.identity()));

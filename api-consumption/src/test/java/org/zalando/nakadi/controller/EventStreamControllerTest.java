@@ -578,19 +578,19 @@ public class EventStreamControllerTest {
 
     protected StreamingResponseBody createStreamingResponseBody() throws IOException {
         return controller.streamEvents(TEST_EVENT_TYPE_NAME, 1, 0, 0, 0, 0,
-                null, null, null, null, responseMock, FULL_ACCESS_CLIENT);
+                null, null, null, false, null, responseMock, FULL_ACCESS_CLIENT);
     }
 
     private StreamingResponseBody createStreamingResponseBody(final Client client) throws Exception {
         return controller.streamEvents(
                 TEST_EVENT_TYPE_NAME, 1, 2, 3, 4, 5,
-                null, null, null,
+                null, null, null, false,
                 "[{\"partition\":\"0\",\"offset\":\"000000000000000000\"}]", responseMock, client);
     }
 
     private StreamingResponseBody createStreamingResponseBody(final String cursorsStr) throws Exception {
         return controller.streamEvents(TEST_EVENT_TYPE_NAME, 1, 2, 3, 4,
-                5, null, null, null, cursorsStr, responseMock, FULL_ACCESS_CLIENT);
+                5, null, null, null, false, cursorsStr, responseMock, FULL_ACCESS_CLIENT);
     }
 
     private StreamingResponseBody createStreamingResponseBody(final Integer batchLimit,
@@ -600,7 +600,7 @@ public class EventStreamControllerTest {
                                                               final Integer streamKeepAliveLimit,
                                                               final String cursorsStr) {
         return controller.streamEvents(TEST_EVENT_TYPE_NAME, batchLimit, streamLimit, batchTimeout, streamTimeout,
-                streamKeepAliveLimit, null, null, null, cursorsStr, responseMock, FULL_ACCESS_CLIENT);
+                streamKeepAliveLimit, null, null, null, false, cursorsStr, responseMock, FULL_ACCESS_CLIENT);
     }
 
 }

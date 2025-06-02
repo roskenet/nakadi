@@ -311,7 +311,8 @@ public class StreamingContext implements SubscriptionStreamer {
             return true;
         }
         return !isConsumptionAllowedFromConsumerTags(event)
-                || eventStreamChecks.isConsumptionBlocked(event);
+                || eventStreamChecks.isConsumptionBlocked(event)
+                || event.isTombstone();
     }
 
     private boolean isConsumptionAllowedFromConsumerTags(final ConsumedEvent event) {

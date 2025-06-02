@@ -20,6 +20,7 @@ public interface LowLevelConsumer extends Closeable {
     List<Event> readEvents();
 
     class Event {
+        private final byte[] key;
         private final byte[] data;
         private final String topic;
         private final int partition;
@@ -29,7 +30,8 @@ public interface LowLevelConsumer extends Closeable {
         private final Map<HeaderTag, String> consumerTags;
         private final Optional<TestProjectIdHeader> testProjectIdHeader;
 
-        public Event(final byte[] data,
+        public Event(final byte[] key,
+                     final byte[] data,
                      final String topic,
                      final int partition,
                      final long offset,
@@ -37,6 +39,7 @@ public interface LowLevelConsumer extends Closeable {
                      final EventOwnerHeader eventOwnerHeader,
                      final Map<HeaderTag, String> consumerTags,
                      final Optional<TestProjectIdHeader> testProjectIdHeader) {
+            this.key = key;
             this.data = data;
             this.topic = topic;
             this.partition = partition;
@@ -45,6 +48,10 @@ public interface LowLevelConsumer extends Closeable {
             this.eventOwnerHeader = eventOwnerHeader;
             this.consumerTags = consumerTags;
             this.testProjectIdHeader = testProjectIdHeader;
+        }
+
+        public byte[] getKey() {
+            return key;
         }
 
         public byte[] getData() {
@@ -94,7 +101,8 @@ public interface LowLevelConsumer extends Closeable {
                     && Arrays.equals(data, event.data) && Objects.equals(topic, event.topic)
                     && Objects.equals(eventOwnerHeader, event.eventOwnerHeader)
                     && Objects.equals(consumerTags, event.consumerTags)
-                    && Objects.equals(testProjectIdHeader, event.testProjectIdHeader);
+                    && Objects.equals(testProjectIdHeader, event.testProjectIdHeader)
+                    && Arrays.equals(key, event.key);
         }
 
         @Override
@@ -102,6 +110,7 @@ public interface LowLevelConsumer extends Closeable {
             int result = Objects.hash(topic, partition, offset, timestamp, eventOwnerHeader,
                     consumerTags, testProjectIdHeader);
             result = 31 * result + Arrays.hashCode(data);
+            result = 31 * result + Arrays.hashCode(key);
             return result;
         }
     }

@@ -16,6 +16,7 @@ import java.util.Optional;
 @Immutable
 public class ConsumedEvent implements Resource<ConsumedEvent> {
 
+    private final byte[] key;
     private final byte[] event;
     private final NakadiCursor position;
     private final long timestamp;
@@ -23,15 +24,21 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
     private final Map<HeaderTag, String> consumerTags;
     private final Optional<TestProjectIdHeader> testProjectIdHeader;
 
-    public ConsumedEvent(final byte[] event, final NakadiCursor position, final long timestamp,
+    public ConsumedEvent(final byte[] key, final byte[] event,
+                         final NakadiCursor position, final long timestamp,
                          @Nullable final EventOwnerHeader owner, final Map<HeaderTag, String> consumerTags,
                          final Optional<TestProjectIdHeader> testProjectIdHeader) {
+        this.key = key;
         this.event = event;
         this.position = position;
         this.timestamp = timestamp;
         this.owner = owner;
         this.consumerTags = consumerTags;
         this.testProjectIdHeader = testProjectIdHeader;
+    }
+
+    public byte[] getKey() {
+        return key;
     }
 
     public byte[] getEvent() {
@@ -48,6 +55,10 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
 
     public Optional<TestProjectIdHeader> getTestProjectIdHeader() {
         return testProjectIdHeader;
+    }
+
+    public boolean isTombstone() {
+        return event == null;
     }
 
     @Override

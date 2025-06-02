@@ -3,6 +3,7 @@ package org.zalando.nakadi.service;
 import com.codahale.metrics.Meter;
 import com.google.common.collect.Lists;
 import org.apache.kafka.common.KafkaException;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.zalando.nakadi.domain.ConsumedEvent;
@@ -111,7 +112,9 @@ public class EventStream {
                     latestOffsets.put(event.getPosition().getPartition(), event.getPosition());
 
                     // put message to batch
-                    currentBatches.get(event.getPosition().getPartition()).add(event.getEvent());
+                    final byte[] eventPayload = event.isTombstone() ?
+                            transformForTombstoneEvent(event) : event.getEvent();
+                    currentBatches.get(event.getPosition().getPartition()).add(eventPayload);
                     messagesRead++;
                     bytesInMemory += event.getEvent().length;
 
@@ -194,12 +197,34 @@ public class EventStream {
         }
     }
 
+    // TODO: find more suitable place, maybe ConsumedEvent#toTombstoneEvent()?
+    private byte[] transformForTombstoneEvent(final ConsumedEvent event) {
+        final JSONObject metadata = new JSONObject();
+        metadata
+                .put("event_type", event.getConsumerTags()
+                        .get(HeaderTag.PUBLISHED_EVENT_TYPE))
+                // this might be wrong due to misplaced events bug, but filtering is done before this method is called
+                .put("partition", event.getPosition().getPartition())
+                .put("partition_compaction_key", new String(event.getKey()));
+
+        event.getTestProjectIdHeader().ifPresent(
+                testProjectIdHeader -> metadata.put("test_project_id", testProjectIdHeader.getValue()));
+        return new JSONObject()
+                .put("metadata", metadata)
+                .toString().getBytes();
+    }
+
     private boolean shouldEventBeDiscarded(final ConsumedEvent evt) {
-        return eventStreamChecks.shouldSkipMisplacedEvent(evt)
+       return eventStreamChecks.shouldSkipMisplacedEvent(evt)
                 || evt.getConsumerTags().containsKey(HeaderTag.CONSUMER_SUBSCRIPTION_ID)
                 || eventStreamChecks.isConsumptionBlocked(evt)
                 || shouldEventBeFilteredBecauseOfTestProjectId(config.getTestDataFilter(), evt)
+                || shouldSkipIfTombstone(evt)
                 || !doesMatchSSFFilter(evt);
+    }
+
+    private boolean shouldSkipIfTombstone(final ConsumedEvent event) {
+        return event.isTombstone() && !config.isReceiveTombstones();
     }
 
     private boolean doesMatchSSFFilter(final ConsumedEvent evt) {

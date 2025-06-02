@@ -147,12 +147,14 @@ public class NakadiKafkaConsumerTest {
         assertThat("The event we read first should have the same data as first mocked ConsumerRecord",
                 consumedEvents.get(0),
                 equalTo(new LowLevelConsumer.Event(
+                        "k1".getBytes(),
                         event1, TOPIC, PARTITION, event1Offset, now, null,
                         Collections.emptyMap(), Optional.empty())));
 
         assertThat("The event we read second should have the same data as second mocked ConsumerRecord",
                 consumedEvents.get(1),
                 equalTo(new LowLevelConsumer.Event(
+                        "k2".getBytes(),
                         event2, TOPIC, PARTITION, event2Offset, now, null,
                         Collections.emptyMap(), Optional.empty())));
 
