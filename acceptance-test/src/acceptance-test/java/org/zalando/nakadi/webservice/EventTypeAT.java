@@ -741,6 +741,62 @@ public class EventTypeAT extends BaseAT {
     }
 
     @Test
+    public void whenPUTNoneCompatibiltyWithValidSchemaToForwardInvalidThenOK() throws JsonProcessingException {
+        final EventTypeTestBuilder builder = EventTypeTestBuilder.builder();
+        final EventType src = builder
+                .compatibilityMode(CompatibilityMode.NONE)
+                .schema("{}")
+                .build();
+
+        NakadiTestUtils.switchFeature(Feature.FORCE_EVENT_TYPE_CREATE_SCHEMA_VALIDATION, false);
+
+        given().body(MAPPER.writer().writeValueAsString(src))
+                .contentType(JSON)
+                .when().post(ENDPOINT)
+                .then().statusCode(HttpStatus.SC_CREATED);
+
+        final EventType updated = builder
+                .compatibilityMode(CompatibilityMode.FORWARD)
+                .schema("{\"foo\": \"bar\"}")
+                .build();
+
+        NakadiTestUtils.switchFeature(Feature.FORCE_EVENT_TYPE_UPDATE_SCHEMA_VALIDATION, false);
+
+        given().body(MAPPER.writer().writeValueAsString(updated))
+                .contentType(JSON)
+                .when().put(ENDPOINT + "/" + updated.getName())
+                .then().statusCode(HttpStatus.SC_OK);
+    }
+
+    @Test
+    public void whenPUTNoneCompatibiltyWithValidSchemaToCompatibleInvalidThenThrow() throws JsonProcessingException {
+        final EventTypeTestBuilder builder = EventTypeTestBuilder.builder();
+        final EventType src = builder
+                .compatibilityMode(CompatibilityMode.NONE)
+                .schema("{}")
+                .build();
+
+        NakadiTestUtils.switchFeature(Feature.FORCE_EVENT_TYPE_CREATE_SCHEMA_VALIDATION, false);
+
+        given().body(MAPPER.writer().writeValueAsString(src))
+                .contentType(JSON)
+                .when().post(ENDPOINT)
+                .then().statusCode(HttpStatus.SC_CREATED);
+
+        final EventType updated = builder
+                .compatibilityMode(CompatibilityMode.COMPATIBLE)
+                .schema("{\"foo\": \"bar\"}")
+                .build();
+
+        NakadiTestUtils.switchFeature(Feature.FORCE_EVENT_TYPE_UPDATE_SCHEMA_VALIDATION, false);
+
+        given().body(MAPPER.writer().writeValueAsString(updated))
+                .contentType(JSON)
+                .when().put(ENDPOINT + "/" + updated.getName())
+                .then().statusCode(HttpStatus.SC_UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
     public void whenPUTForwardCompatibiltyWithAlreadyInvalidSchemaToAnotherInvalidThenOK()
             throws JsonProcessingException {
 
