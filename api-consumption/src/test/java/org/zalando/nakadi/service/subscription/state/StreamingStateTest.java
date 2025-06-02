@@ -166,7 +166,8 @@ public class StreamingStateTest {
         when(consumer.getAssignment()).thenReturn(Collections.emptySet());
 
         // Throw exception when reassigning partitions to consumer
-        doThrow(new InvalidCursorException(CursorError.UNAVAILABLE, anyCursor)).when(consumer).reassign(any());
+        doThrow(new InvalidCursorException(CursorError.UNAVAILABLE_AS_OFFSET_IN_FUTURE, anyCursor))
+                .when(consumer).reassign(any());
         when(timelineService.createEventConsumer(any())).thenReturn(consumer);
         when(subscription.getEventTypes()).thenReturn(Collections.singleton("t"));
 

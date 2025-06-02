@@ -7,6 +7,8 @@ import org.zalando.nakadi.repository.kafka.KafkaCursor;
 
 import java.util.Objects;
 
+import static org.zalando.nakadi.domain.CursorError.UNAVAILABLE_AS_TIMELINE_DELETED;
+
 public abstract class NakadiCursor {
     public static final int VERSION_LENGTH = 3;
 
@@ -167,7 +169,7 @@ public abstract class NakadiCursor {
         public void checkStorageAvailability() throws InvalidCursorException {
             asKafkaCursor();
             if (getTimeline().isDeleted()) {
-                throw new InvalidCursorException(CursorError.UNAVAILABLE, this);
+                throw new InvalidCursorException(UNAVAILABLE_AS_TIMELINE_DELETED, this);
             }
 
         }

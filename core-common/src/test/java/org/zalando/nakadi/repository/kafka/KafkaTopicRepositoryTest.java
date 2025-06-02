@@ -306,11 +306,18 @@ public class KafkaTopicRepositoryTest {
     @Test
     @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
     public void testInvalidCursors() {
-        final Cursor outOfBoundOffset = cursor("0", "38");
+        final Cursor offsetInThePast = cursor("0", "38");
         try {
-            kafkaTopicRepository.validateReadCursors(asTopicPosition(MY_TOPIC, asList(outOfBoundOffset)));
+            kafkaTopicRepository.validateReadCursors(asTopicPosition(MY_TOPIC, asList(offsetInThePast)));
         } catch (final InvalidCursorException e) {
-            assertThat(e.getError(), equalTo(CursorError.UNAVAILABLE));
+            assertThat(e.getError(), equalTo(CursorError.UNAVAILABLE_AS_OFFSET_EXPIRED));
+        }
+
+        final Cursor offsetInTheFuture = cursor("0", "40");
+        try {
+            kafkaTopicRepository.validateReadCursors(asTopicPosition(MY_TOPIC, asList(offsetInTheFuture)));
+        } catch (final InvalidCursorException e) {
+            assertThat(e.getError(), equalTo(CursorError.UNAVAILABLE_AS_OFFSET_IN_FUTURE));
         }
 
         final Cursor nonExistingPartition = cursor("99", "100");

@@ -26,8 +26,6 @@ import org.zalando.nakadi.exceptions.runtime.InvalidCursorException;
 import org.zalando.nakadi.exceptions.runtime.NoSuchEventTypeException;
 import org.zalando.nakadi.exceptions.runtime.ServiceTemporarilyUnavailableException;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
-import org.zalando.nakadi.service.AllowListService;
-import org.zalando.nakadi.service.timeline.HighLevelConsumer;
 import org.zalando.nakadi.repository.LowLevelConsumer;
 import org.zalando.nakadi.repository.TopicRepository;
 import org.zalando.nakadi.repository.kafka.KafkaPartitionStatistics;
@@ -36,6 +34,7 @@ import org.zalando.nakadi.security.ClientResolver;
 import org.zalando.nakadi.security.FullAccessClient;
 import org.zalando.nakadi.security.NakadiClient;
 import org.zalando.nakadi.service.AdminService;
+import org.zalando.nakadi.service.AllowListService;
 import org.zalando.nakadi.service.AuthorizationValidator;
 import org.zalando.nakadi.service.EventStream;
 import org.zalando.nakadi.service.EventStreamChecks;
@@ -43,6 +42,7 @@ import org.zalando.nakadi.service.EventStreamConfig;
 import org.zalando.nakadi.service.EventStreamFactory;
 import org.zalando.nakadi.service.EventTypeChangeListener;
 import org.zalando.nakadi.service.converter.CursorConverterImpl;
+import org.zalando.nakadi.service.timeline.HighLevelConsumer;
 import org.zalando.nakadi.service.timeline.TimelineService;
 import org.zalando.nakadi.util.ThreadUtils;
 import org.zalando.problem.Problem;
@@ -55,6 +55,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
@@ -62,13 +63,14 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -276,19 +278,34 @@ public class EventStreamControllerTest {
     }
 
     @Test
-    public void whenInvalidCursorsThenPreconditionFailed() throws Exception {
-        final NakadiCursor cursor = NakadiCursor.of(timeline, "0", "000000000000000000");
+    public void whenInvalidCursorsInFutureThenPreconditionFailed() throws Exception {
+        final NakadiCursor cursor = NakadiCursor.of(timeline, "0", "000000000000000100");
         when(eventTypeCache.getEventType(TEST_EVENT_TYPE_NAME)).thenReturn(EVENT_TYPE);
         when(timelineService.createEventConsumer(eq(KAFKA_CLIENT_ID)))
-                .thenThrow(new InvalidCursorException(CursorError.UNAVAILABLE, cursor));
+                .thenThrow(new InvalidCursorException(CursorError.UNAVAILABLE_AS_OFFSET_IN_FUTURE, cursor));
 
         final StreamingResponseBody responseBody = createStreamingResponseBody(1, 0, 0, 0, 0,
-                "[{\"partition\":\"0\",\"offset\":\"00000000000000000\"}]");
+                "[{\"partition\":\"0\",\"offset\":\"00000000000000100\"}]");
 
         final Problem expectedProblem = Problem.valueOf(PRECONDITION_FAILED,
-                "offset 000000000000000000 for partition 0 event type " + TEST_EVENT_TYPE_NAME +
-                        " is unavailable as retention time of data elapsed. " +
-                        "PATCH partition offset with valid and available offset");
+                "offset 000000000000000100 for partition 0 event type " + TEST_EVENT_TYPE_NAME +
+                        " is unavailable as offsets are in the future.");
+        assertThat(responseToString(responseBody), JSON_TEST_HELPER.matchesObject(expectedProblem));
+    }
+
+    @Test
+    public void whenInvalidCursorsOfDeletedTimelineThenPreconditionFailed() throws Exception {
+        final NakadiCursor cursor = NakadiCursor.of(timeline, "0", "00000000000000100");
+        when(eventTypeCache.getEventType(TEST_EVENT_TYPE_NAME)).thenReturn(EVENT_TYPE);
+        when(timelineService.createEventConsumer(eq(KAFKA_CLIENT_ID)))
+                .thenThrow(new InvalidCursorException(CursorError.UNAVAILABLE_AS_TIMELINE_DELETED, cursor));
+
+        final StreamingResponseBody responseBody = createStreamingResponseBody(1, 0, 0, 0, 0,
+                "[{\"partition\":\"0\",\"offset\":\"00000000000000100\"}]");
+
+        final Problem expectedProblem = Problem.valueOf(PRECONDITION_FAILED,
+                "offset 00000000000000100 for partition 0 event type " + TEST_EVENT_TYPE_NAME +
+                        " is unavailable as timeline has been deleted");
         assertThat(responseToString(responseBody), JSON_TEST_HELPER.matchesObject(expectedProblem));
     }
 
@@ -314,6 +331,59 @@ public class EventStreamControllerTest {
         assertThat(
                 streamConfig.getCursors(),
                 equalTo(tps2.stream().map(PartitionStatistics::getLast).collect(Collectors.toList())));
+    }
+
+    @Test
+    public void whenCursorsInPastThenBeginOffsetsAreUsed() throws IOException, InvalidCursorException {
+        // Given
+        final String partitionZeroOffset = "000000000000000001";
+        final String partitionOneOffset = "000000000000000020";
+        final String cursorStr = "[{\"partition\":\"0\",\"offset\":\"" + "001-0000-" + partitionZeroOffset + "\"}," +
+                "{\"partition\":\"1\",\"offset\":\"" + "001-0000-" + partitionOneOffset + "\"}]";
+
+        final KafkaPartitionStatistics partition1Statistics = new KafkaPartitionStatistics(timeline, 1, 0, 34);
+        final KafkaPartitionStatistics partition0Statistics = new KafkaPartitionStatistics(timeline, 0, 50, 87);
+        final List<PartitionStatistics> tps2 = ImmutableList.of(partition0Statistics, partition1Statistics);
+
+        when(eventTypeCache.getEventType(TEST_EVENT_TYPE_NAME)).thenReturn(EVENT_TYPE);
+        when(eventTypeCache.getTimelinesOrdered(TEST_EVENT_TYPE_NAME)).thenReturn(List.of(timeline));
+        when(timelineService.getActiveTimeline(any(EventType.class))).thenReturn(timeline);
+        when(timelineService.getActiveTimelinesOrdered(any(String.class))).thenReturn(List.of(timeline));
+        when(timelineService.getTopicRepository(timeline)).thenReturn(topicRepositoryMock);
+
+        when(topicRepositoryMock.loadTopicStatistics(eq(Collections.singletonList(timeline)))).thenReturn(tps2);
+        when(topicRepositoryMock.loadPartitionStatistics(timeline, "0")).thenReturn(Optional.of(partition0Statistics));
+        when(topicRepositoryMock.loadPartitionStatistics(timeline, "1")).thenReturn(Optional.of(partition1Statistics));
+
+        // Throw exception only for the first partition
+        doThrow(new InvalidCursorException(CursorError.UNAVAILABLE_AS_OFFSET_EXPIRED,
+                        NakadiCursor.of(timeline, "0", partitionZeroOffset)
+                )
+        ).when(topicRepositoryMock).validateReadCursors(List.of(NakadiCursor.of(timeline, "0", partitionZeroOffset)));
+
+        doNothing().when(topicRepositoryMock)
+                .validateReadCursors(List.of(NakadiCursor.of(timeline, "1", partitionOneOffset)));
+
+        final ArgumentCaptor<EventStreamConfig> configCaptor = ArgumentCaptor.forClass(EventStreamConfig.class);
+        final EventStream eventStreamMock = mock(EventStream.class);
+        when(eventStreamFactoryMock.createEventStream(any(), any(), configCaptor.capture(), any(), any(), any()))
+                .thenReturn(eventStreamMock);
+
+        // When
+        final StreamingResponseBody responseBody = createStreamingResponseBody(1, 0, 1, 1, 0, cursorStr);
+        responseBody.writeTo(new ByteArrayOutputStream());
+
+        // Then
+        final EventStreamConfig streamConfig = configCaptor.getValue();
+        streamConfig.getCursors().sort(Comparator.comparing(NakadiCursor::getPartition));
+
+        verify(topicRepositoryMock).validateReadCursors(List.of(NakadiCursor.of(timeline, "0", partitionZeroOffset)));
+        verify(topicRepositoryMock).validateReadCursors(List.of(NakadiCursor.of(timeline, "1", partitionOneOffset)));
+
+        // The available offsets in Kafka for partition 0 is 000000000000000050. As the requested offset is
+        // less than that, the `BEGIN` offset is SET for partition 0.
+        assertThat(streamConfig.getCursors().stream().map(NakadiCursor::getOffset).collect(Collectors.toList()),
+                equalTo(List.of("000000000000000049", partitionOneOffset)));
     }
 
     @Test

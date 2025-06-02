@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.zalando.nakadi.cache.EventTypeCache;
-import org.zalando.nakadi.domain.CursorError;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.NakadiCursor;
 import org.zalando.nakadi.domain.PartitionStatistics;
@@ -73,6 +72,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static org.zalando.nakadi.domain.CursorError.INVALID_FORMAT;
+import static org.zalando.nakadi.domain.CursorError.NULL_OFFSET;
+import static org.zalando.nakadi.domain.CursorError.NULL_PARTITION;
+import static org.zalando.nakadi.domain.CursorError.UNAVAILABLE_AS_OFFSET_EXPIRED;
+import static org.zalando.nakadi.domain.CursorError.UNAVAILABLE_AS_TIMELINE_DELETED;
 import static org.zalando.nakadi.metrics.MetricUtils.metricNameFor;
 import static org.zalando.nakadi.metrics.MetricUtils.metricNameForLoLAOpenConnections;
 import static org.zalando.nakadi.service.StreamingFilters.filterExpressionToPredicate;
@@ -146,34 +150,41 @@ public class EventStreamController {
             // Unfortunately, In order to have consistent exception checking, one can not just call validator
             for (final Cursor cursor : cursors) {
                 if (null == cursor.getPartition()) {
-                    throw new InvalidCursorException(CursorError.NULL_PARTITION, cursor, eventType.getName());
+                    throw new InvalidCursorException(NULL_PARTITION, cursor, eventType.getName());
                 } else if (null == cursor.getOffset()) {
-                    throw new InvalidCursorException(CursorError.NULL_OFFSET, cursor, eventType.getName());
+                    throw new InvalidCursorException(NULL_OFFSET, cursor, eventType.getName());
                 }
             }
         }
+        // Validate if the cursor falls within the range of the timeline
         final Timeline latestTimeline = timelineService.getActiveTimeline(eventType);
         if (null != cursors) {
             if (cursors.isEmpty()) {
-                throw new InvalidCursorException(CursorError.INVALID_FORMAT, eventType.getName());
+                throw new InvalidCursorException(INVALID_FORMAT, eventType.getName());
             }
             final List<NakadiCursor> result = new ArrayList<>();
+            final List<NakadiCursor> validatedCursors = new ArrayList<>();
             for (final Cursor c : cursors) {
                 result.add(cursorConverter.convert(eventType.getName(), c));
             }
-
             for (final NakadiCursor c : result) {
                 if (c.getTimeline().isDeleted()) {
-                    throw new InvalidCursorException(CursorError.UNAVAILABLE, c);
+                    throw new InvalidCursorException(UNAVAILABLE_AS_TIMELINE_DELETED, c);
                 }
             }
             final Map<Storage, List<NakadiCursor>> groupedCursors = result.stream().collect(
                     Collectors.groupingBy(c -> c.getTimeline().getStorage()));
             for (final Map.Entry<Storage, List<NakadiCursor>> entry : groupedCursors.entrySet()) {
-                timelineService.getTopicRepository(entry.getKey())
-                        .validateReadCursors(entry.getValue());
+                final TopicRepository topicRepository = timelineService.getTopicRepository(entry.getKey());
+                validatedCursors.addAll(
+                        validateNakadiCursorsAndReplaceWithBeginIfOffsetsExpired(
+                                eventType,
+                                topicRepository,
+                                entry.getValue()
+                        )
+                );
             }
-            return result;
+            return validatedCursors;
         } else {
             final TopicRepository latestTopicRepository = timelineService.getTopicRepository(latestTimeline);
             // if no cursors provided - read from the newest available events
@@ -182,6 +193,31 @@ public class EventStreamController {
                     .map(PartitionStatistics::getLast)
                     .collect(Collectors.toList());
         }
+    }
+
+    private List<NakadiCursor> validateNakadiCursorsAndReplaceWithBeginIfOffsetsExpired(
+            final EventType eventType,
+            final TopicRepository topicRepository,
+            final List<NakadiCursor> cursors) {
+        final List<NakadiCursor> validatedCursors = new ArrayList<>();
+        cursors.forEach(cursor -> {
+            try {
+                topicRepository.validateReadCursors(List.of(cursor));
+                validatedCursors.add(cursor);
+            } catch (final InvalidCursorException e) {
+                if (e.getError() == UNAVAILABLE_AS_OFFSET_EXPIRED) {
+                    final String failedPartition = e.getPartition();
+                    final Cursor beginCursor = new Cursor(failedPartition, Cursor.BEFORE_OLDEST_OFFSET);
+                    final NakadiCursor beginNakadiCursor = cursorConverter.convert(eventType.getName(), beginCursor);
+                    LOG.debug("Offsets Expired: Replacing cursor with `BEGIN` for partition {} of event type {}",
+                            e.getPartition(), eventType.getName());
+                    validatedCursors.add(beginNakadiCursor);
+                } else {
+                    throw e;
+                }
+            }
+        });
+        return validatedCursors;
     }
 
     private void authorizeStreamRead(final String eventType) throws AccessDeniedException,

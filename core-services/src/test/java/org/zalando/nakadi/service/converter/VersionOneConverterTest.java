@@ -42,7 +42,7 @@ public class VersionOneConverterTest {
             converter.convert(eventTypeName, cursor);
             Assert.fail("Convert should throw exception on invalid cursor");
         } catch (final InvalidCursorException ex) {
-            Assert.assertEquals(CursorError.UNAVAILABLE, ex.getError());
+            Assert.assertEquals(CursorError.UNAVAILABLE_AS_TIMELINE_DELETED, ex.getError());
         }
     }
 

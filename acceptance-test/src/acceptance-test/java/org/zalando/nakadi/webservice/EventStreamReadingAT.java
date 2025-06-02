@@ -350,7 +350,7 @@ public class EventStreamReadingAT extends BaseAT {
     }
 
     @Test(timeout = 5000)
-    public void whenInvalidCursorsThenPreconditionFailed() {
+    public void whenCursorsWithInvalidPartitionThenPreconditionFailed() {
         RestAssured.given()
                 .header(new Header("X-nakadi-cursors", "[{\"partition\":\"very_wrong_partition\",\"offset\":\"3\"}]"))
                 .when()
@@ -361,6 +361,43 @@ public class EventStreamReadingAT extends BaseAT {
                 .contentType(Matchers.equalTo("application/problem+json"))
                 .and()
                 .body("detail", Matchers.equalTo("non existing partition very_wrong_partition"));
+    }
+
+    @Test(timeout = 5000)
+    public void whenCursorsWithInvalidOffsetThenPreconditionFailed() {
+        RestAssured.given()
+                .header(new Header("X-nakadi-cursors", "[{\"partition\":\"0\",\"offset\":\"invalid_offset\"}]"))
+                .when()
+                .get(streamEndpoint)
+                .then()
+                .statusCode(HttpStatus.PRECONDITION_FAILED.value())
+                .and()
+                .contentType(Matchers.equalTo("application/problem+json"))
+                .and()
+                .body("detail", Matchers.equalTo("invalid offset invalid_offset for partition 0"));
+    }
+
+    @Test(timeout = 5000)
+    public void whenCursorsWithOffsetsInFutureThenPreconditionFailed() {
+        final String futureOffset = "000000000111000000";
+        final String partition = "0";
+        RestAssured.given()
+                .header(new Header("X-nakadi-cursors",
+                        "[{\"partition\":\"" + partition + "\",\"offset\":\"" + futureOffset + "\"}]"))
+                .when()
+                .get(streamEndpoint)
+                .then()
+                .statusCode(HttpStatus.PRECONDITION_FAILED.value())
+                .and()
+                .contentType(Matchers.equalTo("application/problem+json"))
+                .and()
+                .body("detail", Matchers.equalTo(
+                                String.format(
+                                        "offset %s for partition %s event type %s is unavailable as offsets " +
+                                                "are in the future.", futureOffset, partition, eventType.getName()
+                                )
+                        )
+                );
     }
 
     @Test(timeout = 10000)
@@ -555,7 +592,7 @@ public class EventStreamReadingAT extends BaseAT {
                         .collect(Collectors.joining(",")) + "]");
         Assert.assertEquals(HttpServletResponse.SC_OK, connection.getResponseCode());
 
-        try (InputStream inputStream = connection.getInputStream()){
+        try (InputStream inputStream = connection.getInputStream()) {
             final BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, Charsets.UTF_8));
 
             final String line = reader.readLine();
@@ -572,26 +609,26 @@ public class EventStreamReadingAT extends BaseAT {
         given()
                 .body("[" +
                         "{" +
-                            "\"metadata\":{" +
-                                "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a0\"," +
-                                "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"" +
-                            "}," +
-                            "\"foo\": \"bar_01\"" +
+                        "\"metadata\":{" +
+                        "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a0\"," +
+                        "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"" +
+                        "}," +
+                        "\"foo\": \"bar_01\"" +
                         "}," +
                         "{" +
-                            "\"metadata\":{" +
-                                "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a1\"," +
-                                "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"," +
-                                "\"test_project_id\":\"beauty-pilot\"" +
-                            "}," +
-                            "\"foo\": \"bar_02\"" +
+                        "\"metadata\":{" +
+                        "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a1\"," +
+                        "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"," +
+                        "\"test_project_id\":\"beauty-pilot\"" +
+                        "}," +
+                        "\"foo\": \"bar_02\"" +
                         "}," +
                         "{" +
-                            "\"metadata\":{" +
-                                "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a2\"," +
-                                "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"" +
-                            "}," +
-                            "\"foo\": \"bar_03\"" +
+                        "\"metadata\":{" +
+                        "\"eid\":\"9cd00c47-b792-4fc8-bb1b-317f04e3a2a2\"," +
+                        "\"occurred_at\":\"2024-10-10T15:42:03.746Z\"" +
+                        "}," +
+                        "\"foo\": \"bar_03\"" +
                         "}" +
                         "]")
                 .contentType(ContentType.JSON)
@@ -767,7 +804,7 @@ public class EventStreamReadingAT extends BaseAT {
         Assert.assertThat(cursor, Matchers.hasKey("offset"));
 
         if (batch.containsKey("events")) {
-            final List<Map<String,Object>> events = (List<Map<String,Object>>) batch.get("events");
+            final List<Map<String, Object>> events = (List<Map<String, Object>>) batch.get("events");
             events.forEach(event -> {
                 Assert.assertThat((String) event.get("foo"), Matchers.startsWith("bar_"));
             });

@@ -82,7 +82,8 @@ import static org.apache.kafka.common.config.ConfigResource.Type.TOPIC;
 import static org.zalando.nakadi.domain.CursorError.NULL_OFFSET;
 import static org.zalando.nakadi.domain.CursorError.NULL_PARTITION;
 import static org.zalando.nakadi.domain.CursorError.PARTITION_NOT_FOUND;
-import static org.zalando.nakadi.domain.CursorError.UNAVAILABLE;
+import static org.zalando.nakadi.domain.CursorError.UNAVAILABLE_AS_OFFSET_EXPIRED;
+import static org.zalando.nakadi.domain.CursorError.UNAVAILABLE_AS_OFFSET_IN_FUTURE;
 
 public class KafkaTopicRepository implements TopicRepository {
 
@@ -732,12 +733,12 @@ public class KafkaTopicRepository implements TopicRepository {
             // Checking oldest position
             final KafkaCursor oldestCursor = KafkaCursor.fromNakadiCursor(partition.get().getBeforeFirst());
             if (toCheck.compareTo(oldestCursor) < 0) {
-                throw new InvalidCursorException(UNAVAILABLE, position);
+                throw new InvalidCursorException(UNAVAILABLE_AS_OFFSET_EXPIRED, position);
             }
-            // checking newest position
+            // checking the newest position
             final KafkaCursor newestPosition = KafkaCursor.fromNakadiCursor(partition.get().getLast());
             if (toCheck.compareTo(newestPosition) > 0) {
-                throw new InvalidCursorException(UNAVAILABLE, position);
+                throw new InvalidCursorException(UNAVAILABLE_AS_OFFSET_IN_FUTURE, position);
             }
         }
     }

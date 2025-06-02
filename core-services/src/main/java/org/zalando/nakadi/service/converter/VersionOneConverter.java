@@ -1,7 +1,6 @@
 package org.zalando.nakadi.service.converter;
 
 import org.zalando.nakadi.cache.EventTypeCache;
-import org.zalando.nakadi.domain.CursorError;
 import org.zalando.nakadi.domain.NakadiCursor;
 import org.zalando.nakadi.domain.Timeline;
 import org.zalando.nakadi.exceptions.runtime.InternalNakadiException;
@@ -16,6 +15,9 @@ import org.zalando.nakadi.view.SubscriptionCursorWithoutToken;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+
+import static org.zalando.nakadi.domain.CursorError.INVALID_OFFSET;
+import static org.zalando.nakadi.domain.CursorError.UNAVAILABLE_AS_TIMELINE_DELETED;
 
 class VersionOneConverter implements VersionedConverter {
     private static final int TIMELINE_ORDER_LENGTH = 4;
@@ -47,25 +49,25 @@ class VersionOneConverter implements VersionedConverter {
             throws InternalNakadiException, NoSuchEventTypeException, InvalidCursorException {
         final String[] parts = cursor.getOffset().split("-", 3);
         if (parts.length != 3) {
-            throw new InvalidCursorException(CursorError.INVALID_OFFSET, eventTypeStr);
+            throw new InvalidCursorException(INVALID_OFFSET, eventTypeStr);
         }
         final String versionStr = parts[0];
         if (versionStr.length() != CursorConverter.VERSION_LENGTH) {
-            throw new InvalidCursorException(CursorError.INVALID_OFFSET, eventTypeStr);
+            throw new InvalidCursorException(INVALID_OFFSET, eventTypeStr);
         }
         final String orderStr = parts[1];
         if (orderStr.length() != TIMELINE_ORDER_LENGTH) {
-            throw new InvalidCursorException(CursorError.INVALID_OFFSET, eventTypeStr);
+            throw new InvalidCursorException(INVALID_OFFSET, eventTypeStr);
         }
         final String offsetStr = parts[2];
         if (offsetStr.isEmpty() || !CursorConversionUtils.NUMBERS_ONLY_PATTERN.matcher(offsetStr).matches()) {
-            throw new InvalidCursorException(CursorError.INVALID_OFFSET, eventTypeStr);
+            throw new InvalidCursorException(INVALID_OFFSET, eventTypeStr);
         }
         final int order;
         try {
             order = Integer.parseInt(orderStr, TIMELINE_ORDER_BASE);
         } catch (final NumberFormatException ex) {
-            throw new InvalidCursorException(CursorError.INVALID_OFFSET, eventTypeStr);
+            throw new InvalidCursorException(INVALID_OFFSET, eventTypeStr);
         }
         return findCorrectTimelinedCursor(eventTypeStr, order, cursor.getPartition(), offsetStr);
     }
@@ -84,7 +86,7 @@ class VersionOneConverter implements VersionedConverter {
             }
         }
         if (null == timeline) {
-            throw new InvalidCursorException(CursorError.UNAVAILABLE, eventType);
+            throw new InvalidCursorException(UNAVAILABLE_AS_TIMELINE_DELETED, eventType);
         }
         NakadiCursor cursor = NakadiCursor.of(timeline, partition, offset);
         while (cursor.isLast()) {

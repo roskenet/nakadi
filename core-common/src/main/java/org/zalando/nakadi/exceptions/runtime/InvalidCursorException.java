@@ -46,7 +46,7 @@ public class InvalidCursorException extends NakadiBaseException {
         }
     }
 
-    private String getPartition() {
+    public String getPartition() {
         if (null != cursor) {
             return cursor.getPartition();
         } else if (null != position) {
@@ -71,10 +71,15 @@ public class InvalidCursorException extends NakadiBaseException {
         switch (error) {
             case PARTITION_NOT_FOUND:
                 return "non existing partition " + getPartition();
-            case UNAVAILABLE:
+            case UNAVAILABLE_AS_OFFSET_IN_FUTURE:
                 return "offset " + getOffset() + " for partition " + getPartition() + " event type " +
-                        getEventType() + " is unavailable as retention time of data elapsed. " +
-                        "PATCH partition offset with valid and available offset";
+                        getEventType() + " is unavailable as offsets are in the future.";
+            case UNAVAILABLE_AS_OFFSET_EXPIRED:
+                return "offset " + getOffset() + " for partition " + getPartition() + " event type " +
+                        getEventType() + " is unavailable as retention time of data elapsed.";
+            case UNAVAILABLE_AS_TIMELINE_DELETED:
+                return "offset " + getOffset() + " for partition " + getPartition() + " event type " +
+                        getEventType() + " is unavailable as timeline has been deleted";
             case NULL_OFFSET:
                 return "offset must not be null";
             case NULL_PARTITION:
