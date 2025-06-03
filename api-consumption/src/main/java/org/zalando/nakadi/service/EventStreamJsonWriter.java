@@ -121,7 +121,7 @@ public class EventStreamJsonWriter implements EventStreamWriter {
         if (!events.isEmpty()) {
             os.write(B_EVENTS_ARRAY_BEGIN);
             for (int i = 0; i < events.size(); i++) {
-                final byte[] event = events.get(i).getEvent();
+                final byte[] event = events.get(i).getPayload();
                 os.write(kafkaRecordDeserializer.deserializeToJsonBytes(event));
                 byteCount += event.length;
                 if (i < (events.size() - 1)) {

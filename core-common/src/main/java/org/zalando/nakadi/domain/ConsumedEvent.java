@@ -23,6 +23,7 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
     private final EventOwnerHeader owner;
     private final Map<HeaderTag, String> consumerTags;
     private final Optional<TestProjectIdHeader> testProjectIdHeader;
+    private byte[] tombstoneEvent;
 
     public ConsumedEvent(final byte[] key, final byte[] event,
                          final NakadiCursor position, final long timestamp,
@@ -44,6 +45,27 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
     public byte[] getEvent() {
         return event;
     }
+
+    public byte[] getPayload() {
+        if (isTombstone()) {
+            // TODO: remove later, just placed to figure out errors
+            if (null == tombstoneEvent) {
+                throw new IllegalStateException(
+                        "Tombstone event is not set, cannot return event data for tombstone event");
+            }
+            return tombstoneEvent;
+        }
+        return event;
+    }
+
+    public void setTombstoneEvent(final byte[] tombstoneEvent) {
+        this.tombstoneEvent = tombstoneEvent;
+    }
+
+    public byte[] getTombstoneEvent() {
+        return tombstoneEvent;
+   }
+
 
     public NakadiCursor getPosition() {
         return position;

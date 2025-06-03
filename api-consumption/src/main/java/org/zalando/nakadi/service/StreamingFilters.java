@@ -34,7 +34,7 @@ public class StreamingFilters {
         final Function<EventsWrapper, Boolean> filterPredicate,
         final ConsumedEvent event) {
         try {
-            final byte[] eventData = event.getEvent();
+            final byte[] eventData = event.getPayload();
             final EventsWrapper eventsWrapper = FilterExpressionCompiler.singletonInput(eventData);
             return filterPredicate.apply(eventsWrapper);
         } catch (Exception e) {

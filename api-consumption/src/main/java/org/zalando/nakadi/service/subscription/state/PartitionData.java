@@ -139,7 +139,7 @@ class PartitionData {
         final List<ConsumedEvent> result = new ArrayList<>();
         for (int i = 0; !nakadiEvents.isEmpty() && condition.test(i); ++i) {
             final ConsumedEvent event = nakadiEvents.remove(0);
-            bytesInMemory -= event.getEvent().length;
+            bytesInMemory -= event.getPayload().length;
             result.add(event);
         }
         if (!result.isEmpty()) {
@@ -222,14 +222,14 @@ class PartitionData {
         }
         while (!nakadiEvents.isEmpty() && comparator.compare(nakadiEvents.get(0).getPosition(), commitOffset) <= 0) {
             final ConsumedEvent evt = nakadiEvents.remove(0);
-            bytesInMemory -= evt.getEvent().length;
+            bytesInMemory -= evt.getPayload().length;
         }
         return new CommitResult(seekKafka, committed);
     }
 
     void addEvent(final ConsumedEvent event) {
         nakadiEvents.add(event);
-        bytesInMemory += event.getEvent().length;
+        bytesInMemory += event.getPayload().length;
     }
 
     boolean isCommitted() {

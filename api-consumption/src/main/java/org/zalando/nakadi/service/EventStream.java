@@ -96,6 +96,9 @@ public class EventStream {
                 if (consumedEvents.isEmpty()) {
                     final List<ConsumedEvent> eventsFromKafka = eventConsumer.readEvents();
                     for (final ConsumedEvent evt : eventsFromKafka) {
+                        if (evt.isTombstone()) {
+                            evt.setTombstoneEvent(createTombstonePayload(evt));
+                        }
                         if (shouldEventBeDiscarded(evt)) {
                             continue;
                         }
@@ -112,11 +115,9 @@ public class EventStream {
                     latestOffsets.put(event.getPosition().getPartition(), event.getPosition());
 
                     // put message to batch
-                    final byte[] eventPayload = event.isTombstone() ?
-                            transformForTombstoneEvent(event) : event.getEvent();
-                    currentBatches.get(event.getPosition().getPartition()).add(eventPayload);
+                    currentBatches.get(event.getPosition().getPartition()).add(event.getPayload());
                     messagesRead++;
-                    bytesInMemory += event.getEvent().length;
+                    bytesInMemory += event.getPayload().length;
 
                     // if we read the message - reset keep alive counter for this partition
                     keepAliveInARow.put(event.getPosition().getPartition(), 0);
@@ -197,22 +198,6 @@ public class EventStream {
         }
     }
 
-    // TODO: find more suitable place, maybe ConsumedEvent#toTombstoneEvent()?
-    private byte[] transformForTombstoneEvent(final ConsumedEvent event) {
-        final JSONObject metadata = new JSONObject();
-        metadata
-                .put("event_type", event.getConsumerTags()
-                        .get(HeaderTag.PUBLISHED_EVENT_TYPE))
-                // this might be wrong due to misplaced events bug, but filtering is done before this method is called
-                .put("partition", event.getPosition().getPartition())
-                .put("partition_compaction_key", new String(event.getKey()));
-
-        event.getTestProjectIdHeader().ifPresent(
-                testProjectIdHeader -> metadata.put("test_project_id", testProjectIdHeader.getValue()));
-        return new JSONObject()
-                .put("metadata", metadata)
-                .toString().getBytes();
-    }
 
     private boolean shouldEventBeDiscarded(final ConsumedEvent evt) {
        return eventStreamChecks.shouldSkipMisplacedEvent(evt)
@@ -225,6 +210,24 @@ public class EventStream {
 
     private boolean shouldSkipIfTombstone(final ConsumedEvent event) {
         return event.isTombstone() && !config.isReceiveTombstones();
+    }
+
+    // TODO: find more suitable place
+    private byte[] createTombstonePayload(final ConsumedEvent event) {
+       final JSONObject metadata = new JSONObject();
+        metadata
+                .put("event_type", event.getConsumerTags()
+                        .get(HeaderTag.PUBLISHED_EVENT_TYPE))
+                // this might be wrong due to misplaced events bug, but filtering is done before this method is called
+                .put("partition", event.getPosition().getPartition())
+                .put("partition_compaction_key", new String(event.getKey()));
+
+        event.getTestProjectIdHeader().ifPresent(
+                testProjectIdHeader -> metadata.put("test_project_id", testProjectIdHeader.getValue()));
+        final var res = new JSONObject()
+                .put("metadata", metadata)
+                .toString().getBytes();
+        return res;
     }
 
     private boolean doesMatchSSFFilter(final ConsumedEvent evt) {

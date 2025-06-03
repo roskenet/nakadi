@@ -46,7 +46,7 @@ public class EventStreamBinaryWriter implements EventStreamWriter {
                         .build())
                 .setInfo(metadata.orElse(null))
                 .setEvents(events.stream()
-                        .map(ConsumedEvent::getEvent)
+                        .map(ConsumedEvent::getPayload)
                         .map(nakadiRecordMapper::fromBytesEnvelope)
                         .collect(Collectors.toList())
                 )
