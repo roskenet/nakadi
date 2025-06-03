@@ -443,13 +443,16 @@ public class EventStreamTest {
 
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         final Cursor cursor = new Cursor("22", "000000000000000023");
-        final ArrayList<byte[]> events = Lists.newArrayList(
-                "{\"a\":\"b\"}".getBytes(),
-                "{\"c\":\"d\"}".getBytes(),
-                "{\"e\":\"f\"}".getBytes());
+        final List<ConsumedEvent> events = new LinkedList<>();
+        events.add(new ConsumedEvent(null,"{\"a\":\"b\"}".getBytes(), NakadiCursor.of(TIMELINE, "0", "000000000000000000"), 0,
+                null, null, Optional.empty()));
+        events.add(new ConsumedEvent(null,"{\"c\":\"d\"}".getBytes(), NakadiCursor.of(TIMELINE, "0", "000000000000000001"), 0,
+                null, null, Optional.empty()));
+        events.add(new ConsumedEvent(null,"{\"e\":\"f\"}".getBytes(), NakadiCursor.of(TIMELINE, "0", "000000000000000000"), 0,
+                null, null, Optional.empty()));
 
         try {
-            eventStreamWriter.writeBatch(baos, cursor, events);
+            eventStreamWriter.writeBatch(baos, cursor, events, false);
             final Map<String, Object> batch =
                     TestUtils.OBJECT_MAPPER.readValue(baos.toString(), new TypeReference<Map<String, Object>>() {
                     });
@@ -477,10 +480,10 @@ public class EventStreamTest {
 
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         final Cursor cursor = new Cursor("11", "000000000000000012");
-        final ArrayList<byte[]> events = Lists.newArrayList();
+        final List<ConsumedEvent> events = Lists.newArrayList();
 
         try {
-            eventStreamWriter.writeBatch(baos, cursor, events);
+            eventStreamWriter.writeBatch(baos, cursor, events, false);
             final String json = baos.toString();
 
             assertEquals("{\"cursor\":{\"partition\":\"11\",\"offset\":\"000000000000000012\"}}\n", json);
