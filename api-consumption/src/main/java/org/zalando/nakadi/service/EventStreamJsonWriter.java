@@ -59,7 +59,8 @@ public class EventStreamJsonWriter implements EventStreamWriter {
     }
 
     @Override
-    public long writeBatch(final OutputStream os, final Cursor cursor, final List<ConsumedEvent> events, boolean isTombstoneBatch) throws IOException {
+    public long writeBatch(final OutputStream os, final Cursor cursor, final List<ConsumedEvent> events,
+                           final boolean isTombstoneBatch) throws IOException {
         int byteCount = B_FIXED_BYTE_COUNT;
 
         os.write(B_CURSOR_PARTITION_BEGIN);

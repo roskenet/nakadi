@@ -870,7 +870,8 @@ public class EventStreamReadingAT extends BaseAT {
                 .category(EventCategory.BUSINESS)
                 .enrichmentStrategies(Lists.newArrayList(EnrichmentStrategyDescriptor.METADATA_ENRICHMENT))
                 .schema("{\"type\": \"object\",\"properties\": " +
-                        "{\"part_field\": {\"type\": \"string\"}, \"id\": {\"type\": \"string\"}},\"required\": [\"part_field\"]}")
+                        "{\"part_field\": {\"type\": \"string\"}, \"id\": {\"type\": \"string\"}}" +
+                        ",\"required\": [\"part_field\"]}")
                 .build();
         createEventTypeInNakadi(eventType);
         return eventType;
@@ -954,7 +955,8 @@ public class EventStreamReadingAT extends BaseAT {
 
     @SuppressWarnings("unchecked")
     private void validateTombstoneBatch(final Map<String, Object> batch, final String expectedPartition,
-                                     final String expectedOffset, final int expectedEventNum, final String expectedKey) {
+                                        final String expectedOffset, final int expectedEventNum,
+                                        final String expectedKey) {
         validateBatch(batch, expectedPartition, expectedOffset, expectedEventNum, "tombstones");
 
         final List<Map<String, Object>> tombstones = (List<Map<String, Object>>) batch.get("tombstones");
@@ -962,7 +964,7 @@ public class EventStreamReadingAT extends BaseAT {
         final Map<String, String> tombstoneMetadata = (Map<String, String>) tombstones.get(0).get("metadata");
         Assert.assertThat(tombstoneMetadata.get("partition_compaction_key"), equalTo(expectedKey));
         Assert.assertThat(tombstoneMetadata.get("event_type"), notNullValue());
-   }
+    }
 
     @SuppressWarnings("unchecked")
     private List<JsonNode> deserializeBatchesJsonNode(final String body) {

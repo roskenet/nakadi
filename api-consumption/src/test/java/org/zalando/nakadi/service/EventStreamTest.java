@@ -444,11 +444,14 @@ public class EventStreamTest {
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         final Cursor cursor = new Cursor("22", "000000000000000023");
         final List<ConsumedEvent> events = new LinkedList<>();
-        events.add(new ConsumedEvent(null,"{\"a\":\"b\"}".getBytes(), NakadiCursor.of(TIMELINE, "0", "000000000000000000"), 0,
+        events.add(new ConsumedEvent(null,"{\"a\":\"b\"}".getBytes(),
+                NakadiCursor.of(TIMELINE, "0", "000000000000000000"), 0,
                 null, null, Optional.empty()));
-        events.add(new ConsumedEvent(null,"{\"c\":\"d\"}".getBytes(), NakadiCursor.of(TIMELINE, "0", "000000000000000001"), 0,
+        events.add(new ConsumedEvent(null,"{\"c\":\"d\"}".getBytes(),
+                NakadiCursor.of(TIMELINE, "0", "000000000000000001"), 0,
                 null, null, Optional.empty()));
-        events.add(new ConsumedEvent(null,"{\"e\":\"f\"}".getBytes(), NakadiCursor.of(TIMELINE, "0", "000000000000000000"), 0,
+        events.add(new ConsumedEvent(null,"{\"e\":\"f\"}".getBytes(),
+                NakadiCursor.of(TIMELINE, "0", "000000000000000000"), 0,
                 null, null, Optional.empty()));
 
         try {

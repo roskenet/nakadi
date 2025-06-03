@@ -137,7 +137,8 @@ public class EventStream {
                             || config.getBatchTimeout() * 1000L <= timeSinceBatchStart
                             || currentBatches.get(partition).size() >= config.getBatchLimit()) {
                         final List<ConsumedEvent> eventsToSend = currentBatches.get(partition);
-                        final boolean somethingToSend = !eventsToSend.isEmpty() || tombstonePerPartition.containsKey(partition);
+                        final boolean somethingToSend = !eventsToSend.isEmpty()
+                                || tombstonePerPartition.containsKey(partition);
 
                         // send normal events, could be empty
                         sendBatch(latestOffsets.get(partition), eventsToSend, false);
@@ -170,10 +171,12 @@ public class EventStream {
                 while (isMemoryLimitReached(bytesInMemory)) {
                     final Map.Entry<String, List<ConsumedEvent>> heaviestPartition = currentBatches.entrySet().stream()
                             .max(Comparator.comparing(
-                                    entry -> entry.getValue().stream().mapToLong(event -> event.getPayload().length).sum()))
+                                    entry -> entry.getValue().stream()
+                                            .mapToLong(event -> event.getPayload().length).sum()))
                             .get();
                     sendBatch(latestOffsets.get(heaviestPartition.getKey()), heaviestPartition.getValue(), false);
-                    final long freed = heaviestPartition.getValue().stream().mapToLong(v -> v.getPayload().length).sum();
+                    final long freed = heaviestPartition.getValue().stream()
+                            .mapToLong(v -> v.getPayload().length).sum();
                     LOG.info("Memory limit reached for event type {}: {} bytes. Freed: {} bytes, {} messages",
                             config.getEtName(), bytesInMemory, freed, heaviestPartition.getValue().size());
                     bytesInMemory -= freed;
@@ -277,7 +280,8 @@ public class EventStream {
                 .collect(Collectors.toMap(identity(), valueFunction));
     }
 
-    private void sendBatch(final NakadiCursor topicPosition, final List<ConsumedEvent> currentBatch, boolean isTombstoneBatch)
+    private void sendBatch(final NakadiCursor topicPosition, final List<ConsumedEvent> currentBatch,
+                           final boolean isTombstoneBatch)
             throws IOException {
         final long bytesWritten = eventStreamWriter
                 .writeBatch(outputStream, cursorConverter.convert(topicPosition), currentBatch, isTombstoneBatch);
