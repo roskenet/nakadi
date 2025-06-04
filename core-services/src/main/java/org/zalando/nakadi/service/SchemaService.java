@@ -155,11 +155,19 @@ public class SchemaService implements SchemaProviderService {
 
     public void validateSchemaForUpdate(final EventType original, final EventTypeBase updated)
             throws SchemaValidationException {
-
+        //
+        // This is needed to support teams who have migrated to a strictly-valid schema, and then realized that some
+        // publishing requests are failing.  The fastest mitigation for them is to rollback the schema change, but that
+        // will be blocked if their schema before was not strictly-valid.
+        //
+        // The requirement for this to work is that the current compatibility mode of the event type is `none` and it is
+        // not being changed to `compatible`.
+        //
         final boolean strictMetaschemaValidation =
                 updated.getCompatibilityMode() == CompatibilityMode.COMPATIBLE
-                || featureToggleService.isFeatureEnabled(Feature.FORCE_EVENT_TYPE_UPDATE_SCHEMA_VALIDATION)
-                || isStrictlyValidSchema(original);
+                || (original.getCompatibilityMode() != CompatibilityMode.NONE
+                        && (featureToggleService.isFeatureEnabled(Feature.FORCE_EVENT_TYPE_UPDATE_SCHEMA_VALIDATION)
+                                || isStrictlyValidSchema(original)));
 
         validateSchema(updated, strictMetaschemaValidation);
     }
