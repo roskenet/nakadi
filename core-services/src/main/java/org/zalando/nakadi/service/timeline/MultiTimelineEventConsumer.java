@@ -110,10 +110,7 @@ public class MultiTimelineEventConsumer implements HighLevelConsumer {
             if (timelineBorderReached) {
                 timelinesChanged.set(true);
             }
-            // filter out tombstones
-//            if (!event.isTombstone()) {
-                filteredResult.add(event);
-//            }
+               filteredResult.add(event);
         }
         return filteredResult;
     }

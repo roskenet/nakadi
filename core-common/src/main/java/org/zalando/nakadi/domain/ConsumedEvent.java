@@ -48,7 +48,6 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
 
     public byte[] getPayload() {
         if (isTombstone()) {
-            // TODO: remove later, just placed to figure out errors
             if (null == tombstoneEvent) {
                 throw new IllegalStateException(
                         "Tombstone event is not set, cannot return event data for tombstone event");

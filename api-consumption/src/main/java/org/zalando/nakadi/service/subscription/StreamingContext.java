@@ -304,6 +304,9 @@ public class StreamingContext implements SubscriptionStreamer {
     }
 
     public boolean isConsumptionBlocked(final ConsumedEvent event) {
+        if (event.isTombstone()) {
+            return true;
+        }
         if (eventStreamChecks.shouldSkipMisplacedEvent(event)) {
                 return true;
         }
@@ -311,8 +314,7 @@ public class StreamingContext implements SubscriptionStreamer {
             return true;
         }
         return !isConsumptionAllowedFromConsumerTags(event)
-                || eventStreamChecks.isConsumptionBlocked(event)
-                || event.isTombstone();
+                || eventStreamChecks.isConsumptionBlocked(event);
     }
 
     private boolean isConsumptionAllowedFromConsumerTags(final ConsumedEvent event) {
