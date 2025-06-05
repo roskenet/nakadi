@@ -10,6 +10,7 @@ import org.everit.json.schema.loader.SchemaLoader;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.zalando.nakadi.config.ProspectedFormatValidatorsConfig;
 import org.zalando.nakadi.domain.EventCategory;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.EventTypeSchema;
@@ -27,18 +28,18 @@ public class EventValidatorBuilder {
 
     // NOTE: org.everit.json also adds additional format validators that are not listed here explicitly!
     private static final FormatValidator[] ASSERTED_FORMAT_VALIDATORS = {
-            new RFC3339DateTimeValidator(),
-            new ISO4217CurrencyCodeValidator(),
+            new RFC3339DateTimeValidator(), // format: date-time
+            new ISO4217CurrencyCodeValidator(), // format: iso-4217
             new ISO4217CurrencyCodeValidator("ISO-4217"),
+            new BCP47LanguageTagValidator(), // format: bcp47
+            new ISO3166Alpha2CountryCodeValidator(), // format: iso-3166-alpha-2
+            new RegexFormatValidator(), // format: regex
+            new TimeFormatValidator(), // format: time
     };
     private static final FormatValidator[] PROSPECTIVE_FORMAT_VALIDATORS = {
             new UUIDValidator("uuid"),
             new UUIDValidator("UUID"),
             new DateFormatValidator(), // format: date
-            new TimeFormatValidator(), // format: time
-            new RegexFormatValidator(), // format: regex
-            new ISO3166Alpha2CountryCodeValidator(), // format: iso-3166-alpha-2
-            new BCP47LanguageTagValidator(), // format: bcp47
     };
     private static final Map<String, Feature> FORMAT_TO_FEATURE_MAPPING;
     static {
@@ -54,11 +55,15 @@ public class EventValidatorBuilder {
     private static final JsonSchemaValidator METADATA_VALIDATOR = new MetadataValidator();
     private final JsonSchemaEnrichment loader;
     private final FeatureToggleService featureToggleService;
+    private final ProspectedFormatValidatorsConfig prospectedFormatValidatorsConfig;
 
     @Autowired
-    public EventValidatorBuilder(final JsonSchemaEnrichment loader, final FeatureToggleService featureToggleService) {
+    public EventValidatorBuilder(final JsonSchemaEnrichment loader,
+                                 final FeatureToggleService featureToggleService,
+                                 final ProspectedFormatValidatorsConfig prospectedFormatValidatorsConfig) {
         this.loader = loader;
         this.featureToggleService = featureToggleService;
+        this.prospectedFormatValidatorsConfig = prospectedFormatValidatorsConfig;
     }
 
     public JsonSchemaValidator build(final EventType eventType) {
@@ -86,8 +91,12 @@ public class EventValidatorBuilder {
         for (final var validator: ASSERTED_FORMAT_VALIDATORS) {
             builder.addFormatValidator(validator);
         }
-        final Predicate<String> isFormatAsserted =
-                (formatName) -> featureToggleService.isFeatureEnabled(FORMAT_TO_FEATURE_MAPPING.get(formatName));
+        final Predicate<String> isFormatAsserted = (formatName) ->  {
+                if (prospectedFormatValidatorsConfig.getIgnoredEventTypes().contains(eventTypeName)) {
+                  return false;
+                };
+                return featureToggleService.isFeatureEnabled(FORMAT_TO_FEATURE_MAPPING.get(formatName));
+        };
         for (final var validator: PROSPECTIVE_FORMAT_VALIDATORS) {
             builder.addFormatValidator(new LoggingFormatChecker(validator, eventTypeName, isFormatAsserted));
         }

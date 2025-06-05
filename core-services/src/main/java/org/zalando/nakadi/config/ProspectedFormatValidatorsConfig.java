@@ -18,38 +18,40 @@ import java.io.InputStream;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 @Component
-public class OptInTeamsConfig {
+public class ProspectedFormatValidatorsConfig {
 
     private final Resource resource;
     private final ObjectMapper objectMapper;
-    private volatile Set<String> optInTeams;
+    private volatile Set<String> ignoredEventTypes;
 
-    private static final Logger LOG = LoggerFactory.getLogger(OptInTeamsConfig.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ProspectedFormatValidatorsConfig.class);
 
-    static class TeamIds {
+    static class EventTypes {
 
         @NotNull
-        private List<String> teamIds;
+        private List<String> ignoredEventTypes;
 
         @JsonCreator
-        TeamIds(@JsonProperty("team_ids") final List<String> teamIds) {
-            this.teamIds = teamIds;
+        EventTypes(@JsonProperty("ignored_event_types") final List<String> ignoredEventTypes) {
+            this.ignoredEventTypes = ignoredEventTypes;
         }
 
-        public List<String> getTeamIds() {
-            return teamIds;
+        public List<String> getIgnoredEventTypes() {
+            return ignoredEventTypes;
         }
     }
 
     @Autowired
-    public OptInTeamsConfig(
-            @Value("${nakadi.aspd.opt.in.teams:classpath:aspd-opt-in-teams.json}") final Resource configuration,
+    public ProspectedFormatValidatorsConfig(
+            @Value("${nakadi.prospected.validators.event.types.list"
+                    + ":classpath:prospected-validators-event-types-lists.json}") final Resource configuration,
             final ObjectMapper objectMapper
     ) {
         this.resource = configuration;
-        this.optInTeams = Collections.emptySet();
+        this.ignoredEventTypes = Collections.emptySet();
         this.objectMapper = objectMapper;
     }
 
@@ -58,22 +60,23 @@ public class OptInTeamsConfig {
         reloadConfigurationIfChanged();
     }
 
-    @Scheduled(fixedDelay = 10_000)
+    @Scheduled(fixedDelay = 10, timeUnit = TimeUnit.SECONDS)
     public void checkConfigurationChange() {
         LOG.trace("Checking if configuration is changed");
         reloadConfigurationIfChanged();
     }
 
-    public Set<String> getOptInTeams() {
-        return optInTeams;
+    public Set<String> getIgnoredEventTypes() {
+        return ignoredEventTypes;
     }
 
     private void reloadConfigurationIfChanged() {
         try (InputStream in = resource.getInputStream()) {
-            final TeamIds teamIds = objectMapper.readValue(in, TeamIds.class);
-            optInTeams = Set.copyOf(teamIds.getTeamIds());
-        } catch (IOException ex) {
-            LOG.warn("Failed to read opt-in configuration from resource {}", resource, ex);
+            final ProspectedFormatValidatorsConfig.EventTypes ets =
+                    objectMapper.readValue(in, ProspectedFormatValidatorsConfig.EventTypes.class);
+            ignoredEventTypes = Set.copyOf(ets.getIgnoredEventTypes());
+        } catch (IOException|RuntimeException ex) {
+            LOG.warn("Failed to read prospected-format configuration from resource {}", resource, ex);
         }
     }
 }
