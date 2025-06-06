@@ -75,6 +75,9 @@ public class ProspectedFormatValidatorsConfig {
             final ProspectedFormatValidatorsConfig.EventTypes ets =
                     objectMapper.readValue(in, ProspectedFormatValidatorsConfig.EventTypes.class);
             ignoredEventTypes = Set.copyOf(ets.getIgnoredEventTypes());
+            if (!ets.getIgnoredEventTypes().isEmpty()) {
+                LOG.info("Loaded config with {} ignored event types", ets.getIgnoredEventTypes().size());
+            }
         } catch (IOException|RuntimeException ex) {
             LOG.warn("Failed to read prospected-format configuration from resource {}", resource, ex);
         }
