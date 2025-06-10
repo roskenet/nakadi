@@ -15,7 +15,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -78,8 +77,6 @@ public class EventStream {
             final Map<String, NakadiCursor> latestOffsets = config.getCursors().stream().collect(
                     Collectors.toMap(NakadiCursor::getPartition, c -> c));
 
-            final Map<String, ConsumedEvent> tombstonePerPartition = new HashMap<>();
-
             final long start = currentTimeMillis();
             final Map<String, Long> batchStartTimes = createMapWithPartitionKeys(partition -> start);
             final List<ConsumedEvent> consumedEvents = new LinkedList<>();
@@ -113,15 +110,11 @@ public class EventStream {
 
                 if (eventOrEmpty.isPresent()) {
                     final ConsumedEvent event = eventOrEmpty.get();
-                    if (event.isTombstone()) {
-                       tombstonePerPartition.put(event.getPosition().getPartition(), event);
-                    } else {
-                        // update offset for the partition of event that was read
-                        latestOffsets.put(event.getPosition().getPartition(), event.getPosition());
+                    // update offset for the partition of event that was read
+                    latestOffsets.put(event.getPosition().getPartition(), event.getPosition());
 
-                        // put message to batch
-                        currentBatches.get(event.getPosition().getPartition()).add(event);
-                   }
+                    // put message to batch
+                    currentBatches.get(event.getPosition().getPartition()).add(event);
                     messagesRead++;
                     bytesInMemory += event.getPayload().length;
 
@@ -129,41 +122,21 @@ public class EventStream {
                     keepAliveInARow.put(event.getPosition().getPartition(), 0);
                 }
 
-                    // for each partition check if it's time to send the batch
+                // for each partition check if it's time to send the batch
                 for (final String partition : latestOffsets.keySet()) {
                     final long timeSinceBatchStart = currentTimeMillis() - batchStartTimes.get(partition);
-                    // immediately send batch if tombstone exists, otherwise check batch size and timeout thresholds
-                    if (tombstonePerPartition.containsKey(partition)
-                            || config.getBatchTimeout() * 1000L <= timeSinceBatchStart
+                    if (config.getBatchTimeout() * 1000L <= timeSinceBatchStart
                             || currentBatches.get(partition).size() >= config.getBatchLimit()) {
                         final List<ConsumedEvent> eventsToSend = currentBatches.get(partition);
-                        final boolean somethingToSend = !eventsToSend.isEmpty()
-                                || tombstonePerPartition.containsKey(partition);
-
-                        // send normal events, could be empty
-                        sendBatch(latestOffsets.get(partition), eventsToSend, false);
-
-                        // send tombstone if exists
-                        if (tombstonePerPartition.containsKey(partition)) {
-                            final ConsumedEvent tombstone = tombstonePerPartition.get(partition);
-                            sendBatch(tombstone.getPosition(), Collections.singletonList(tombstone), true);
-
-                            bytesInMemory -= tombstone.getPayload().length;
-
-                            tombstonePerPartition.remove(partition);
-                            latestOffsets.put(partition, tombstone.getPosition());
-                        }
+                        sendBatch(latestOffsets.get(partition), eventsToSend);
 
                         if (!eventsToSend.isEmpty()) {
                             bytesInMemory -= eventsToSend.stream().mapToLong(v -> v.getPayload().length).sum();
                             eventsToSend.clear();
-                        }
-
-                        if (!somethingToSend){
+                        } else {
                             // if we hit keep alive count limit - close the stream
                             keepAliveInARow.put(partition, keepAliveInARow.get(partition) + 1);
                         }
-
                         batchStartTimes.put(partition, currentTimeMillis());
                     }
                 }
@@ -174,7 +147,7 @@ public class EventStream {
                                     entry -> entry.getValue().stream()
                                             .mapToLong(event -> event.getPayload().length).sum()))
                             .get();
-                    sendBatch(latestOffsets.get(heaviestPartition.getKey()), heaviestPartition.getValue(), false);
+                    sendBatch(latestOffsets.get(heaviestPartition.getKey()), heaviestPartition.getValue());
                     final long freed = heaviestPartition.getValue().stream()
                             .mapToLong(v -> v.getPayload().length).sum();
                     LOG.info("Memory limit reached for event type {}: {} bytes. Freed: {} bytes, {} messages",
@@ -206,7 +179,7 @@ public class EventStream {
 
                     for (final String partition : latestOffsets.keySet()) {
                         if (!currentBatches.get(partition).isEmpty()) {
-                            sendBatch(latestOffsets.get(partition), currentBatches.get(partition), false);
+                            sendBatch(latestOffsets.get(partition), currentBatches.get(partition));
                         }
                     }
 
@@ -247,14 +220,14 @@ public class EventStream {
                         .get(HeaderTag.PUBLISHED_EVENT_TYPE))
                 // this might be wrong due to misplaced events bug, but filtering is done before this method is called
                 .put("partition", event.getPosition().getPartition())
-                .put("partition_compaction_key", new String(event.getKey()));
+                .put("partition_compaction_key", new String(event.getKey()))
+                .put("is_tombstone", true);
 
         event.getTestProjectIdHeader().ifPresent(
                 testProjectIdHeader -> metadata.put("test_project_id", testProjectIdHeader.getValue()));
-        final var res = new JSONObject()
+        return new JSONObject()
                 .put("metadata", metadata)
                 .toString().getBytes();
-        return res;
     }
 
     private boolean doesMatchSSFFilter(final ConsumedEvent evt) {
@@ -280,11 +253,10 @@ public class EventStream {
                 .collect(Collectors.toMap(identity(), valueFunction));
     }
 
-    private void sendBatch(final NakadiCursor topicPosition, final List<ConsumedEvent> currentBatch,
-                           final boolean isTombstoneBatch)
+    private void sendBatch(final NakadiCursor topicPosition, final List<ConsumedEvent> currentBatch)
             throws IOException {
         final long bytesWritten = eventStreamWriter
-                .writeBatch(outputStream, cursorConverter.convert(topicPosition), currentBatch, isTombstoneBatch);
+                .writeBatch(outputStream, cursorConverter.convert(topicPosition), currentBatch);
         bytesFlushedMeter.mark(bytesWritten);
         kpiCollector.recordBatchSent(config.getEtName(), bytesWritten, currentBatch.size());
     }

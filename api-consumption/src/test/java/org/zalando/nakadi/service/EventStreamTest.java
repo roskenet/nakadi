@@ -455,7 +455,7 @@ public class EventStreamTest {
                 null, null, Optional.empty()));
 
         try {
-            eventStreamWriter.writeBatch(baos, cursor, events, false);
+            eventStreamWriter.writeBatch(baos, cursor, events);
             final Map<String, Object> batch =
                     TestUtils.OBJECT_MAPPER.readValue(baos.toString(), new TypeReference<Map<String, Object>>() {
                     });
@@ -486,7 +486,7 @@ public class EventStreamTest {
         final List<ConsumedEvent> events = Lists.newArrayList();
 
         try {
-            eventStreamWriter.writeBatch(baos, cursor, events, false);
+            eventStreamWriter.writeBatch(baos, cursor, events);
             final String json = baos.toString();
 
             assertEquals("{\"cursor\":{\"partition\":\"11\",\"offset\":\"000000000000000012\"}}\n", json);

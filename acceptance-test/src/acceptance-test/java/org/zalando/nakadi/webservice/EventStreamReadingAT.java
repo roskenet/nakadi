@@ -832,33 +832,36 @@ public class EventStreamReadingAT extends BaseAT {
         final List<Map<String, Object>> p0Batches = batches
                 .stream()
                 .filter(isForPartition("0"))
-                .filter(b -> hasBatchType("events").test(b) || hasBatchType("tombstones").test(b))
+                .filter(b -> hasBatchType("events").test(b))
                 .collect(Collectors.toList());
 
         final List<Map<String, Object>> p1Batches = batches
                 .stream()
                 .filter(isForPartition("1"))
-                .filter(b -> hasBatchType("events").test(b) || hasBatchType("tombstones").test(b))
+                .filter(b -> hasBatchType("events").test(b))
                 .collect(Collectors.toList());
 
-        assertThat(p0Batches, hasSize(4));
-        assertThat(p1Batches, hasSize(3));
+        assertThat(p0Batches, hasSize(3));
+        assertThat(p1Batches, hasSize(2));
 
         // structure validation -- start
+
+        p0Batches.forEach(System.out::println);
+        p1Batches.forEach(System.out::println);
 
         // the first two batches should contain only events and no tombstones
         validateEventsBatch(p0Batches.get(0), "0", "001-0001-000000000000000001", 2);
         validateEventsBatch(p1Batches.get(0), "1", "001-0001-000000000000000001", 2);
 
         // if tombstones are sent they are only sent one in batch
-        validateTombstoneBatch(p0Batches.get(1), "0", "001-0001-000000000000000002", 1, "k1");
-        validateTombstoneBatch(p0Batches.get(2), "0", "001-0001-000000000000000003", 1, "k1");
-        validateTombstoneBatch(p1Batches.get(1), "1", "001-0001-000000000000000002", 1, "k2");
-        validateTombstoneBatch(p1Batches.get(2), "1", "001-0001-000000000000000003", 1, "k2");
+        validateTombstoneBatch(p0Batches.get(1), "0", "001-0001-000000000000000003", 2, "k1");
+        validateTombstoneBatch(p1Batches.get(1), "1", "001-0001-000000000000000003", 2, "k2");
+//        validateTombstoneBatch(p1Batches.get(1), "1", "001-0001-000000000000000002", 1, "k2");
+//        validateTombstoneBatch(p1Batches.get(2), "1", "001-0001-000000000000000003", 1, "k2");
 
         // the last batch should only exist for partition 0 and it should have multiple events
         // this shows that we are able to read events normally after tombstones
-        validateEventsBatch(p0Batches.get(3), "0", "001-0001-000000000000000005", 2);
+        validateEventsBatch(p0Batches.get(2), "0", "001-0001-000000000000000005", 2);
     }
 
     private static EventType createCompactedEventType() throws JsonProcessingException {
@@ -957,10 +960,10 @@ public class EventStreamReadingAT extends BaseAT {
     private void validateTombstoneBatch(final Map<String, Object> batch, final String expectedPartition,
                                         final String expectedOffset, final int expectedEventNum,
                                         final String expectedKey) {
-        validateBatch(batch, expectedPartition, expectedOffset, expectedEventNum, "tombstones");
+        validateBatch(batch, expectedPartition, expectedOffset, expectedEventNum, "events");
 
-        final List<Map<String, Object>> tombstones = (List<Map<String, Object>>) batch.get("tombstones");
-        Assert.assertThat(tombstones.get(0).keySet(), hasSize(1));
+        final List<Map<String, Object>> tombstones = (List<Map<String, Object>>) batch.get("events");
+//        Assert.assertThat(tombstones.get(0).keySet(), hasSize(1));
         final Map<String, String> tombstoneMetadata = (Map<String, String>) tombstones.get(0).get("metadata");
         Assert.assertThat(tombstoneMetadata.get("partition_compaction_key"), equalTo(expectedKey));
         Assert.assertThat(tombstoneMetadata.get("event_type"), notNullValue());

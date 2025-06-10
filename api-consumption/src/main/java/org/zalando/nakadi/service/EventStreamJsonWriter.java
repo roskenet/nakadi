@@ -25,7 +25,6 @@ public class EventStreamJsonWriter implements EventStreamWriter {
     private static final byte[] B_CURSOR_TOKEN_BEGIN = "\",\"cursor_token\":\"".getBytes(UTF_8);
     private static final byte[] B_CLOSE_CURLY_BRACKET = "}".getBytes(UTF_8);
     private static final byte[] B_EVENTS_ARRAY_BEGIN = ",\"events\":[".getBytes(UTF_8);
-    private static final byte[] B_TOMBSTONES_ARRAY_BEGIN = ",\"tombstones\":[".getBytes(UTF_8);
     private static final byte[] B_DEBUG_BEGIN = ",\"info\":{\"debug\":\"".getBytes(UTF_8);
     private static final byte[] B_DEBUG_END = "\"}".getBytes(UTF_8);
 
@@ -59,8 +58,8 @@ public class EventStreamJsonWriter implements EventStreamWriter {
     }
 
     @Override
-    public long writeBatch(final OutputStream os, final Cursor cursor, final List<ConsumedEvent> events,
-                           final boolean isTombstoneBatch) throws IOException {
+    public long writeBatch(final OutputStream os, final Cursor cursor, final List<ConsumedEvent> events)
+     throws IOException {
         int byteCount = B_FIXED_BYTE_COUNT;
 
         os.write(B_CURSOR_PARTITION_BEGIN);
@@ -74,11 +73,7 @@ public class EventStreamJsonWriter implements EventStreamWriter {
 
         os.write(B_CURSOR_PARTITION_END);
         if (!events.isEmpty()) {
-            if (isTombstoneBatch) {
-                os.write(B_TOMBSTONES_ARRAY_BEGIN);
-            } else {
-                os.write(B_EVENTS_ARRAY_BEGIN);
-            }
+            os.write(B_EVENTS_ARRAY_BEGIN);
             for (int i = 0; i < events.size(); i++) {
                 final byte[] event = events.get(i).getPayload();
                 os.write(kafkaRecordDeserializer.deserializeToJsonBytes(event));
