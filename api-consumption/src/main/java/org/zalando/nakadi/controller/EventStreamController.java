@@ -376,13 +376,8 @@ public class EventStreamController {
                     writeProblemResponse(response, outputStream, INTERNAL_SERVER_ERROR, e.getMessage());
                 } catch (final InvalidCursorException e) {
                     writeProblemResponse(response, outputStream, PRECONDITION_FAILED, e.getMessage());
-                } catch (final InvalidFilterLangException e) {
-                    writeProblemResponse(response, outputStream, BAD_REQUEST, e.getMessage());
-                } catch (final MissingFilterLangException e) {
-                    writeProblemResponse(response, outputStream, BAD_REQUEST, e.getMessage());
-                } catch (final MissingFilterException e) {
-                    writeProblemResponse(response, outputStream, BAD_REQUEST, e.getMessage());
-                } catch (final InvalidFilterException e) {
+                } catch (final IllegalArgumentException | InvalidFilterLangException | MissingFilterLangException |
+                               MissingFilterException | InvalidFilterException e) {
                     writeProblemResponse(response, outputStream, BAD_REQUEST, e.getMessage());
                 } catch (final AccessDeniedException e) {
                     writeProblemResponse(response, outputStream, FORBIDDEN, e.explain());
