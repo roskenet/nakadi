@@ -55,6 +55,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -777,8 +778,8 @@ public class EventStreamReadingAT extends BaseAT {
     }
 
     @Test(timeout = 15000)
-    public void testConsumptionForDeletedEvents() throws JsonProcessingException {
-        final EventType eventType = createCompactedEventType();
+    public void testConsumptionForTombstoneEvents() throws JsonProcessingException {
+        final EventType eventType = createCompactedEventType(2);
 
         final BiConsumer<String, String> publishEvent = (id, value) -> {
             final String event = "{\"metadata\":" +
@@ -841,32 +842,104 @@ public class EventStreamReadingAT extends BaseAT {
                 .filter(b -> hasBatchType("events").test(b))
                 .collect(Collectors.toList());
 
+
+        // validation start
         assertThat(p0Batches, hasSize(3));
         assertThat(p1Batches, hasSize(2));
 
-        // structure validation -- start
-
-        p0Batches.forEach(System.out::println);
-        p1Batches.forEach(System.out::println);
-
-        // the first two batches should contain only events and no tombstones
+       // the first two batches should contain only events and no tombstones, 4 events
         validateEventsBatch(p0Batches.get(0), "0", "001-0001-000000000000000001", 2);
         validateEventsBatch(p1Batches.get(0), "1", "001-0001-000000000000000001", 2);
 
-        // if tombstones are sent they are only sent one in batch
-        validateTombstoneBatch(p0Batches.get(1), "0", "001-0001-000000000000000003", 2, "k1");
-        validateTombstoneBatch(p1Batches.get(1), "1", "001-0001-000000000000000003", 2, "k2");
-//        validateTombstoneBatch(p1Batches.get(1), "1", "001-0001-000000000000000002", 1, "k2");
-//        validateTombstoneBatch(p1Batches.get(2), "1", "001-0001-000000000000000003", 1, "k2");
+        // the next two batches should contain tombstones in the same events array, 4 events
+        validateEventsBatch(p0Batches.get(1), "0", "001-0001-000000000000000003", 2);
+        validateEventsBatch(p1Batches.get(1), "1", "001-0001-000000000000000003", 2);
+        validateTombstoneEvents(p0Batches.get(1),2, "k1");
+        validateTombstoneEvents(p1Batches.get(1),2, "k2");
 
-        // the last batch should only exist for partition 0 and it should have multiple events
+        // the last batch should only exist for partition 0 and it should have multiple events, 2 events
         // this shows that we are able to read events normally after tombstones
         validateEventsBatch(p0Batches.get(2), "0", "001-0001-000000000000000005", 2);
     }
 
-    private static EventType createCompactedEventType() throws JsonProcessingException {
+    @Test(timeout = 15000)
+    public void testTombstoneEventsWithTestingInProduction() throws JsonProcessingException {
+        final EventType eventType = createCompactedEventType(1);
+        final AtomicBoolean testFilter = new AtomicBoolean(false);
+        final BiConsumer<String, String> publishEvent = (id, value) -> {
+
+            final String event = "{\"metadata\":" +
+                    "{\"occurred_at\":\"2019-12-12T14:25:21Z\",\"eid\":\"f08976bc-9754-4eb2-a9b4-9c9c47d4ce64\"," +
+                    (testFilter.get() ? "\"test_project_id\":\"beauty-pilot\"," : "") +
+                    "\"partition_compaction_key\":\"" + value + "\"}, " +
+                    "\"part_field\": \"" + value + "\"," +
+                    "\"id\": \"" + id + "\"}";
+            NakadiTestUtils.publishEvent(eventType.getName(), event);
+        };
+
+        final Consumer<String> publishDelete = (value) -> {
+            final String event = "{\"metadata\": " +
+                    "{\"partition_compaction_key\":\"" + value + "\"" +
+                    (testFilter.get() ? ",\"test_project_id\":\"beauty-pilot\"" : "") +
+                    "}," +
+                    "\"part_field\": \"" + value
+                    + "\"}";
+            NakadiTestUtils.deleteEvent(eventType.getName(), event);
+        };
+
+        publishEvent.accept("1", "k1");
+        testFilter.set(true);
+        publishEvent.accept("2", "k2");
+        publishDelete.accept("k2");
+
+
+        final var startCursors = JSON_MAPPER.writeValueAsString(List.of(
+                new Cursor("0", "001-0001--1")));
+        final Response responseAll = RestAssured.given()
+                .header(new Header("X-nakadi-cursors", startCursors))
+                .param("batch_limit", "2")
+                .param("stream_timeout", "2")
+                .param("batch_flush_timeout", "2")
+                .param("receive_tombstones", "true")
+                .param("test_data_filter", "LIVE")
+                .when()
+                .get(createStreamEndpointUrl(eventType.getName()));
+
+        final Response responseTest = RestAssured.given()
+                .header(new Header("X-nakadi-cursors", startCursors))
+                .param("batch_limit", "2")
+                .param("stream_timeout", "2")
+                .param("batch_flush_timeout", "2")
+                .param("receive_tombstones", "true")
+                .param("test_data_filter", "TEST")
+                .when()
+                .get(createStreamEndpointUrl(eventType.getName()));
+
+        final List<Map<String, Object>> testLiveBatches =  deserializeBatches(responseAll.print())
+                .stream()
+                .filter(b -> hasBatchType("events").test(b))
+                .collect(Collectors.toList());
+
+        final List<Map<String, Object>> testBatches = deserializeBatches(responseTest.print())
+                .stream()
+                .filter(b -> hasBatchType("events").test(b))
+                .collect(Collectors.toList());
+
+        assertThat(testLiveBatches, hasSize(1));
+        assertThat(testBatches, hasSize(1));
+
+        // batches for live filter receive no tombstone records for test filter
+        validateEventsBatch(testLiveBatches.get(0), "0", "001-0001-000000000000000000", 1);
+        validateTombstoneEvents(testLiveBatches.get(0), 0, "ignore");
+
+        // batches for test filter receive tombstone records for test filter
+        validateEventsBatch(testBatches.get(0), "0", "001-0001-000000000000000002", 2);
+        validateTombstoneEvents(testBatches.get(0), 1, "k2");
+    }
+
+    private static EventType createCompactedEventType(final int partitions) throws JsonProcessingException {
         final EventType eventType = EventTypeTestBuilder.builder()
-                .defaultStatistic(new EventTypeStatistics(2, 2))
+                .defaultStatistic(new EventTypeStatistics(partitions, partitions))
                 .cleanupPolicy(CleanupPolicy.COMPACT)
                 .partitionStrategy(PartitionStrategy.HASH_STRATEGY)
                 .partitionKeyFields(Collections.singletonList("part_field"))
@@ -957,16 +1030,21 @@ public class EventStreamReadingAT extends BaseAT {
     }
 
     @SuppressWarnings("unchecked")
-    private void validateTombstoneBatch(final Map<String, Object> batch, final String expectedPartition,
-                                        final String expectedOffset, final int expectedEventNum,
-                                        final String expectedKey) {
-        validateBatch(batch, expectedPartition, expectedOffset, expectedEventNum, "events");
+    private void validateTombstoneEvents(final Map<String, Object> batch,
+                                         final int expectedEventNum,
+                                         final String expectedKey) {
+        final List<Map<String, Object>> events = (List<Map<String, Object>>) batch.get("events");
+        final List<Map<String, Object>> tombstoneEvents = events.stream().filter(event -> {
+                     final var metadata = (Map<String, String>) event.get("metadata");
+                     return metadata.get("is_tombstone") != null && metadata.get("is_tombstone").equals("true");
+                }).collect(Collectors.toList());
 
-        final List<Map<String, Object>> tombstones = (List<Map<String, Object>>) batch.get("events");
-//        Assert.assertThat(tombstones.get(0).keySet(), hasSize(1));
-        final Map<String, String> tombstoneMetadata = (Map<String, String>) tombstones.get(0).get("metadata");
-        Assert.assertThat(tombstoneMetadata.get("partition_compaction_key"), equalTo(expectedKey));
-        Assert.assertThat(tombstoneMetadata.get("event_type"), notNullValue());
+        Assert.assertThat(tombstoneEvents, hasSize(expectedEventNum));
+        for (final Map<String, Object> event : tombstoneEvents) {
+            final Map<String, String> metadata = (Map<String, String>) event.get("metadata");
+            Assert.assertThat(metadata.get("partition_compaction_key"), equalTo(expectedKey));
+            Assert.assertThat(metadata.get("event_type"), notNullValue());
+        }
     }
 
     @SuppressWarnings("unchecked")

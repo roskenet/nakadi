@@ -221,7 +221,7 @@ public class EventStream {
                 // this might be wrong due to misplaced events bug, but filtering is done before this method is called
                 .put("partition", event.getPosition().getPartition())
                 .put("partition_compaction_key", new String(event.getKey()))
-                .put("is_tombstone", true);
+                .put("is_tombstone", "true");
 
         event.getTestProjectIdHeader().ifPresent(
                 testProjectIdHeader -> metadata.put("test_project_id", testProjectIdHeader.getValue()));
