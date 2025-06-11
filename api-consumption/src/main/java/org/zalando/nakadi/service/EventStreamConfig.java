@@ -232,7 +232,6 @@ public class EventStreamConfig {
             } else if (batchLimit < 1) {
                 throw new InvalidLimitException("batch_limit can't be lower than 1");
             }
-            // TODO: validate allowDeletes is only true for compacted/compacted_and_deleted event types
             return new EventStreamConfig(cursors, batchLimit, streamLimit, batchTimeout, streamTimeout,
                     streamKeepAliveLimit, etName, consumingClient, maxMemoryUsageBytes, testDataFilter,
                     filterPredicate, receiveTombstones);
