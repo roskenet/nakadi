@@ -1035,8 +1035,8 @@ public class EventStreamReadingAT extends BaseAT {
                                          final String expectedKey) {
         final List<Map<String, Object>> events = (List<Map<String, Object>>) batch.get("events");
         final List<Map<String, Object>> tombstoneEvents = events.stream().filter(event -> {
-                     final var metadata = (Map<String, String>) event.get("metadata");
-                     return metadata.get("is_tombstone") != null && metadata.get("is_tombstone").equals("true");
+                     final var metadata = (Map<String, Object>) event.get("metadata");
+                     return metadata.get("is_tombstone") != null && metadata.get("is_tombstone").equals(true);
                 }).collect(Collectors.toList());
 
         Assert.assertThat(tombstoneEvents, hasSize(expectedEventNum));

@@ -84,7 +84,7 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
                 // is done before the event is sent to user
                 .put("partition", getPosition().getPartition())
                 .put("partition_compaction_key", new String(getKey(), StandardCharsets.UTF_8))
-                .put("is_tombstone", "true");
+                .put("is_tombstone", true);
 
         getTestProjectIdHeader().ifPresent(
                 testProjectIdHeader -> metadata.put("test_project_id", testProjectIdHeader.getValue()));
