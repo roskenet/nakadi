@@ -111,7 +111,7 @@ public class EventStreamChecks {
      */
     public boolean shouldSkipMisplacedEvent(final ConsumedEvent event) {
         if (featureToggleService.isFeatureEnabled(Feature.SKIP_MISPLACED_EVENTS)) {
-           final String expectedEventTypeName = event.getPosition().getEventType();
+            final String expectedEventTypeName = event.getPosition().getEventType();
             if (eventTypeCache.getEventType(expectedEventTypeName).getCategory() != EventCategory.UNDEFINED) {
                 try {
                     final String actualEventTypeName = kafkaRecordDeserializer.getEventTypeName(event.getPayload());

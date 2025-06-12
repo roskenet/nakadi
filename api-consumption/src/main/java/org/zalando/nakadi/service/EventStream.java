@@ -3,7 +3,6 @@ package org.zalando.nakadi.service;
 import com.codahale.metrics.Meter;
 import com.google.common.collect.Lists;
 import org.apache.kafka.common.KafkaException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.zalando.nakadi.domain.ConsumedEvent;
