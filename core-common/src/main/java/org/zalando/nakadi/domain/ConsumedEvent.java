@@ -38,7 +38,6 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
         this.owner = owner;
         this.consumerTags = consumerTags;
         this.testProjectIdHeader = testProjectIdHeader;
-        this.tombstoneEvent = createTombstonePayload();
     }
 
     public byte[] getKey() {
@@ -51,6 +50,9 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
 
     public byte[] getPayload() {
         if (isTombstone()) {
+            if (tombstoneEvent == null) {
+                tombstoneEvent = createTombstonePayload();
+            }
            return tombstoneEvent;
         }
         return event;
@@ -73,9 +75,6 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
     }
 
     private byte[] createTombstonePayload() {
-        if (!isTombstone()) {
-            return null;
-        }
         final JSONObject metadata = new JSONObject();
         metadata
                 .put("event_type", getConsumerTags()
@@ -105,7 +104,6 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
         final ConsumedEvent that = (ConsumedEvent) o;
         // TODO: compare array contents?
         return Objects.equals(this.event, that.event)
-                && Objects.equals(this.tombstoneEvent, that.tombstoneEvent)
                 && Objects.equals(this.position, that.position);
     }
 
