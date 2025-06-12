@@ -100,7 +100,6 @@ public class MultiTimelineEventConsumer implements HighLevelConsumer {
             return result;
         }
 
-        final List<ConsumedEvent> filteredResult = new ArrayList<>(result.size());
         for (final ConsumedEvent event : result) {
             final EventTypePartition etp = event.getPosition().getEventTypePartition();
             latestOffsets.put(etp, event.getPosition());
@@ -110,9 +109,8 @@ public class MultiTimelineEventConsumer implements HighLevelConsumer {
             if (timelineBorderReached) {
                 timelinesChanged.set(true);
             }
-               filteredResult.add(event);
         }
-        return filteredResult;
+        return result;
     }
 
     /**
