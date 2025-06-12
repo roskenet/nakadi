@@ -66,6 +66,7 @@ public class NakadiKafkaConsumer implements LowLevelConsumer {
         final List<Event> result = new ArrayList<>(records.count());
         for (final ConsumerRecord<byte[], byte[]> record : records) {
             result.add(new Event(
+                    record.key(),
                     record.value(),
                     record.topic(),
                     record.partition(),

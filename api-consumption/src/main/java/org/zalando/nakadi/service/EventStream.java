@@ -70,7 +70,7 @@ public class EventStream {
             int messagesRead = 0;
             final Map<String, Integer> keepAliveInARow = createMapWithPartitionKeys(partition -> 0);
 
-            final Map<String, List<byte[]>> currentBatches =
+            final Map<String, List<ConsumedEvent>> currentBatches =
                     createMapWithPartitionKeys(partition -> Lists.newArrayList());
             // Partition to NakadiCursor.
             final Map<String, NakadiCursor> latestOffsets = config.getCursors().stream().collect(
@@ -106,14 +106,13 @@ public class EventStream {
 
                 if (eventOrEmpty.isPresent()) {
                     final ConsumedEvent event = eventOrEmpty.get();
-
                     // update offset for the partition of event that was read
                     latestOffsets.put(event.getPosition().getPartition(), event.getPosition());
 
                     // put message to batch
-                    currentBatches.get(event.getPosition().getPartition()).add(event.getEvent());
+                    currentBatches.get(event.getPosition().getPartition()).add(event);
                     messagesRead++;
-                    bytesInMemory += event.getEvent().length;
+                    bytesInMemory += event.getPayload().length;
 
                     // if we read the message - reset keep alive counter for this partition
                     keepAliveInARow.put(event.getPosition().getPartition(), 0);
@@ -124,28 +123,29 @@ public class EventStream {
                     final long timeSinceBatchStart = currentTimeMillis() - batchStartTimes.get(partition);
                     if (config.getBatchTimeout() * 1000L <= timeSinceBatchStart
                             || currentBatches.get(partition).size() >= config.getBatchLimit()) {
-                        final List<byte[]> eventsToSend = currentBatches.get(partition);
+                        final List<ConsumedEvent> eventsToSend = currentBatches.get(partition);
                         sendBatch(latestOffsets.get(partition), eventsToSend);
 
                         if (!eventsToSend.isEmpty()) {
-                            bytesInMemory -= eventsToSend.stream().mapToLong(v -> v.length).sum();
+                            bytesInMemory -= eventsToSend.stream().mapToLong(v -> v.getPayload().length).sum();
                             eventsToSend.clear();
                         } else {
                             // if we hit keep alive count limit - close the stream
                             keepAliveInARow.put(partition, keepAliveInARow.get(partition) + 1);
                         }
-
                         batchStartTimes.put(partition, currentTimeMillis());
                     }
                 }
                 // Dump some data that is exceeding memory limits
                 while (isMemoryLimitReached(bytesInMemory)) {
-                    final Map.Entry<String, List<byte[]>> heaviestPartition = currentBatches.entrySet().stream()
+                    final Map.Entry<String, List<ConsumedEvent>> heaviestPartition = currentBatches.entrySet().stream()
                             .max(Comparator.comparing(
-                                    entry -> entry.getValue().stream().mapToLong(event -> event.length).sum()))
+                                    entry -> entry.getValue().stream()
+                                            .mapToLong(event -> event.getPayload().length).sum()))
                             .get();
                     sendBatch(latestOffsets.get(heaviestPartition.getKey()), heaviestPartition.getValue());
-                    final long freed = heaviestPartition.getValue().stream().mapToLong(v -> v.length).sum();
+                    final long freed = heaviestPartition.getValue().stream()
+                            .mapToLong(v -> v.getPayload().length).sum();
                     LOG.info("Memory limit reached for event type {}: {} bytes. Freed: {} bytes, {} messages",
                             config.getEtName(), bytesInMemory, freed, heaviestPartition.getValue().size());
                     bytesInMemory -= freed;
@@ -174,7 +174,7 @@ public class EventStream {
                         || config.getStreamLimit() != 0 && messagesRead >= config.getStreamLimit()) {
 
                     for (final String partition : latestOffsets.keySet()) {
-                        if (currentBatches.get(partition).size() > 0) {
+                        if (!currentBatches.get(partition).isEmpty()) {
                             sendBatch(latestOffsets.get(partition), currentBatches.get(partition));
                         }
                     }
@@ -194,12 +194,18 @@ public class EventStream {
         }
     }
 
+
     private boolean shouldEventBeDiscarded(final ConsumedEvent evt) {
         return eventStreamChecks.shouldSkipMisplacedEvent(evt)
                 || evt.getConsumerTags().containsKey(HeaderTag.CONSUMER_SUBSCRIPTION_ID)
                 || eventStreamChecks.isConsumptionBlocked(evt)
                 || shouldEventBeFilteredBecauseOfTestProjectId(config.getTestDataFilter(), evt)
+                || shouldSkipIfTombstone(evt)
                 || !doesMatchSSFFilter(evt);
+    }
+
+    private boolean shouldSkipIfTombstone(final ConsumedEvent event) {
+        return event.isTombstone() && !config.isReceiveTombstones();
     }
 
     private boolean doesMatchSSFFilter(final ConsumedEvent evt) {
@@ -225,7 +231,7 @@ public class EventStream {
                 .collect(Collectors.toMap(identity(), valueFunction));
     }
 
-    private void sendBatch(final NakadiCursor topicPosition, final List<byte[]> currentBatch)
+    private void sendBatch(final NakadiCursor topicPosition, final List<ConsumedEvent> currentBatch)
             throws IOException {
         final long bytesWritten = eventStreamWriter
                 .writeBatch(outputStream, cursorConverter.convert(topicPosition), currentBatch);

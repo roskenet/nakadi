@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.zalando.nakadi.cache.EventTypeCache;
+import org.zalando.nakadi.domain.CleanupPolicy;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.NakadiCursor;
 import org.zalando.nakadi.domain.PartitionStatistics;
@@ -229,6 +230,21 @@ public class EventStreamController {
         }
     }
 
+    private boolean validateAndGetReceiveTombstone(final String receiveTombstones, final EventType eventType) {
+        if (receiveTombstones == null) {
+            return false;
+        }
+        if (!("true".equalsIgnoreCase(receiveTombstones) || "false".equalsIgnoreCase(receiveTombstones))) {
+            throw new IllegalArgumentException("Invalid value for receive_tombstones: " + receiveTombstones);
+        }
+        final var result = Boolean.parseBoolean(receiveTombstones);
+
+        if (result && eventType.getCleanupPolicy() == CleanupPolicy.DELETE) {
+            throw new IllegalArgumentException("receive_tombstones can only be true for compacted Event type");
+        }
+        return result;
+    }
+
     @RequestMapping(value = "/event-types/{name}/events", method = RequestMethod.GET)
     public StreamingResponseBody streamEvents(
             @PathVariable("name") final String eventTypeName,
@@ -241,6 +257,7 @@ public class EventStreamController {
             @Nullable @RequestParam(value = "test_data_filter", required = false) final TestDataFilter testDataFilter,
             @Nullable @RequestParam(value = "ssf_expr", required = false) final String ssfFilter,
             @Nullable @RequestParam(value = "ssf_lang", required = false) final String ssfLang,
+            @RequestParam(value = "receive_tombstones", required = false) final String receiveTombstones,
             @Nullable @RequestHeader(name = "X-nakadi-cursors", required = false) final String cursorsStr,
             final HttpServletResponse response, final Client client) {
         final MDCUtils.Context requestContext = MDCUtils.getContext();
@@ -303,6 +320,7 @@ public class EventStreamController {
                             .withMaxMemoryUsageBytes(maxMemoryUsageBytes)
                             .withTestDataFilter(Optional.ofNullable(testDataFilter).orElse(TestDataFilter.LIVE))
                             .withFilterPredicate(filterPredicate)
+                            .withReceiveTombstones(validateAndGetReceiveTombstone(receiveTombstones, eventType))
                             .build();
 
                     consumerCounter = metricRegistry.counter(metricNameFor(eventTypeName, CONSUMERS_COUNT_METRIC_NAME));
@@ -374,13 +392,8 @@ public class EventStreamController {
                     writeProblemResponse(response, outputStream, INTERNAL_SERVER_ERROR, e.getMessage());
                 } catch (final InvalidCursorException e) {
                     writeProblemResponse(response, outputStream, PRECONDITION_FAILED, e.getMessage());
-                } catch (final InvalidFilterLangException e) {
-                    writeProblemResponse(response, outputStream, BAD_REQUEST, e.getMessage());
-                } catch (final MissingFilterLangException e) {
-                    writeProblemResponse(response, outputStream, BAD_REQUEST, e.getMessage());
-                } catch (final MissingFilterException e) {
-                    writeProblemResponse(response, outputStream, BAD_REQUEST, e.getMessage());
-                } catch (final InvalidFilterException e) {
+                } catch (final IllegalArgumentException | InvalidFilterLangException | MissingFilterLangException |
+                               MissingFilterException | InvalidFilterException e) {
                     writeProblemResponse(response, outputStream, BAD_REQUEST, e.getMessage());
                 } catch (final AccessDeniedException e) {
                     writeProblemResponse(response, outputStream, FORBIDDEN, e.explain());

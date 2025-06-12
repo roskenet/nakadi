@@ -343,7 +343,12 @@ public class EventPublisher {
             if (null != consumerTags) {
                 debugConsumerTags.putAll(consumerTags);
             }
+            // misplaced events
             debugConsumerTags.put(HeaderTag.DEBUG_PUBLISHER_TOPIC_ID, topic);
+            if (delete) {
+                // TODO: rethink the variable name?
+                debugConsumerTags.put(HeaderTag.PUBLISHED_EVENT_TYPE, eventType.getName());
+            }
             // DEBUG
             topicRepository.syncPostBatch(topic, batch, eventType.getName(), debugConsumerTags, delete);
         } catch (final EventPublishingException epe) {

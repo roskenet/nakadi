@@ -304,6 +304,9 @@ public class StreamingContext implements SubscriptionStreamer {
     }
 
     public boolean isConsumptionBlocked(final ConsumedEvent event) {
+        if (event.isTombstone()) {
+            return true;
+        }
         if (eventStreamChecks.shouldSkipMisplacedEvent(event)) {
                 return true;
         }

@@ -1,5 +1,6 @@
 package org.zalando.nakadi.domain;
 
+import org.json.JSONObject;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.Resource;
@@ -7,6 +8,7 @@ import org.zalando.nakadi.plugin.api.authz.ResourceType;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.Immutable;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -16,16 +18,20 @@ import java.util.Optional;
 @Immutable
 public class ConsumedEvent implements Resource<ConsumedEvent> {
 
+    private final byte[] key;
     private final byte[] event;
     private final NakadiCursor position;
     private final long timestamp;
     private final EventOwnerHeader owner;
     private final Map<HeaderTag, String> consumerTags;
     private final Optional<TestProjectIdHeader> testProjectIdHeader;
+    private byte[] tombstoneEvent;
 
-    public ConsumedEvent(final byte[] event, final NakadiCursor position, final long timestamp,
+    public ConsumedEvent(final byte[] key, final byte[] event,
+                         final NakadiCursor position, final long timestamp,
                          @Nullable final EventOwnerHeader owner, final Map<HeaderTag, String> consumerTags,
                          final Optional<TestProjectIdHeader> testProjectIdHeader) {
+        this.key = key;
         this.event = event;
         this.position = position;
         this.timestamp = timestamp;
@@ -34,11 +40,25 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
         this.testProjectIdHeader = testProjectIdHeader;
     }
 
+    public byte[] getKey() {
+        return key;
+    }
+
     public byte[] getEvent() {
         return event;
     }
 
-    public NakadiCursor getPosition() {
+    public byte[] getPayload() {
+        if (isTombstone()) {
+            if (tombstoneEvent == null) {
+                tombstoneEvent = createTombstonePayload();
+            }
+           return tombstoneEvent;
+        }
+        return event;
+    }
+
+   public NakadiCursor getPosition() {
         return position;
     }
 
@@ -48,6 +68,28 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
 
     public Optional<TestProjectIdHeader> getTestProjectIdHeader() {
         return testProjectIdHeader;
+    }
+
+    public boolean isTombstone() {
+        return event == null;
+    }
+
+    private byte[] createTombstonePayload() {
+        final JSONObject metadata = new JSONObject();
+        metadata
+                .put("event_type", getConsumerTags()
+                        .get(HeaderTag.PUBLISHED_EVENT_TYPE))
+                // the partition might be wrong due to misplaced events bug, but filtering based on et name
+                // is done before the event is sent to user
+                .put("partition", getPosition().getPartition())
+                .put("partition_compaction_key", new String(getKey(), StandardCharsets.UTF_8))
+                .put("is_tombstone", true);
+
+        getTestProjectIdHeader().ifPresent(
+                testProjectIdHeader -> metadata.put("test_project_id", testProjectIdHeader.getValue()));
+        return new JSONObject()
+                .put("metadata", metadata)
+                .toString().getBytes(StandardCharsets.UTF_8);
     }
 
     @Override
@@ -60,6 +102,7 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
         }
 
         final ConsumedEvent that = (ConsumedEvent) o;
+        // TODO: compare array contents?
         return Objects.equals(this.event, that.event)
                 && Objects.equals(this.position, that.position);
     }

@@ -46,6 +46,7 @@ public class EventStreamChecksTest {
         final Timeline timeline = TestUtils.buildTimeline("correct.event-type");
         final NakadiCursor position = NakadiCursor.of(timeline, "0", "0");
         return new ConsumedEvent(
+                null,
                 event,
                 position,
                 0,

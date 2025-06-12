@@ -27,7 +27,7 @@ public class EventStreamBinaryWriter implements EventStreamWriter {
     }
 
     @Override
-    public long writeBatch(final OutputStream os, final Cursor cursor, final List<byte[]> events) {
+    public long writeBatch(final OutputStream os, final Cursor cursor, final List<ConsumedEvent> events) {
         throw new InternalNakadiException("the method was designed for Low Level API consumption, " +
                 "which is not supported for binary payloads");
     }
@@ -46,7 +46,7 @@ public class EventStreamBinaryWriter implements EventStreamWriter {
                         .build())
                 .setInfo(metadata.orElse(null))
                 .setEvents(events.stream()
-                        .map(ConsumedEvent::getEvent)
+                        .map(ConsumedEvent::getPayload)
                         .map(nakadiRecordMapper::fromBytesEnvelope)
                         .collect(Collectors.toList())
                 )

@@ -304,7 +304,7 @@ public class StreamingContextTest {
                         null, null);
         final Predicate<byte[]> isConsumptionBlocked =
                 bytes -> context.isConsumptionBlocked(
-                        new ConsumedEvent(bytes, cursor, 0L, null, Collections.emptyMap(), Optional.empty()));
+                        new ConsumedEvent(null, bytes, cursor, 0L, null, Collections.emptyMap(), Optional.empty()));
 
         Assert.assertTrue(isConsumptionBlocked.test(noMetadataEvent.getBytes()));
         Assert.assertTrue(isConsumptionBlocked.test(noEventTypeEvent.getBytes()));

@@ -474,7 +474,7 @@ class StreamingState extends State {
     private void sendToDeadLetterQueue(final ConsumedEvent event, final int failedCommitsCount) {
         // TODO: how do we handle AVRO here?
 
-        final String failedEventString = new String(event.getEvent(), StandardCharsets.UTF_8);
+        final String failedEventString = new String(event.getPayload(), StandardCharsets.UTF_8);
         final JSONObject failedEvent = new JSONObject(failedEventString);
 
         final JSONObject errorMessage =

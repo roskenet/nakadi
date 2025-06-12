@@ -114,7 +114,8 @@ public class EventStreamChecks {
             final String expectedEventTypeName = event.getPosition().getEventType();
             if (eventTypeCache.getEventType(expectedEventTypeName).getCategory() != EventCategory.UNDEFINED) {
                 try {
-                    final String actualEventTypeName = kafkaRecordDeserializer.getEventTypeName(event.getEvent());
+                    final String actualEventTypeName = kafkaRecordDeserializer.getEventTypeName(event.getPayload());
+
                     if (!expectedEventTypeName.equals(actualEventTypeName)) {
                         LOG.warn("Consumed event for event type '{}', but expected '{}' (at position {}), topic id: {}",
                                 actualEventTypeName, expectedEventTypeName, event.getPosition(),

@@ -58,7 +58,8 @@ public class EventStreamJsonWriter implements EventStreamWriter {
     }
 
     @Override
-    public long writeBatch(final OutputStream os, final Cursor cursor, final List<byte[]> events) throws IOException {
+    public long writeBatch(final OutputStream os, final Cursor cursor, final List<ConsumedEvent> events)
+     throws IOException {
         int byteCount = B_FIXED_BYTE_COUNT;
 
         os.write(B_CURSOR_PARTITION_BEGIN);
@@ -74,7 +75,7 @@ public class EventStreamJsonWriter implements EventStreamWriter {
         if (!events.isEmpty()) {
             os.write(B_EVENTS_ARRAY_BEGIN);
             for (int i = 0; i < events.size(); i++) {
-                final byte[] event = events.get(i);
+                final byte[] event = events.get(i).getPayload();
                 os.write(kafkaRecordDeserializer.deserializeToJsonBytes(event));
                 byteCount += event.length;
                 if (i < (events.size() - 1)) {
@@ -121,7 +122,7 @@ public class EventStreamJsonWriter implements EventStreamWriter {
         if (!events.isEmpty()) {
             os.write(B_EVENTS_ARRAY_BEGIN);
             for (int i = 0; i < events.size(); i++) {
-                final byte[] event = events.get(i).getEvent();
+                final byte[] event = events.get(i).getPayload();
                 os.write(kafkaRecordDeserializer.deserializeToJsonBytes(event));
                 byteCount += event.length;
                 if (i < (events.size() - 1)) {

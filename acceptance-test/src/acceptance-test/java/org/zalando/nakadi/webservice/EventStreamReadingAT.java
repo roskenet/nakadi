@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Charsets;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.jayway.restassured.RestAssured;
 import com.jayway.restassured.http.ContentType;
@@ -20,11 +21,13 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.zalando.nakadi.domain.CleanupPolicy;
 import org.zalando.nakadi.domain.EnrichmentStrategyDescriptor;
 import org.zalando.nakadi.domain.EventCategory;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.EventTypeStatistics;
 import org.zalando.nakadi.domain.TestDataFilter;
+import org.zalando.nakadi.partitioning.PartitionStrategy;
 import org.zalando.nakadi.repository.kafka.KafkaTestHelper;
 import org.zalando.nakadi.service.BlacklistService;
 import org.zalando.nakadi.util.ThreadUtils;
@@ -52,6 +55,9 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -60,6 +66,12 @@ import java.util.stream.IntStream;
 import static com.jayway.restassured.RestAssured.given;
 import static java.text.MessageFormat.format;
 import static java.util.stream.IntStream.range;
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.notNullValue;
+import static org.hamcrest.MatcherAssert.assertThat;
+
+import static org.hamcrest.Matchers.hasSize;
+import static org.zalando.nakadi.webservice.utils.NakadiTestUtils.createEventTypeInNakadi;
 
 public class EventStreamReadingAT extends BaseAT {
 
@@ -138,7 +150,7 @@ public class EventStreamReadingAT extends BaseAT {
         final List<Map<String, Object>> batches = deserializeBatches(body);
 
         // validate amount of batches and structure of each batch
-        Assert.assertThat(batches, Matchers.hasSize(PARTITIONS_NUM));
+        Assert.assertThat(batches, hasSize(PARTITIONS_NUM));
         batches.forEach(this::validateBatchStructure);
 
         // find the batch where we expect to see the messages we pushed
@@ -157,7 +169,7 @@ public class EventStreamReadingAT extends BaseAT {
                 eventsPushed);
 
         // check that batch has offset, partition and events number we expect
-        validateBatch(batchToCheck, TEST_PARTITION, expectedOffset, eventsPushed);
+        validateEventsBatch(batchToCheck, TEST_PARTITION, expectedOffset, eventsPushed);
     }
 
     @Test(timeout = 10000)
@@ -212,7 +224,7 @@ public class EventStreamReadingAT extends BaseAT {
 
         // validate amount of batches and structure of each batch
         // for partition with events we should get 2 batches
-        Assert.assertThat(batches, Matchers.hasSize(PARTITIONS_NUM + 1));
+        Assert.assertThat(batches, hasSize(PARTITIONS_NUM + 1));
         batches.forEach(batch -> validateBatchStructure(batch));
 
         // find the batches where we expect to see the messages we pushed
@@ -220,7 +232,7 @@ public class EventStreamReadingAT extends BaseAT {
                 .stream()
                 .filter(isForPartition(TEST_PARTITION))
                 .collect(Collectors.toList());
-        Assert.assertThat(batchesToCheck, Matchers.hasSize(2));
+        Assert.assertThat(batchesToCheck, hasSize(2));
 
         // calculate the offset we expect to see in this batch in a stream
         final Cursor partitionCursor = kafkaInitialNextOffsets.stream()
@@ -233,8 +245,8 @@ public class EventStreamReadingAT extends BaseAT {
                 TestUtils.toTimelineOffset(Long.parseLong(partitionCursor.getOffset()) - 1 + eventsPushed);
 
         // check that batches have offset, partition and events number we expect
-        validateBatch(batchesToCheck.get(0), TEST_PARTITION, expectedOffset1, batchLimit);
-        validateBatch(batchesToCheck.get(1), TEST_PARTITION, expectedOffset2, eventsPushed - batchLimit);
+        validateEventsBatch(batchesToCheck.get(0), TEST_PARTITION, expectedOffset1, batchLimit);
+        validateEventsBatch(batchesToCheck.get(1), TEST_PARTITION, expectedOffset2, eventsPushed - batchLimit);
     }
 
     @Test(timeout = 10000)
@@ -256,7 +268,7 @@ public class EventStreamReadingAT extends BaseAT {
         final List<Map<String, Object>> batches = deserializeBatches(body);
 
         // validate amount of batches and structure of each batch
-        Assert.assertThat(batches, Matchers.hasSize(PARTITIONS_NUM));
+        Assert.assertThat(batches, hasSize(PARTITIONS_NUM));
         batches.forEach(batch -> validateBatchStructure(batch));
 
         // validate that the latest offsets in batches correspond to the newest offsets
@@ -288,7 +300,7 @@ public class EventStreamReadingAT extends BaseAT {
         final List<Map<String, Object>> batches = deserializeBatches(body);
 
         // validate amount of batches and structure of each batch
-        Assert.assertThat(batches, Matchers.hasSize(PARTITIONS_NUM * keepAliveLimit));
+        Assert.assertThat(batches, hasSize(PARTITIONS_NUM * keepAliveLimit));
         batches.forEach(batch -> validateBatchStructure(batch));
     }
 
@@ -765,6 +777,182 @@ public class EventStreamReadingAT extends BaseAT {
         );
     }
 
+    @Test(timeout = 15000)
+    public void testConsumptionForTombstoneEvents() throws JsonProcessingException {
+        final EventType eventType = createCompactedEventType(2);
+
+        final BiConsumer<String, String> publishEvent = (id, value) -> {
+            final String event = "{\"metadata\":" +
+                    "{\"occurred_at\":\"2019-12-12T14:25:21Z\",\"eid\":\"f08976bc-9754-4eb2-a9b4-9c9c47d4ce64\"," +
+                    "\"partition_compaction_key\":\"" + value + "\"}, " +
+                    "\"part_field\": \"" + value + "\"," +
+                    "\"id\": \"" + id + "\"}";
+            NakadiTestUtils.publishEvent(eventType.getName(), event);
+        };
+
+        final Consumer<String> publishDelete = (value) -> {
+            final String event = "{\"metadata\": " +
+                    "{\"partition_compaction_key\":\"" + value + "\"},\"part_field\": \"" + value
+                    + "\"}";
+            NakadiTestUtils.deleteEvent(eventType.getName(), event);
+        };
+
+        // upon execution, we expect that event type will receive:
+        // 4 events published (p0: [1, 3], p1:  [2, 4])
+        // 4 events deleted (p0: [k1, k1], p1:  [k2, k2]))
+        // 2 event published (p0: [5, 6] p1: [])
+        // Consumer is expected to receive all 10 events and only once.
+
+        publishEvent.accept("1", "k1");
+        publishEvent.accept("2", "k2");
+        publishEvent.accept("3", "k1");
+        publishEvent.accept("4", "k2");
+
+        publishDelete.accept("k1");
+        publishDelete.accept("k2");
+        publishDelete.accept("k1");
+        publishDelete.accept("k2");
+
+        publishEvent.accept("5", "k1");
+        publishEvent.accept("6", "k1");
+
+        final var startCursors = JSON_MAPPER.writeValueAsString(List.of(
+                new Cursor("0", "001-0001--1"),
+                new Cursor("1", "001-0001--1")));
+        final Response response = RestAssured.given()
+                .header(new Header("X-nakadi-cursors", startCursors))
+                .param("batch_limit", "2")
+                .param("stream_timeout", "2")
+                .param("batch_flush_timeout", "2")
+                .param("receive_tombstones", "true")
+                .when()
+                .get(createStreamEndpointUrl(eventType.getName()));
+
+        response.then().statusCode(HttpStatus.OK.value()).header(HttpHeaders.TRANSFER_ENCODING, "chunked");
+        final List<Map<String, Object>> batches = deserializeBatches(response.print());
+        final List<Map<String, Object>> p0Batches = batches
+                .stream()
+                .filter(isForPartition("0"))
+                .filter(b -> hasBatchType("events").test(b))
+                .collect(Collectors.toList());
+
+        final List<Map<String, Object>> p1Batches = batches
+                .stream()
+                .filter(isForPartition("1"))
+                .filter(b -> hasBatchType("events").test(b))
+                .collect(Collectors.toList());
+
+
+        // validation start
+        assertThat(p0Batches, hasSize(3));
+        assertThat(p1Batches, hasSize(2));
+
+       // the first two batches should contain only events and no tombstones, 4 events
+        validateEventsBatch(p0Batches.get(0), "0", "001-0001-000000000000000001", 2);
+        validateEventsBatch(p1Batches.get(0), "1", "001-0001-000000000000000001", 2);
+
+        // the next two batches should contain tombstones in the same events array, 4 events
+        validateEventsBatch(p0Batches.get(1), "0", "001-0001-000000000000000003", 2);
+        validateEventsBatch(p1Batches.get(1), "1", "001-0001-000000000000000003", 2);
+        validateTombstoneEvents(p0Batches.get(1),2, "k1");
+        validateTombstoneEvents(p1Batches.get(1),2, "k2");
+
+        // the last batch should only exist for partition 0 and it should have multiple events, 2 events
+        // this shows that we are able to read events normally after tombstones
+        validateEventsBatch(p0Batches.get(2), "0", "001-0001-000000000000000005", 2);
+    }
+
+    @Test(timeout = 15000)
+    public void testTombstoneEventsWithTestingInProduction() throws JsonProcessingException {
+        final EventType eventType = createCompactedEventType(1);
+        final AtomicBoolean testFilter = new AtomicBoolean(false);
+        final BiConsumer<String, String> publishEvent = (id, value) -> {
+
+            final String event = "{\"metadata\":" +
+                    "{\"occurred_at\":\"2019-12-12T14:25:21Z\",\"eid\":\"f08976bc-9754-4eb2-a9b4-9c9c47d4ce64\"," +
+                    (testFilter.get() ? "\"test_project_id\":\"beauty-pilot\"," : "") +
+                    "\"partition_compaction_key\":\"" + value + "\"}, " +
+                    "\"part_field\": \"" + value + "\"," +
+                    "\"id\": \"" + id + "\"}";
+            NakadiTestUtils.publishEvent(eventType.getName(), event);
+        };
+
+        final Consumer<String> publishDelete = (value) -> {
+            final String event = "{\"metadata\": " +
+                    "{\"partition_compaction_key\":\"" + value + "\"" +
+                    (testFilter.get() ? ",\"test_project_id\":\"beauty-pilot\"" : "") +
+                    "}," +
+                    "\"part_field\": \"" + value
+                    + "\"}";
+            NakadiTestUtils.deleteEvent(eventType.getName(), event);
+        };
+
+        publishEvent.accept("1", "k1");
+        testFilter.set(true);
+        publishEvent.accept("2", "k2");
+        publishDelete.accept("k2");
+
+
+        final var startCursors = JSON_MAPPER.writeValueAsString(List.of(
+                new Cursor("0", "001-0001--1")));
+        final Response responseAll = RestAssured.given()
+                .header(new Header("X-nakadi-cursors", startCursors))
+                .param("batch_limit", "2")
+                .param("stream_timeout", "2")
+                .param("batch_flush_timeout", "2")
+                .param("receive_tombstones", "true")
+                .param("test_data_filter", "LIVE")
+                .when()
+                .get(createStreamEndpointUrl(eventType.getName()));
+
+        final Response responseTest = RestAssured.given()
+                .header(new Header("X-nakadi-cursors", startCursors))
+                .param("batch_limit", "2")
+                .param("stream_timeout", "2")
+                .param("batch_flush_timeout", "2")
+                .param("receive_tombstones", "true")
+                .param("test_data_filter", "TEST")
+                .when()
+                .get(createStreamEndpointUrl(eventType.getName()));
+
+        final List<Map<String, Object>> testLiveBatches =  deserializeBatches(responseAll.print())
+                .stream()
+                .filter(b -> hasBatchType("events").test(b))
+                .collect(Collectors.toList());
+
+        final List<Map<String, Object>> testBatches = deserializeBatches(responseTest.print())
+                .stream()
+                .filter(b -> hasBatchType("events").test(b))
+                .collect(Collectors.toList());
+
+        assertThat(testLiveBatches, hasSize(1));
+        assertThat(testBatches, hasSize(1));
+
+        // batches for live filter receive no tombstone records for test filter
+        validateEventsBatch(testLiveBatches.get(0), "0", "001-0001-000000000000000000", 1);
+        validateTombstoneEvents(testLiveBatches.get(0), 0, "ignore");
+
+        // batches for test filter receive tombstone records for test filter
+        validateEventsBatch(testBatches.get(0), "0", "001-0001-000000000000000002", 2);
+        validateTombstoneEvents(testBatches.get(0), 1, "k2");
+    }
+
+    private static EventType createCompactedEventType(final int partitions) throws JsonProcessingException {
+        final EventType eventType = EventTypeTestBuilder.builder()
+                .defaultStatistic(new EventTypeStatistics(partitions, partitions))
+                .cleanupPolicy(CleanupPolicy.COMPACT)
+                .partitionStrategy(PartitionStrategy.HASH_STRATEGY)
+                .partitionKeyFields(Collections.singletonList("part_field"))
+                .category(EventCategory.BUSINESS)
+                .enrichmentStrategies(Lists.newArrayList(EnrichmentStrategyDescriptor.METADATA_ENRICHMENT))
+                .schema("{\"type\": \"object\",\"properties\": " +
+                        "{\"part_field\": {\"type\": \"string\"}, \"id\": {\"type\": \"string\"}}" +
+                        ",\"required\": [\"part_field\"]}")
+                .build();
+        createEventTypeInNakadi(eventType);
+        return eventType;
+    }
+
 
     private static String createStreamEndpointUrl(final String eventType) {
         return format("/event-types/{0}/events", eventType);
@@ -776,6 +964,10 @@ public class EventStreamReadingAT extends BaseAT {
             final Map<String, String> cursor = (Map<String, String>) batch.get("cursor");
             return partition.equals(cursor.get("partition"));
         };
+    }
+
+    private Predicate<Map<String, Object>> hasBatchType(final String batchType) {
+        return batch -> batch.get(batchType) != null;
     }
 
     private List<Map<String, Object>> deserializeBatches(final String body) {
@@ -813,19 +1005,47 @@ public class EventStreamReadingAT extends BaseAT {
 
     @SuppressWarnings("unchecked")
     private void validateBatch(final Map<String, Object> batch, final String expectedPartition,
-                               final String expectedOffset, final int expectedEventNum) {
+                               final String expectedOffset, final int expectedEventNum,
+                               final String batchType) {
+        final Set<String> validRootKeys = Set.of("cursor", batchType);
         final Map<String, String> cursor = (Map<String, String>) batch.get("cursor");
         Assert.assertThat(cursor.get("partition"), Matchers.equalTo(expectedPartition));
         Assert.assertThat(cursor.get("offset"), Matchers.equalTo(expectedOffset));
 
-        if (batch.containsKey("events")) {
-            final List<String> events = (List<String>) batch.get("events");
+        if (batch.containsKey(batchType)) {
+            final List<String> events = (List<String>) batch.get(batchType);
             Assert.assertThat(events.size(), Matchers.equalTo(expectedEventNum));
         } else {
             Assert.assertThat(0, Matchers.equalTo(expectedEventNum));
         }
+
+       batch.keySet().stream().filter(key -> !validRootKeys.contains(key))
+                .forEach(key -> Assert.fail("Unexpected key in batch: " + key));
+   }
+
+    @SuppressWarnings("unchecked")
+    private void validateEventsBatch(final Map<String, Object> batch, final String expectedPartition,
+                                     final String expectedOffset, final int expectedEventNum) {
+        validateBatch(batch, expectedPartition, expectedOffset, expectedEventNum, "events");
     }
 
+    @SuppressWarnings("unchecked")
+    private void validateTombstoneEvents(final Map<String, Object> batch,
+                                         final int expectedEventNum,
+                                         final String expectedKey) {
+        final List<Map<String, Object>> events = (List<Map<String, Object>>) batch.get("events");
+        final List<Map<String, Object>> tombstoneEvents = events.stream().filter(event -> {
+                     final var metadata = (Map<String, Object>) event.get("metadata");
+                     return metadata.get("is_tombstone") != null && metadata.get("is_tombstone").equals(true);
+                }).collect(Collectors.toList());
+
+        Assert.assertThat(tombstoneEvents, hasSize(expectedEventNum));
+        for (final Map<String, Object> event : tombstoneEvents) {
+            final Map<String, String> metadata = (Map<String, String>) event.get("metadata");
+            Assert.assertThat(metadata.get("partition_compaction_key"), equalTo(expectedKey));
+            Assert.assertThat(metadata.get("event_type"), notNullValue());
+        }
+    }
 
     @SuppressWarnings("unchecked")
     private List<JsonNode> deserializeBatchesJsonNode(final String body) {

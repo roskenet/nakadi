@@ -37,12 +37,14 @@ public class EventStreamConfig {
     private final TestDataFilter testDataFilter;
 
     private final Function<EventsWrapper, Boolean> filterPredicate;
+    private final boolean receiveTombstones;
 
     private EventStreamConfig(final List<NakadiCursor> cursors, final int batchLimit,
                               final int streamLimit, final int batchTimeout, final int streamTimeout,
                               final int streamKeepAliveLimit, final String etName, final Client consumingClient,
                               final long maxMemoryUsageBytes, final TestDataFilter testDataFilter,
-                              final Function<EventsWrapper, Boolean> filterPredicate) {
+                              final Function<EventsWrapper, Boolean> filterPredicate,
+                              final boolean receiveTombstones) {
         this.cursors = cursors;
         this.batchLimit = batchLimit;
         this.streamLimit = streamLimit;
@@ -54,6 +56,7 @@ public class EventStreamConfig {
         this.maxMemoryUsageBytes = maxMemoryUsageBytes;
         this.testDataFilter = testDataFilter;
         this.filterPredicate = filterPredicate;
+        this.receiveTombstones = receiveTombstones;
     }
 
     public List<NakadiCursor> getCursors() {
@@ -100,6 +103,10 @@ public class EventStreamConfig {
         return filterPredicate;
     }
 
+    public boolean isReceiveTombstones() {
+        return receiveTombstones;
+    }
+
     @Override
     public String toString() {
         return "EventStreamConfig{" +
@@ -114,6 +121,7 @@ public class EventStreamConfig {
                 ", maxMemoryUsageBytes=" + maxMemoryUsageBytes +
                 ", testDataFilter=" + testDataFilter +
                 ", filterPredicate=" + filterPredicate +
+                ", receiveTombstones=" + receiveTombstones +
                 '}';
     }
 
@@ -138,6 +146,7 @@ public class EventStreamConfig {
         private Client consumingClient;
         private TestDataFilter testDataFilter;
         private Function<EventsWrapper, Boolean> filterPredicate;
+        private boolean receiveTombstones;
 
         public Builder withCursors(final List<NakadiCursor> cursors) {
             this.cursors = cursors;
@@ -210,6 +219,11 @@ public class EventStreamConfig {
             return this;
         }
 
+        public Builder withReceiveTombstones(final boolean receiveTombstones) {
+            this.receiveTombstones = receiveTombstones;
+            return this;
+        }
+
         public EventStreamConfig build() throws InvalidLimitException {
             if (streamLimit != 0 && streamLimit < batchLimit) {
                 throw new InvalidLimitException("stream_limit can't be lower than batch_limit");
@@ -220,7 +234,7 @@ public class EventStreamConfig {
             }
             return new EventStreamConfig(cursors, batchLimit, streamLimit, batchTimeout, streamTimeout,
                     streamKeepAliveLimit, etName, consumingClient, maxMemoryUsageBytes, testDataFilter,
-                    filterPredicate);
+                    filterPredicate, receiveTombstones);
         }
 
     }

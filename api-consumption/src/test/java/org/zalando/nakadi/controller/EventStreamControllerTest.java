@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.zalando.nakadi.cache.EventTypeCache;
 import org.zalando.nakadi.config.SecuritySettings;
+import org.zalando.nakadi.domain.CleanupPolicy;
 import org.zalando.nakadi.domain.CursorError;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.EventTypeBase;
@@ -529,6 +530,28 @@ public class EventStreamControllerTest {
     }
 
     @Test
+    public void testInvalidReceiveTombstone() throws Exception {
+        when(eventTypeCache.getEventType(TEST_EVENT_TYPE_NAME)).thenReturn(EVENT_TYPE);
+        final StreamingResponseBody responseBody =
+                createStreamingResponseBody(EVENT_TYPE.getName(), "non_boolean_value");
+        final Problem expectedProblem = Problem
+                .valueOf(BAD_REQUEST, "Invalid value for receive_tombstones: non_boolean_value");
+        assertThat(responseToString(responseBody), JSON_TEST_HELPER.matchesObject(expectedProblem));
+    }
+
+    @Test
+    public void testReceiveTombstoneWithNonCompactedEt() throws Exception {
+        final var et = buildDefaultEventType();
+        et.setCleanupPolicy(CleanupPolicy.DELETE);
+        when(eventTypeCache.getEventType(et.getName())).thenReturn(et);
+        final StreamingResponseBody responseBody =
+                createStreamingResponseBody(et.getName(), "true");
+        final Problem expectedProblem = Problem
+                .valueOf(BAD_REQUEST, "receive_tombstones can only be true for compacted Event type");
+        assertThat(responseToString(responseBody), JSON_TEST_HELPER.matchesObject(expectedProblem));
+    }
+
+    @Test
     public void testAccessAllowedForAllDataAccess() throws Exception {
         doNothing().when(authorizationValidator).authorizeStreamRead(any());
 
@@ -578,19 +601,19 @@ public class EventStreamControllerTest {
 
     protected StreamingResponseBody createStreamingResponseBody() throws IOException {
         return controller.streamEvents(TEST_EVENT_TYPE_NAME, 1, 0, 0, 0, 0,
-                null, null, null, null, responseMock, FULL_ACCESS_CLIENT);
+                null, null, null, null, null, responseMock, FULL_ACCESS_CLIENT);
     }
 
     private StreamingResponseBody createStreamingResponseBody(final Client client) throws Exception {
         return controller.streamEvents(
                 TEST_EVENT_TYPE_NAME, 1, 2, 3, 4, 5,
-                null, null, null,
+                null, null, null, null,
                 "[{\"partition\":\"0\",\"offset\":\"000000000000000000\"}]", responseMock, client);
     }
 
     private StreamingResponseBody createStreamingResponseBody(final String cursorsStr) throws Exception {
         return controller.streamEvents(TEST_EVENT_TYPE_NAME, 1, 2, 3, 4,
-                5, null, null, null, cursorsStr, responseMock, FULL_ACCESS_CLIENT);
+                5, null, null, null, null, cursorsStr, responseMock, FULL_ACCESS_CLIENT);
     }
 
     private StreamingResponseBody createStreamingResponseBody(final Integer batchLimit,
@@ -600,7 +623,13 @@ public class EventStreamControllerTest {
                                                               final Integer streamKeepAliveLimit,
                                                               final String cursorsStr) {
         return controller.streamEvents(TEST_EVENT_TYPE_NAME, batchLimit, streamLimit, batchTimeout, streamTimeout,
-                streamKeepAliveLimit, null, null, null, cursorsStr, responseMock, FULL_ACCESS_CLIENT);
+                streamKeepAliveLimit, null, null, null, null, cursorsStr, responseMock, FULL_ACCESS_CLIENT);
+    }
+
+    protected StreamingResponseBody createStreamingResponseBody(final String eventType,
+                                                                final String receiveTombstone) throws IOException {
+        return controller.streamEvents(eventType, 1, 0, 0, 0, 0,
+                null, null, null, receiveTombstone, null, responseMock, FULL_ACCESS_CLIENT);
     }
 
 }

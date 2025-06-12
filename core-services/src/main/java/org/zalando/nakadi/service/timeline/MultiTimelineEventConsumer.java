@@ -100,7 +100,6 @@ public class MultiTimelineEventConsumer implements HighLevelConsumer {
             return result;
         }
 
-        final List<ConsumedEvent> filteredResult = new ArrayList<>(result.size());
         for (final ConsumedEvent event : result) {
             final EventTypePartition etp = event.getPosition().getEventTypePartition();
             latestOffsets.put(etp, event.getPosition());
@@ -110,12 +109,8 @@ public class MultiTimelineEventConsumer implements HighLevelConsumer {
             if (timelineBorderReached) {
                 timelinesChanged.set(true);
             }
-            // filter out tombstones
-            if (event.getEvent() != null) {
-                filteredResult.add(event);
-            }
         }
-        return filteredResult;
+        return result;
     }
 
     /**
@@ -129,6 +124,7 @@ public class MultiTimelineEventConsumer implements HighLevelConsumer {
         for (final LowLevelConsumer consumer : eventConsumers.values()) {
             final List<ConsumedEvent> partialResult = consumer.readEvents().stream()
                     .map(event -> new ConsumedEvent(
+                            event.getKey(),
                             event.getData(),
                             NakadiCursor.of(timelinesByTopic.get(
                                     event.getTopic()),
