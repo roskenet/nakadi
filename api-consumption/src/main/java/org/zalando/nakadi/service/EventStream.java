@@ -196,7 +196,7 @@ public class EventStream {
 
 
     private boolean shouldEventBeDiscarded(final ConsumedEvent evt) {
-       return eventStreamChecks.shouldSkipMisplacedEvent(evt)
+        return eventStreamChecks.shouldSkipMisplacedEvent(evt)
                 || evt.getConsumerTags().containsKey(HeaderTag.CONSUMER_SUBSCRIPTION_ID)
                 || eventStreamChecks.isConsumptionBlocked(evt)
                 || shouldEventBeFilteredBecauseOfTestProjectId(config.getTestDataFilter(), evt)
@@ -207,8 +207,6 @@ public class EventStream {
     private boolean shouldSkipIfTombstone(final ConsumedEvent event) {
         return event.isTombstone() && !config.isReceiveTombstones();
     }
-
-    // TODO: find more suitable place
 
     private boolean doesMatchSSFFilter(final ConsumedEvent evt) {
         if (config.getFilterPredicate() == null) {
