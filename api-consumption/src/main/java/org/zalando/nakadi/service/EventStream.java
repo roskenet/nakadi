@@ -96,10 +96,7 @@ public class EventStream {
                 if (consumedEvents.isEmpty()) {
                     final List<ConsumedEvent> eventsFromKafka = eventConsumer.readEvents();
                     for (final ConsumedEvent evt : eventsFromKafka) {
-                        if (evt.isTombstone()) {
-                            evt.setTombstoneEvent(createTombstonePayload(evt));
-                        }
-                        if (shouldEventBeDiscarded(evt)) {
+                       if (shouldEventBeDiscarded(evt)) {
                             continue;
                         }
                         consumedEvents.add(evt);
@@ -213,22 +210,6 @@ public class EventStream {
     }
 
     // TODO: find more suitable place
-    private byte[] createTombstonePayload(final ConsumedEvent event) {
-       final JSONObject metadata = new JSONObject();
-        metadata
-                .put("event_type", event.getConsumerTags()
-                        .get(HeaderTag.PUBLISHED_EVENT_TYPE))
-                // this might be wrong due to misplaced events bug, but filtering is done before this method is called
-                .put("partition", event.getPosition().getPartition())
-                .put("partition_compaction_key", new String(event.getKey()))
-                .put("is_tombstone", "true");
-
-        event.getTestProjectIdHeader().ifPresent(
-                testProjectIdHeader -> metadata.put("test_project_id", testProjectIdHeader.getValue()));
-        return new JSONObject()
-                .put("metadata", metadata)
-                .toString().getBytes();
-    }
 
     private boolean doesMatchSSFFilter(final ConsumedEvent evt) {
         if (config.getFilterPredicate() == null) {

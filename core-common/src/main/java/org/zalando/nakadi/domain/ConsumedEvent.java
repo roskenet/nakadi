@@ -1,5 +1,6 @@
 package org.zalando.nakadi.domain;
 
+import org.json.JSONObject;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationAttribute;
 import org.zalando.nakadi.plugin.api.authz.AuthorizationService;
 import org.zalando.nakadi.plugin.api.authz.Resource;
@@ -7,6 +8,7 @@ import org.zalando.nakadi.plugin.api.authz.ResourceType;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.Immutable;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +38,7 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
         this.owner = owner;
         this.consumerTags = consumerTags;
         this.testProjectIdHeader = testProjectIdHeader;
+        this.tombstoneEvent = createTombstonePayload();
     }
 
     public byte[] getKey() {
@@ -48,25 +51,12 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
 
     public byte[] getPayload() {
         if (isTombstone()) {
-            if (null == tombstoneEvent) {
-                throw new IllegalStateException(
-                        "Tombstone event is not set, cannot return event data for tombstone event");
-            }
-            return tombstoneEvent;
+           return tombstoneEvent;
         }
         return event;
     }
 
-    public void setTombstoneEvent(final byte[] tombstoneEvent) {
-        this.tombstoneEvent = tombstoneEvent;
-    }
-
-    public byte[] getTombstoneEvent() {
-        return tombstoneEvent;
-   }
-
-
-    public NakadiCursor getPosition() {
+   public NakadiCursor getPosition() {
         return position;
     }
 
@@ -80,6 +70,27 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
 
     public boolean isTombstone() {
         return event == null;
+    }
+
+    private byte[] createTombstonePayload() {
+        if (!isTombstone()) {
+            return null;
+        }
+        final JSONObject metadata = new JSONObject();
+        metadata
+                .put("event_type", getConsumerTags()
+                        .get(HeaderTag.PUBLISHED_EVENT_TYPE))
+                // the partition might be wrong due to misplaced events bug, but filtering based on et name
+                // is done before the event is sent to user
+                .put("partition", getPosition().getPartition())
+                .put("partition_compaction_key", new String(getKey(), StandardCharsets.UTF_8))
+                .put("is_tombstone", "true");
+
+        getTestProjectIdHeader().ifPresent(
+                testProjectIdHeader -> metadata.put("test_project_id", testProjectIdHeader.getValue()));
+        return new JSONObject()
+                .put("metadata", metadata)
+                .toString().getBytes(StandardCharsets.UTF_8);
     }
 
     @Override
