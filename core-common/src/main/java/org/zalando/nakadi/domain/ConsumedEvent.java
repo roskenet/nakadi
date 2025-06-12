@@ -103,7 +103,9 @@ public class ConsumedEvent implements Resource<ConsumedEvent> {
         }
 
         final ConsumedEvent that = (ConsumedEvent) o;
+        // TODO: compare array contents?
         return Objects.equals(this.event, that.event)
+                && Objects.equals(this.tombstoneEvent, that.tombstoneEvent)
                 && Objects.equals(this.position, that.position);
     }
 

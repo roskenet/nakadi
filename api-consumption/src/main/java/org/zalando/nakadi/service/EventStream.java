@@ -95,7 +95,7 @@ public class EventStream {
                 if (consumedEvents.isEmpty()) {
                     final List<ConsumedEvent> eventsFromKafka = eventConsumer.readEvents();
                     for (final ConsumedEvent evt : eventsFromKafka) {
-                       if (shouldEventBeDiscarded(evt)) {
+                        if (shouldEventBeDiscarded(evt)) {
                             continue;
                         }
                         consumedEvents.add(evt);
