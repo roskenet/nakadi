@@ -6,6 +6,9 @@
       "occurred_at": {
         "type": "string"
       },
+      "received_at": {
+        "type": "string"
+      },
       "eid": {
         "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$",
         "type": "string"
@@ -15,6 +18,9 @@
         "enum": [
           "{{EVENT_TYPE_NAME}}"
         ]
+      },
+      "version": {
+        "type": "string"
       },
       "partition": {
         "type": "string"
@@ -59,6 +65,9 @@
       "occurred_at": {
         "type": "string"
       },
+      "received_at": {
+        "type": "string"
+      },
       "eid": {
         "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$",
         "type": "string"
@@ -68,6 +77,9 @@
         "enum": [
           "{{EVENT_TYPE_NAME}}"
         ]
+      },
+      "version": {
+        "type": "string"
       },
       "partition": {
         "type": "string"
@@ -117,6 +129,9 @@
       "occurred_at": {
         "type": "string"
       },
+      "received_at": {
+        "type": "string"
+      },
       "eid": {
         "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$",
         "type": "string"
@@ -126,6 +141,9 @@
         "enum": [
           "{{EVENT_TYPE_NAME}}"
         ]
+      },
+      "version": {
+        "type": "string"
       },
       "partition": {
         "type": "string"
