@@ -2547,6 +2547,7 @@ definitions:
       is_tombstone:
         description: |
           Indicates that this Event is a tombstone Event.
+        type: boolean
       event_type:
         description: |
           The EventType of this Event. This is enriched by Nakadi on reception of the Event
