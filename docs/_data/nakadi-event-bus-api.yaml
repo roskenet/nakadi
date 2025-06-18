@@ -522,6 +522,7 @@ paths:
         - $ref: '#/parameters/BatchFlushTimeout'
         - $ref: '#/parameters/StreamTimeout'
         - $ref: '#/parameters/StreamKeepAliveLimit'
+        - $ref: '#/parameters/ReceiveTombstones'
         - $ref: '#/parameters/TestDataFilter'
         - $ref: '#/parameters/SSFExpr'
         - $ref: '#/parameters/SSFLang'
@@ -3887,6 +3888,15 @@ parameters:
       - 'PRODUCER_ET': producer event type.
     type: string
     required: true
+
+  ReceiveTombstones:
+    name: receive_tombstones
+    in: query
+    description: |
+      Allows to you to receive tombstone events, which are published using the [deleted-events endpoint](#/paths/~1event-types~1{name}~1deleted-events/post).
+    type: boolean
+    default: false
+    required: false
 
   TestDataFilter:
     name: test_data_filter
