@@ -50,6 +50,18 @@ public class KioServiceTest {
     }
 
     @Test
+    public void existsShouldReturnFalseWhenAppDoesNotMatchPattern() {
+        assertTrue(KioService.isValidFormat("nakadi"));
+        assertTrue(KioService.isValidFormat("nakadi-sql"));
+        assertTrue(KioService.isValidFormat("nakadi2"));
+        assertFalse(KioService.isValidFormat("XXX"));
+        assertFalse(KioService.isValidFormat("some_thing"));
+        assertFalse(KioService.isValidFormat("other.thing"));
+        assertFalse(KioService.isValidFormat("012345abc"));
+        assertFalse(KioService.isValidFormat("nakadi "));
+    }
+
+    @Test
     public void existsShouldReturnTrueIfKioAppExists() throws Throwable {
         final String owningApplication = "aruha";
         WireMock.stubFor(get(urlEqualTo("/" + owningApplication))

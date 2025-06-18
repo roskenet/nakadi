@@ -22,9 +22,17 @@ import org.zalando.nakadi.plugin.api.exceptions.PluginException;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 public class KioService {
     private static final Logger LOGGER = LoggerFactory.getLogger(KioService.class);
+    //
+    // https://github.com/zalando-stups/kio/blob/main/resources/api/kio-api.yaml#L535
+    //
+    // The 'stups_' prefix should be removed before querying.
+    //
+    private static final Pattern APP_PATTERN = Pattern.compile("^[a-z][a-z0-9-]*[a-z0-9]$");
+
     private final String kioUrl;
     private final HttpClient httpClient;
     private final TokenProvider tokenProvider;
@@ -61,7 +69,15 @@ public class KioService {
         return getCachedApplication(applicationId).map(app -> app.teamId);
     }
 
+    static boolean isValidFormat(final String applicationId) {
+        return APP_PATTERN.matcher(applicationId).matches();
+    }
+
     private Optional<KioApplication> getCachedApplication(final String applicationId) {
+        if (!isValidFormat(applicationId)) {
+            return Optional.empty();
+        }
+
         try {
             return valueCache.get(applicationId);
         } catch (final Exception e) {     // it may throw com.google.common.util.concurrent.UncheckedExecutionException
