@@ -461,12 +461,11 @@ paths:
               description: Span context of the span used to trace the request in Nakadi
 
     get:
-      deprecated: true
       tags:
         - stream-api
         - unmanaged-api
       description: |
-        **The Low Level API is deprecated. It will be removed in a future version.**
+        **The Low Level API usage is restricted to only Apache Flink use cases, in order to get access please raise a [support request](https://github.com/zalando-build/aruha-issues/issues/new?template=lola-support.md)**
 
         Starts a stream delivery for the specified partitions of the given EventType.
 
