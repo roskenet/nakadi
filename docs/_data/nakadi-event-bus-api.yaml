@@ -3930,7 +3930,7 @@ parameters:
     name: receive_tombstones
     in: query
     description: |
-      Allows to you to receive tombstone events, which are published using the [deleted-events endpoint](#/paths/~1event-types~1{name}~1deleted-events/post).
+      Allows to you to receive tombstone events, which were deleted using the [deleted-events endpoint](#/paths/~1event-types~1{name}~1deleted-events/post).
     type: boolean
     default: false
     required: false
