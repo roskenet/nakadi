@@ -491,6 +491,15 @@ paths:
 
         The tracking of the current offset in the partitions and of which partitions is being read
         is in the responsibility of the client. No commits are needed.
+        
+        **Note:** When `receive_tombstones` is set to true, the stream will also include tombstone events.
+        Tombstone events are special events that signal the deletion of an event with a specific
+        `partition_compaction_key` from a log-compacted event type. These events will only contain
+        the `metadata` field, which will include `is_tombstone: true`, `event_type`, `partition`,
+        and `partition_compaction_key`. Consumers should be prepared to process events with only
+        these metadata fields when `receive_tombstones` is enabled. Refer to [EventMetadataTombstone](#/definitions/EventMetadataTombstone)
+        for more details.
+
       produces:
         - application/x-json-stream
       parameters:
@@ -511,7 +520,6 @@ paths:
             length limitations on the HTTP query. Another way to initiate this call would be the
             POST method with cursors passed in the method body. This approach can implemented in the
             future versions of this API.
-
           required: false
           type: array
           items:
@@ -522,6 +530,7 @@ paths:
         - $ref: '#/parameters/BatchFlushTimeout'
         - $ref: '#/parameters/StreamTimeout'
         - $ref: '#/parameters/StreamKeepAliveLimit'
+        - $ref: '#/parameters/ReceiveTombstones'
         - $ref: '#/parameters/TestDataFilter'
         - $ref: '#/parameters/SSFExpr'
         - $ref: '#/parameters/SSFLang'
@@ -2532,6 +2541,35 @@ definitions:
       - eid
       - occurred_at
 
+  EventMetadataTombstone:
+    type: object
+    description: |
+      Payload for a tombstone Event, only applicable for Event Type with `cleanup_policy` set to 'compact' or 'compact_and_delete'.
+      Contains limited number for fields as compared to `EventMetadata`.
+    properties:
+      is_tombstone:
+        description: |
+          Indicates that this Event is a tombstone Event.
+        type: boolean
+      event_type:
+        description: |
+          The EventType of this Event. This is enriched by Nakadi on reception of the Event
+          based on the endpoint where the Producer sent the Event to.
+        type: string
+        example: 'pennybags.payment-business-event'
+      partition:
+        description: |
+          Indicates the partition assigned to this Event.
+        type: string
+        example: '0'
+      partition_compaction_key:
+        description: |
+          Value used for per-partition compaction of the event type. Given two events with the same
+          partition_compaction_key value are published to the same partition, the later overwrites the former.
+          Required when 'cleanup_policy' of event type is set to 'compact' or 'compact_and_delete'. Must be absent
+          otherwise.
+        type: string
+        example: '329ed3d2-8366-11e8-adc0-fa7ae01bbebc'
 
   BusinessEvent:
     description: |
@@ -3887,6 +3925,15 @@ parameters:
       - 'PRODUCER_ET': producer event type.
     type: string
     required: true
+
+  ReceiveTombstones:
+    name: receive_tombstones
+    in: query
+    description: |
+      Allows to you to receive tombstone events, which were deleted using the [deleted-events endpoint](#/paths/~1event-types~1{name}~1deleted-events/post).
+    type: boolean
+    default: false
+    required: false
 
   TestDataFilter:
     name: test_data_filter
