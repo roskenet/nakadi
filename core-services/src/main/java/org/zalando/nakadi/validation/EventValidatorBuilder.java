@@ -14,12 +14,8 @@ import org.zalando.nakadi.config.ProspectedFormatValidatorsConfig;
 import org.zalando.nakadi.domain.EventCategory;
 import org.zalando.nakadi.domain.EventType;
 import org.zalando.nakadi.domain.EventTypeSchema;
-import org.zalando.nakadi.domain.Feature;
 import org.zalando.nakadi.exceptions.runtime.NoSuchSchemaException;
-import org.zalando.nakadi.service.FeatureToggleService;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 
@@ -41,28 +37,15 @@ public class EventValidatorBuilder {
             new UUIDValidator("UUID"),
             new DateFormatValidator(), // format: date
     };
-    private static final Map<String, Feature> FORMAT_TO_FEATURE_MAPPING;
-    static {
-        FORMAT_TO_FEATURE_MAPPING = new HashMap<>();
-        for (final var validator: PROSPECTIVE_FORMAT_VALIDATORS) {
-            final var formatName = validator.formatName();
-            final var feature = Feature.valueOf(
-                    "ASSERT_JSON_FORMAT_" + formatName.toUpperCase().replace('-', '_'));
-            FORMAT_TO_FEATURE_MAPPING.put(formatName, feature);
-        }
-    }
 
     private static final JsonSchemaValidator METADATA_VALIDATOR = new MetadataValidator();
     private final JsonSchemaEnrichment loader;
-    private final FeatureToggleService featureToggleService;
     private final ProspectedFormatValidatorsConfig prospectedFormatValidatorsConfig;
 
     @Autowired
     public EventValidatorBuilder(final JsonSchemaEnrichment loader,
-                                 final FeatureToggleService featureToggleService,
                                  final ProspectedFormatValidatorsConfig prospectedFormatValidatorsConfig) {
         this.loader = loader;
-        this.featureToggleService = featureToggleService;
         this.prospectedFormatValidatorsConfig = prospectedFormatValidatorsConfig;
     }
 
@@ -91,12 +74,8 @@ public class EventValidatorBuilder {
         for (final var validator: ASSERTED_FORMAT_VALIDATORS) {
             builder.addFormatValidator(validator);
         }
-        final Predicate<String> isFormatAsserted = (formatName) ->  {
-                if (prospectedFormatValidatorsConfig.getIgnoredEventTypes().contains(eventTypeName)) {
-                  return false;
-                };
-                return featureToggleService.isFeatureEnabled(FORMAT_TO_FEATURE_MAPPING.get(formatName));
-        };
+        final Predicate<String> isFormatAsserted = (formatName) ->
+                !prospectedFormatValidatorsConfig.getIgnoredEventTypes().contains(eventTypeName);
         for (final var validator: PROSPECTIVE_FORMAT_VALIDATORS) {
             builder.addFormatValidator(new LoggingFormatChecker(validator, eventTypeName, isFormatAsserted));
         }

@@ -10,8 +10,6 @@ import org.zalando.nakadi.config.ProspectedFormatValidatorsConfig;
 import org.zalando.nakadi.domain.CompatibilityMode;
 import org.zalando.nakadi.domain.EventCategory;
 import org.zalando.nakadi.domain.EventType;
-import org.zalando.nakadi.domain.Feature;
-import org.zalando.nakadi.service.FeatureToggleService;
 import org.zalando.nakadi.utils.EventTypeTestBuilder;
 import org.zalando.nakadi.utils.IsOptional;
 import org.zalando.nakadi.utils.TestUtils;
@@ -21,24 +19,20 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Optional;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 
 public class JSONSchemaValidationTest {
 
-    private final FeatureToggleService featureToggleService = mock(FeatureToggleService.class);
     private final ProspectedFormatValidatorsConfig config = mock(ProspectedFormatValidatorsConfig.class);
     private EventValidatorBuilder eventValidatorBuilder;
 
     @Before
     public void before() throws IOException {
-        when(featureToggleService.isFeatureEnabled(any(Feature.class))).thenReturn(true);
         when(config.getIgnoredEventTypes()).thenReturn(Collections.emptySet());
         eventValidatorBuilder = new EventValidatorBuilder(
                 new JsonSchemaEnrichment(new DefaultResourceLoader(), "classpath:schema_metadata.json"),
-                featureToggleService,
                 config
                 );
     }
