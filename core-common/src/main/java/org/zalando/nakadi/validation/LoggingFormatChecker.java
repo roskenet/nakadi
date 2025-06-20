@@ -9,11 +9,13 @@ import java.util.function.Predicate;
 
 public class LoggingFormatChecker implements FormatValidator {
     private static final Logger LOG = LoggerFactory.getLogger(LoggingFormatChecker.class);
+    private static final int UUID_LENGTH = 36;
 
     private final FormatValidator validator;
     private final String eventTypeName;
     private boolean loggedOnce = false;
     private final Predicate<String> isFormatAsserted;
+    private boolean checkUuidLengthAndLog;
 
     public LoggingFormatChecker(
             final FormatValidator validator,
@@ -22,6 +24,7 @@ public class LoggingFormatChecker implements FormatValidator {
         this.validator = validator;
         this.eventTypeName = eventTypeName;
         this.isFormatAsserted = isFormatAsserted;
+        this.checkUuidLengthAndLog = "uuid".equals(validator.formatName()) || "UUID".equals(validator.formatName());
     }
 
     @Override
@@ -34,7 +37,14 @@ public class LoggingFormatChecker implements FormatValidator {
             }
             if (!loggedOnce) {
                 loggedOnce = true;
-                LOG.warn("[event-type={}][format={}]: {}", eventTypeName, validator.formatName(), result.get());
+                LOG.warn("[event-type={}][format={}]: {}", eventTypeName, formatName(), result.get());
+            }
+        }
+        if (checkUuidLengthAndLog) {
+            // TODO: move this check to UUIDValidator, after confirming there are no such logs.
+            if (input.length() != UUID_LENGTH) {
+                checkUuidLengthAndLog = false;
+                LOG.warn("[event-type={}][format={}]: [{}] is not strict uuid", eventTypeName, formatName(), input);
             }
         }
         return Optional.empty();
