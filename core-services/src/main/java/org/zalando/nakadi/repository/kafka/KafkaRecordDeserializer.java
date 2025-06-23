@@ -11,6 +11,7 @@ import org.apache.avro.message.BinaryMessageDecoder;
 import org.apache.avro.message.RawMessageDecoder;
 import org.json.JSONObject;
 import org.springframework.stereotype.Component;
+import org.zalando.nakadi.avro.AvroJsonSerializer;
 import org.zalando.nakadi.generated.avro.Envelope;
 import org.zalando.nakadi.generated.avro.Metadata;
 import org.zalando.nakadi.mapper.NakadiRecordMapper;
@@ -34,11 +35,13 @@ public class KafkaRecordDeserializer implements RecordDeserializer {
     private final NakadiRecordMapper nakadiRecordMapper;
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private final AvroJsonSerializer avroJsonSerializer;
 
     public KafkaRecordDeserializer(final NakadiRecordMapper nakadiRecordMapper,
                                    final SchemaProviderService schemaService) {
         this.nakadiRecordMapper = nakadiRecordMapper;
         this.schemaService = schemaService;
+        this.avroJsonSerializer = new AvroJsonSerializer(OBJECT_MAPPER.getFactory());
     }
 
     public byte[] deserializeToJsonBytes(final byte[] data) {
@@ -75,6 +78,7 @@ public class KafkaRecordDeserializer implements RecordDeserializer {
         }
     }
 
+
     private byte[] deserializeToJsonBytes(final Envelope envelope) {
         try {
             final Metadata metadata = envelope.getMetadata();
@@ -94,7 +98,7 @@ public class KafkaRecordDeserializer implements RecordDeserializer {
                 );
                 event = decoder.decode(envelope.getPayload());
             }
-            final StringBuilder sEvent = new StringBuilder(event.toString());
+            final StringBuilder sEvent = new StringBuilder(avroJsonSerializer.toJson(event));
             final var sanitizedMetadata = mapToJson(metadata).toString();
 
             sEvent.deleteCharAt(sEvent.length() - 1)

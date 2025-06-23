@@ -1,0 +1,73 @@
+{
+  "type": "record",
+  "name": "binary_message",
+  "fields": [
+    {
+      "type": "string",
+      "name": "foo"
+    },
+    {
+      "type": "bytes",
+      "name": "bar"
+    },
+    {
+      "name": "magic",
+      "type": {
+        "type": "fixed",
+        "name": "Magic",
+        "size": 4
+      }
+    },
+    {
+      "name": "int_str",
+      "type": [
+          {
+            "type": "int"
+          },
+          {
+            "type": "string"
+          }
+        ]
+    },
+    {
+      "name": "suit",
+      "type": {
+        "type": "enum",
+        "name": "Suit",
+        "symbols": [
+          "SPADES",
+          "HEARTS",
+          "DIAMONDS",
+          "CLUBS"
+        ]
+      }
+    },
+    {
+      "name": "dimensions",
+      "type": {
+            "type": "map",
+            "values": "long"
+      }
+    },
+    {
+      "name": "friends",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "friend",
+          "fields": [
+            {
+              "type": "string",
+              "name": "name"
+            },
+            {
+              "type": "int",
+              "name": "age"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
