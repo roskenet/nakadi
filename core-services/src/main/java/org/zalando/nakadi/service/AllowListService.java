@@ -138,7 +138,12 @@ public class AllowListService {
     }
 
     public boolean canAcceptConnection(final Client client) {
+        if (!nakadiSettings.isLimitLoLaConnections()) {
+            // this node is not configured to limit, so allow any new connections
+            return true;
+        }
         if (!featureToggleService.isFeatureEnabled(Feature.LIMIT_LOLA_CONNECTIONS)) {
+            // the node is configured to limit, but currently the feature toggle is unset by the operator
             return true;
         }
         try {
