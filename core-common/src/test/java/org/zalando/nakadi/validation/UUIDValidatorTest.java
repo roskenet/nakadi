@@ -14,39 +14,26 @@ public class UUIDValidatorTest {
 
     @Test
     public void testValidUUID() {
-        Assertions.assertEquals(36, UUID.randomUUID().toString().length());
-        Assertions.assertEquals(
-                Optional.empty(), uuidValidator.validate("123e4567-e89b-12d3-a456-426614174000"));
+        Assertions.assertTrue(
+                uuidValidator.validate("123e4567-e89b-12d3-a456-426614174000").isEmpty());
+        for (int i = 0; i < 10; ++i) {
+            final String uuid = UUID.randomUUID().toString();
+            Assertions.assertTrue(uuidValidator.validate(uuid).isEmpty());
+        }
     }
 
     @ParameterizedTest
     @ValueSource(strings = {
+            "",
+            "123",
             "123e4567-xyz1-klmn-a456-426614174000",
             "123e4567-e89b-12d3-a456--26614174000",
+            "a-b-c-d-e",
+            "a-0b-00c-000d-000000000000000000000e",
     })
     public void testInvalidUUID(final String value) {
         Assertions.assertEquals(
                 Optional.of(String.format("[%s] is not a valid uuid", value)),
                 uuidValidator.validate(value));
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {
-            "a-b-c-d-e",
-            "a-0b-00c-000d-000000000000000000000e",
-    })
-    public void testStrictlyInvalidUUID(final String value) {
-        // Example of values that are not proper UUIDs,
-        // but that pass validation implemented using java.util.UUID.fromString
-        Assertions.assertTrue(uuidValidator.validate(value).isEmpty());
-        Assertions.assertFalse(UUIDValidator.isStrictlyValid(value));
-    }
-
-    @Test
-    public void testValidUUIDisStrictlyValid() {
-        for (int i = 0; i < 1000; ++i) {
-            final String uuid = UUID.randomUUID().toString();
-            Assertions.assertTrue(UUIDValidator.isStrictlyValid(uuid));
-        }
     }
 }

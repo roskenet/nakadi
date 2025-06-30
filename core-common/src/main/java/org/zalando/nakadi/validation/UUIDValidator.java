@@ -3,7 +3,6 @@ package org.zalando.nakadi.validation;
 import org.everit.json.schema.FormatValidator;
 
 import java.util.Optional;
-import java.util.UUID;
 import java.util.regex.Pattern;
 
 public class UUIDValidator implements FormatValidator {
@@ -17,12 +16,10 @@ public class UUIDValidator implements FormatValidator {
 
     @Override
     public Optional<String> validate(final String input) {
-        try {
-            UUID.fromString(input);
+        if (UUID_REGEX.matcher(input).matches()) {
             return Optional.empty();
-        } catch (final IllegalArgumentException e) {
-            return Optional.of(String.format("[%s] is not a valid uuid", input));
         }
+        return Optional.of(String.format("[%s] is not a valid uuid", input));
     }
 
     @Override

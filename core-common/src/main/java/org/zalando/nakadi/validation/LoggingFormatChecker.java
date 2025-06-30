@@ -14,7 +14,6 @@ public class LoggingFormatChecker implements FormatValidator {
     private final String eventTypeName;
     private boolean loggedOnce = false;
     private final Predicate<String> isFormatAsserted;
-    private boolean checkStrictUuidAndLog;
 
     public LoggingFormatChecker(
             final FormatValidator validator,
@@ -23,7 +22,6 @@ public class LoggingFormatChecker implements FormatValidator {
         this.validator = validator;
         this.eventTypeName = eventTypeName;
         this.isFormatAsserted = isFormatAsserted;
-        this.checkStrictUuidAndLog = "uuid".equals(validator.formatName()) || "UUID".equals(validator.formatName());
     }
 
     @Override
@@ -37,13 +35,6 @@ public class LoggingFormatChecker implements FormatValidator {
             if (!loggedOnce) {
                 loggedOnce = true;
                 LOG.warn("[event-type={}][format={}]: {}", eventTypeName, formatName(), result.get());
-            }
-        }
-        if (checkStrictUuidAndLog) {
-            // TODO: make this proper check in UUIDValidator, after confirming there are no such logs.
-            if (!UUIDValidator.isStrictlyValid(input)) {
-                checkStrictUuidAndLog = false;
-                LOG.warn("[event-type={}][format={}]: [{}] is not strict uuid", eventTypeName, formatName(), input);
             }
         }
         return Optional.empty();
