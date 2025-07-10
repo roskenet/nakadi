@@ -85,35 +85,27 @@ public class ServiceFactory {
             merchantRegistry = createMerchantRegistryInternal(
                     getProperty("nakadi.plugins.authz.merchant-profile-uri") + "/merchants",
                     getOrCreateHttpClient(),
-                    getOrCreateTokenProvider()
-            );
+                    getOrCreateTokenProvider());
         }
         return merchantRegistry;
     }
 
-    static ValueRegistry createMerchantRegistryInternal(
-            final String url, final HttpClient httpClient, final TokenProvider tokenProvider) {
-        return new ValueRegistry.HttpValidatedValueRegistry(
-                tokenProvider,
-                httpClient,
-                url,
-                new int[]{HttpStatus.SC_OK},
-                new int[]{HttpStatus.SC_NOT_FOUND, HttpStatus.SC_BAD_REQUEST});
-    }
-
     public ValueRegistry getOrCreateUserRegistry() throws URISyntaxException {
         if (null == userRegistry) {
+            final ValueRegistry baseRegistry;
             final boolean validatePrincipalExists = Boolean.parseBoolean(
                     getProperty("nakadi.plugins.authz.validate-principal-exists"));
             if (!validatePrincipalExists) {
-                userRegistry = value -> true;
+                baseRegistry = value -> true;
             } else {
-                userRegistry = createUserRegistryInternal(
+                baseRegistry = createUserRegistryInternal(
                         getProperty("nakadi.plugins.authz.users-endpoint"),
                         getOrCreateHttpClient(),
-                        getOrCreateTokenProvider()
-                );
+                        getOrCreateTokenProvider());
             }
+            userRegistry = new ValueRegistry.FilteringValueRegistry(
+                    new ValueRegistry.PatternFilter(Pattern.compile("^[a-z][a-z0-9-]*[a-z0-9]$")),
+                    baseRegistry);
         }
         return userRegistry;
     }
@@ -148,16 +140,23 @@ public class ServiceFactory {
         return zalandoTeamService;
     }
 
+    static ValueRegistry createMerchantRegistryInternal(
+            final String url, final HttpClient httpClient, final TokenProvider tokenProvider) {
+        return new ValueRegistry.HttpValidatedValueRegistry(
+                tokenProvider,
+                httpClient,
+                url,
+                new int[]{HttpStatus.SC_OK},
+                new int[]{HttpStatus.SC_NOT_FOUND, HttpStatus.SC_BAD_REQUEST});
+    }
+
     static ValueRegistry createUserRegistryInternal(
             final String usersEndpoint, final HttpClient httpClient, final TokenProvider tokenProvider) {
-        return new ValueRegistry.FilteringValueRegistry(
-                new ValueRegistry.PatternFilter(Pattern.compile("^[a-z][a-z0-9-]*[a-z0-9]$")),
-                new ValueRegistry.HttpValidatedValueRegistry(
-                        tokenProvider,
-                        httpClient,
-                        usersEndpoint,
-                        new int[]{HttpStatus.SC_OK},
-                        new int[]{HttpStatus.SC_NOT_FOUND})
-        );
+        return new ValueRegistry.HttpValidatedValueRegistry(
+                tokenProvider,
+                httpClient,
+                usersEndpoint,
+                new int[]{HttpStatus.SC_OK},
+                new int[]{HttpStatus.SC_NOT_FOUND});
     }
 }
